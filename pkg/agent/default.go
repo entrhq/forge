@@ -43,9 +43,10 @@ type DefaultAgent struct {
 	metadata           map[string]interface{}
 
 	// Agent loop components
-	tools   map[string]tools.Tool
-	toolsMu sync.RWMutex
-	memory  memory.Memory
+	tools         map[string]tools.Tool
+	toolsMu       sync.RWMutex
+	disabledTools map[string]bool // Tools to exclude from registration
+	memory        memory.Memory
 
 	// Approval system
 	approvalManager *approval.Manager
@@ -119,6 +120,19 @@ func WithContextManager(manager *agentcontext.Manager) AgentOption {
 	}
 }
 
+// WithDisabledTools returns an option to disable specific built-in tools
+// This is useful for headless mode where interactive tools should be disabled
+func WithDisabledTools(toolNames ...string) AgentOption {
+	return func(a *DefaultAgent) {
+		if a.disabledTools == nil {
+			a.disabledTools = make(map[string]bool)
+		}
+		for _, name := range toolNames {
+			a.disabledTools[name] = true
+		}
+	}
+}
+
 // NewDefaultAgent creates a new DefaultAgent with the given provider and options.
 func NewDefaultAgent(provider llm.Provider, opts ...AgentOption) *DefaultAgent {
 	// Create tokenizer for client-side token counting
@@ -160,10 +174,16 @@ func NewDefaultAgent(provider llm.Provider, opts ...AgentOption) *DefaultAgent {
 }
 
 func (a *DefaultAgent) RegisterDefaultTools() {
-	// Initialize built-in tools (always available)
-	a.tools["task_completion"] = tools.NewTaskCompletionTool()
-	a.tools["ask_question"] = tools.NewAskQuestionTool()
-	a.tools["converse"] = tools.NewConverseTool()
+	// Initialize built-in tools (respecting disabled tools configuration)
+	if !a.disabledTools["task_completion"] {
+		a.tools["task_completion"] = tools.NewTaskCompletionTool()
+	}
+	if !a.disabledTools["ask_question"] {
+		a.tools["ask_question"] = tools.NewAskQuestionTool()
+	}
+	if !a.disabledTools["converse"] {
+		a.tools["converse"] = tools.NewConverseTool()
+	}
 }
 
 // Start begins the agent's event loop in a goroutine.
