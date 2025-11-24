@@ -1,6 +1,6 @@
 # 27. Safety Constraint System for Headless Mode
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2025-01-21
 **Deciders:** Forge Core Team
 **Technical Story:** Implement comprehensive safety constraints to prevent runaway autonomous execution
@@ -42,7 +42,7 @@ We need a constraint system that:
 - Support both file-based and CLI-based constraint configuration
 - Enable override capabilities for power users
 - Generate detailed violation reports for debugging
-- Ensure rollback of partial changes on constraint violations
+- Preserve partial work for inspection when constraints are violated
 
 ### Non-Goals
 
@@ -79,7 +79,6 @@ We need a constraint system that:
 - Constraint logic scattered across codebase
 - Difficult to enforce global limits (e.g., total token usage)
 - Harder to track cumulative changes (files modified across multiple tool calls)
-- Rollback more complex (each tool must implement rollback)
 - No single source of truth for constraint state
 
 ### Option 2: Executor-Level Constraint Manager
@@ -89,7 +88,7 @@ We need a constraint system that:
 **Pros:**
 - Centralized constraint logic and state
 - Easy to track cumulative metrics (total files, total tokens)
-- Clean rollback on violation (executor controls transaction)
+- Clean abort on violation (executor controls lifecycle)
 - Single source of truth for constraint configuration
 - Tools remain constraint-agnostic (better separation of concerns)
 
@@ -124,7 +123,7 @@ We need a constraint system that:
 
 1. **Centralized State**: Global constraints (token usage, total files modified) require centralized tracking. The executor already coordinates tool execution, making it the natural owner.
 
-2. **Clean Transaction Model**: The executor controls the execution lifecycle—it can cleanly abort and rollback when a constraint is violated.
+2. **Clean Lifecycle Control**: The executor controls the execution lifecycle—it can cleanly abort and preserve partial work when a constraint is violated.
 
 3. **Separation of Concerns**: Tools focus on their core logic. Constraints are a deployment/execution concern, not a tool concern.
 
@@ -132,7 +131,7 @@ We need a constraint system that:
 
 5. **Simplicity**: Avoids introducing a new middleware layer while still achieving clean separation.
 
-The constraint manager is owned by the HeadlessExecutor and consulted before each tool call. On violation, the executor immediately aborts execution and initiates rollback.
+The constraint manager is owned by the HeadlessExecutor and consulted before each tool call. On violation, the executor immediately aborts execution while preserving partial work for inspection.
 
 ---
 
@@ -142,10 +141,11 @@ The constraint manager is owned by the HeadlessExecutor and consulted before eac
 
 - Centralized constraint enforcement prevents violations
 - Clear ownership: executor manages constraints, tools execute logic
-- Rollback is clean and reliable (executor-controlled)
+- Abort behavior is clean and reliable (executor-controlled)
 - Easy to add new constraint types in one place
 - Constraint state visible for debugging and reporting
 - Tools remain simple and reusable across modes
+- Partial work preserved for inspection when violations occur
 
 ### Negative
 
@@ -482,18 +482,12 @@ func (cm *ConstraintManager) CheckTimeout() error {
 }
 ```
 
-### Rollback on Violation
+### Constraint Violation Handling
 
 ```go
 func (e *HeadlessExecutor) Run(ctx context.Context) error {
-    // Create git snapshot before execution
-    snapshot, err := e.gitManager.CreateSnapshot()
-    if err != nil {
-        return fmt.Errorf("failed to create git snapshot: %w", err)
-    }
-    
     // Execute task with constraint monitoring
-    err = e.executeTask(ctx)
+    err := e.executeTask(ctx)
     
     // Handle constraint violations
     if violation, ok := err.(*ConstraintViolation); ok {
@@ -502,11 +496,14 @@ func (e *HeadlessExecutor) Run(ctx context.Context) error {
             "type", violation.Type,
             "details", violation.Details)
         
-        // Rollback changes
-        if rollbackErr := e.gitManager.RestoreSnapshot(snapshot); rollbackErr != nil {
-            e.logger.Error("Failed to rollback changes", "error", rollbackErr)
-            return fmt.Errorf("constraint violated and rollback failed: %w", rollbackErr)
-        }
+        // Mark execution as failed
+        e.summary.Status = "failed"
+        e.summary.Error = violation.Error()
+        
+        // Note: Partial work is preserved for inspection
+        // This allows developers to review what the agent accomplished
+        // before hitting the constraint limit
+        e.logger.Info("Partial work preserved for inspection")
         
         // Generate violation report
         e.artifactWriter.WriteViolationReport(violation)
@@ -594,7 +591,7 @@ func (cm *ConstraintManager) GetCurrentState() *ConstraintState {
 
 ### Success Metrics
 
-- Zero constraint violations result in incomplete state (rollback 100% successful)
+- Constraint violations abort execution cleanly with preserved partial work
 - Constraint checking overhead < 5ms per tool call
 - Configuration validation catches invalid patterns before execution
 - Clear violation messages enable users to adjust config correctly
@@ -612,7 +609,7 @@ func (cm *ConstraintManager) GetCurrentState() *ConstraintState {
 Each test verifies:
 - Violation detected immediately
 - Execution aborted cleanly
-- Rollback successful
+- Partial work preserved
 - Clear error message
 - Exit code 2 returned
 
@@ -643,3 +640,15 @@ The constraint system is designed to be strict by default but configurable for a
 - Per-tool custom constraints
 
 **Last Updated:** 2025-01-21
+
+## Implementation Notes
+
+**Rollback Decision (2025-01-21):** After implementation, we decided NOT to implement automatic rollback of changes on constraint violations. Instead, partial work is preserved for inspection. This decision was made because:
+
+1. **Debugging Value**: Developers need to see what the agent accomplished before hitting limits
+2. **Iterative Improvement**: Preserved work helps adjust constraints for future runs
+3. **Transparency**: Easier to understand agent behavior when work is visible
+4. **Git Safety**: Users can manually revert if needed using standard git tools
+5. **Simplicity**: Avoids complex snapshot/restore logic
+
+This aligns with the quality gate behavior, which also preserves changes on failure (see `quality_gate.go` line 299).
