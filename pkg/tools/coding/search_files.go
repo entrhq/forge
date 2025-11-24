@@ -62,7 +62,7 @@ func (t *SearchFilesTool) Schema() map[string]interface{} {
 }
 
 // Execute searches for the pattern in files.
-func (t *SearchFilesTool) Execute(ctx context.Context, argsXML []byte) (string, error) {
+func (t *SearchFilesTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
 	// Parse arguments
 	var input struct {
 		XMLName      xml.Name `xml:"arguments"`
@@ -73,11 +73,11 @@ func (t *SearchFilesTool) Execute(ctx context.Context, argsXML []byte) (string, 
 	}
 
 	if err := tools.UnmarshalXMLWithFallback(argsXML, &input); err != nil {
-		return "", fmt.Errorf("invalid arguments: %w", err)
+		return "", nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 
 	if input.Pattern == "" {
-		return "", fmt.Errorf("missing required parameter: pattern")
+		return "", nil, fmt.Errorf("missing required parameter: pattern")
 	}
 
 	// Default to workspace root if no path provided
@@ -92,29 +92,49 @@ func (t *SearchFilesTool) Execute(ctx context.Context, argsXML []byte) (string, 
 
 	// Validate path with workspace guard
 	if err := t.guard.ValidatePath(input.Path); err != nil {
-		return "", fmt.Errorf("invalid path: %w", err)
+		return "", nil, fmt.Errorf("invalid path: %w", err)
 	}
 
 	// Resolve to absolute path
 	absPath, err := t.guard.ResolvePath(input.Path)
 	if err != nil {
-		return "", fmt.Errorf("failed to resolve path: %w", err)
+		return "", nil, fmt.Errorf("failed to resolve path: %w", err)
 	}
 
 	// Compile regex pattern
 	regex, err := regexp.Compile(input.Pattern)
 	if err != nil {
-		return "", fmt.Errorf("invalid regex pattern: %w", err)
+		return "", nil, fmt.Errorf("invalid regex pattern: %w", err)
 	}
 
 	// Search files
 	matches, err := t.searchDirectory(absPath, regex, input.FilePattern, input.ContextLines)
 	if err != nil {
-		return "", fmt.Errorf("search failed: %w", err)
+		return "", nil, fmt.Errorf("search failed: %w", err)
 	}
 
 	// Format output
-	return t.formatMatches(matches)
+	result := t.formatMatches(matches)
+
+	// Build metadata
+	metadata := map[string]interface{}{
+		"path":          input.Path,
+		"pattern":       input.Pattern,
+		"match_count":   len(matches),
+		"context_lines": input.ContextLines,
+	}
+	if input.FilePattern != "" {
+		metadata["file_pattern"] = input.FilePattern
+	}
+
+	// Count unique files
+	fileSet := make(map[string]bool)
+	for _, match := range matches {
+		fileSet[match.FilePath] = true
+	}
+	metadata["files_with_matches"] = len(fileSet)
+
+	return result, metadata, nil
 }
 
 // IsLoopBreaking returns false as this tool doesn't break the agent loop.
@@ -259,9 +279,9 @@ func (t *SearchFilesTool) searchFile(filePath string, regex *regexp.Regexp, cont
 }
 
 // formatMatches formats search matches into a readable string.
-func (t *SearchFilesTool) formatMatches(matches []searchMatch) (string, error) {
+func (t *SearchFilesTool) formatMatches(matches []searchMatch) string {
 	if len(matches) == 0 {
-		return "No matches found", nil
+		return "No matches found"
 	}
 
 	var builder strings.Builder
@@ -311,7 +331,7 @@ func (t *SearchFilesTool) formatMatches(matches []searchMatch) (string, error) {
 	// Add summary
 	builder.WriteString(fmt.Sprintf("Found %d matches", len(matches)))
 
-	return builder.String(), nil
+	return builder.String()
 }
 
 // isBinaryFile performs a simple check to determine if a file is binary.

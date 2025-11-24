@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/entrhq/forge/pkg/agent/tools"
 	"github.com/entrhq/forge/pkg/security/workspace"
@@ -56,7 +57,7 @@ func (t *ReadFileTool) Schema() map[string]interface{} {
 }
 
 // Execute reads the file and returns its contents.
-func (t *ReadFileTool) Execute(ctx context.Context, argsXML []byte) (string, error) {
+func (t *ReadFileTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
 	var input struct {
 		XMLName   xml.Name `xml:"arguments"`
 		Path      string   `xml:"path"`
@@ -65,36 +66,54 @@ func (t *ReadFileTool) Execute(ctx context.Context, argsXML []byte) (string, err
 	}
 
 	if err := tools.UnmarshalXMLWithFallback(argsXML, &input); err != nil {
-		return "", fmt.Errorf("invalid arguments: %w", err)
+		return "", nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 
 	if input.Path == "" {
-		return "", fmt.Errorf("missing required parameter: path")
+		return "", nil, fmt.Errorf("missing required parameter: path")
 	}
 
 	// Validate path with workspace guard
 	if err := t.guard.ValidatePath(input.Path); err != nil {
-		return "", fmt.Errorf("invalid path: %w", err)
+		return "", nil, fmt.Errorf("invalid path: %w", err)
 	}
 
 	// Resolve to absolute path
 	absPath, err := t.guard.ResolvePath(input.Path)
 	if err != nil {
-		return "", fmt.Errorf("failed to resolve path: %w", err)
+		return "", nil, fmt.Errorf("failed to resolve path: %w", err)
 	}
 
 	// Check if file is ignored
 	if t.guard.ShouldIgnore(absPath) {
-		return "", fmt.Errorf("file '%s' is ignored by .gitignore, .forgeignore, or default patterns", input.Path)
+		return "", nil, fmt.Errorf("file '%s' is ignored by .gitignore, .forgeignore, or default patterns", input.Path)
 	}
 
 	// Read file
 	content, err := t.readFileWithLineNumbers(absPath, input.StartLine, input.EndLine)
 	if err != nil {
-		return "", fmt.Errorf("failed to read file: %w", err)
+		return "", nil, fmt.Errorf("failed to read file: %w", err)
 	}
 
-	return content, nil
+	// Build metadata
+	metadata := map[string]interface{}{
+		"path": input.Path,
+	}
+	if input.StartLine > 0 {
+		metadata["start_line"] = input.StartLine
+	}
+	if input.EndLine > 0 {
+		metadata["end_line"] = input.EndLine
+	}
+
+	// Get file info for additional metadata
+	info, err := os.Stat(absPath)
+	if err == nil {
+		metadata["size_bytes"] = info.Size()
+		metadata["modified"] = info.ModTime().Format(time.RFC3339)
+	}
+
+	return content, metadata, nil
 }
 
 // IsLoopBreaking returns false as this tool doesn't break the agent loop.

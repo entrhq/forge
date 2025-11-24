@@ -1,0 +1,42 @@
+# Test configuration for execute_command auto-approval
+# This config will make the agent run a simple shell command
+
+task: "Run the 'echo' command to print 'Hello from Forge headless mode' and save the output to a file called output.txt"
+
+mode: write
+
+# Safety constraints
+constraints:
+  max_files: 5
+  max_lines_changed: 100
+  
+  allowed_patterns:
+    - "**/*.txt"
+  
+  # Include execute_command in allowed tools
+  allowed_tools:
+    - task_completion
+    - read_file
+    - write_file
+    - execute_command
+  
+  max_tokens: 10000
+  timeout: 2m
+
+# No quality gates for this simple test
+quality_gates: []
+
+# No git operations
+git:
+  auto_commit: false
+
+# Artifacts
+artifacts:
+  enabled: true
+  output_dir: ".forge/artifacts"
+  formats:
+    - "execution.json"
+    - "summary.md"
+    - "metrics.json"
+
+workspace_dir: "test-workspace"

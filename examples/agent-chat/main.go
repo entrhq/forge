@@ -46,7 +46,7 @@ func (t *CalculatorTool) Schema() map[string]interface{} {
 	}
 }
 
-func (t *CalculatorTool) Execute(ctx context.Context, argsXML []byte) (string, error) {
+func (t *CalculatorTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
 	var args struct {
 		XMLName   xml.Name `xml:"arguments"`
 		Operation string   `xml:"operation"`
@@ -55,7 +55,7 @@ func (t *CalculatorTool) Execute(ctx context.Context, argsXML []byte) (string, e
 	}
 
 	if err := tools.UnmarshalXMLWithFallback(argsXML, &args); err != nil {
-		return "", fmt.Errorf("invalid arguments: %w", err)
+		return "", nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 
 	var result float64
@@ -68,14 +68,14 @@ func (t *CalculatorTool) Execute(ctx context.Context, argsXML []byte) (string, e
 		result = args.A * args.B
 	case "divide":
 		if args.B == 0 {
-			return "", fmt.Errorf("division by zero")
+			return "", nil, fmt.Errorf("division by zero")
 		}
 		result = args.A / args.B
 	default:
-		return "", fmt.Errorf("unknown operation: %s", args.Operation)
+		return "", nil, fmt.Errorf("unknown operation: %s", args.Operation)
 	}
 
-	return fmt.Sprintf("%.2f", result), nil
+	return fmt.Sprintf("%.2f", result), nil, nil
 }
 
 func (t *CalculatorTool) IsLoopBreaking() bool {

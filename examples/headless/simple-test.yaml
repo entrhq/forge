@@ -1,0 +1,37 @@
+# Simple headless test configuration
+# Tests basic file operations without requiring command approval
+
+task: "Create a simple test file with some content"
+
+mode: write
+
+constraints:
+  max_files: 5
+  max_lines_changed: 100
+  allowed_patterns:
+    - "**/*.txt"
+    - "**/*.md"
+  allowed_tools:
+    - task_completion
+    - read_file
+    - write_file
+    - list_files
+    - search_files
+  max_tokens: 10000
+  timeout: 1m
+
+# No quality gates for this simple test
+quality_gates: []
+
+git:
+  auto_commit: false
+
+artifacts:
+  enabled: true
+  output_dir: ".forge/artifacts"
+  formats:
+    - "execution.json"
+    - "summary.md"
+
+workspace_dir: "test-workspace"
+

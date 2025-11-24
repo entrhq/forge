@@ -22,7 +22,7 @@ func TestTaskCompletionTool(t *testing.T) {
 
 	t.Run("Execute_Success", func(t *testing.T) {
 		args := []byte(`<arguments><result>Task completed successfully!</result></arguments>`)
-		result, err := tool.Execute(context.Background(), args)
+		result, _, err := tool.Execute(context.Background(), args)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -33,7 +33,7 @@ func TestTaskCompletionTool(t *testing.T) {
 
 	t.Run("Execute_EmptyResult", func(t *testing.T) {
 		args := []byte(`<arguments><result></result></arguments>`)
-		_, err := tool.Execute(context.Background(), args)
+		_, _, err := tool.Execute(context.Background(), args)
 		if err == nil {
 			t.Error("expected error for empty result")
 		}
@@ -41,7 +41,7 @@ func TestTaskCompletionTool(t *testing.T) {
 
 	t.Run("Execute_InvalidXML", func(t *testing.T) {
 		args := []byte(`invalid xml`)
-		_, err := tool.Execute(context.Background(), args)
+		_, _, err := tool.Execute(context.Background(), args)
 		if err == nil {
 			t.Error("expected error for invalid XML")
 		}
@@ -65,7 +65,7 @@ func TestAskQuestionTool(t *testing.T) {
 
 	t.Run("Execute_WithoutSuggestions", func(t *testing.T) {
 		args := []byte(`<arguments><question>What is your preferred color?</question></arguments>`)
-		result, err := tool.Execute(context.Background(), args)
+		result, _, err := tool.Execute(context.Background(), args)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -83,7 +83,7 @@ func TestAskQuestionTool(t *testing.T) {
 				<suggestion>Green</suggestion>
 			</suggestions>
 		</arguments>`)
-		result, err := tool.Execute(context.Background(), args)
+		result, _, err := tool.Execute(context.Background(), args)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -95,7 +95,7 @@ func TestAskQuestionTool(t *testing.T) {
 
 	t.Run("Execute_EmptyQuestion", func(t *testing.T) {
 		args := []byte(`<arguments><question></question></arguments>`)
-		_, err := tool.Execute(context.Background(), args)
+		_, _, err := tool.Execute(context.Background(), args)
 		if err == nil {
 			t.Error("expected error for empty question")
 		}
@@ -119,7 +119,7 @@ func TestConverseTool(t *testing.T) {
 
 	t.Run("Execute_Success", func(t *testing.T) {
 		args := []byte(`<arguments><message>Hello! How can I help you today?</message></arguments>`)
-		result, err := tool.Execute(context.Background(), args)
+		result, _, err := tool.Execute(context.Background(), args)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -130,7 +130,7 @@ func TestConverseTool(t *testing.T) {
 
 	t.Run("Execute_EmptyMessage", func(t *testing.T) {
 		args := []byte(`<arguments><message></message></arguments>`)
-		_, err := tool.Execute(context.Background(), args)
+		_, _, err := tool.Execute(context.Background(), args)
 		if err == nil {
 			t.Error("expected error for empty message")
 		}

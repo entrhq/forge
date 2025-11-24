@@ -43,21 +43,21 @@ func (t *ConverseTool) Schema() map[string]interface{} {
 }
 
 // Execute runs the tool and returns the conversational message
-func (t *ConverseTool) Execute(ctx context.Context, argsXML []byte) (string, error) {
+func (t *ConverseTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
 	var args struct {
 		XMLName xml.Name `xml:"arguments"`
 		Message string   `xml:"message"`
 	}
 
 	if err := UnmarshalXMLWithFallback(argsXML, &args); err != nil {
-		return "", fmt.Errorf("invalid arguments for converse: %w", err)
+		return "", nil, fmt.Errorf("invalid arguments for converse: %w", err)
 	}
 
 	if args.Message == "" {
-		return "", fmt.Errorf("message cannot be empty")
+		return "", nil, fmt.Errorf("message cannot be empty")
 	}
 
-	return args.Message, nil
+	return args.Message, nil, nil
 }
 
 // IsLoopBreaking returns true because this tool terminates the agent loop

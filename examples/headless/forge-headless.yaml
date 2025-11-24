@@ -1,0 +1,91 @@
+# Forge Headless Configuration Example
+# This configuration file demonstrates how to configure the headless executor
+# for autonomous CI/CD execution with safety constraints and quality gates.
+
+# Task description - what the agent should accomplish
+task: "Fix all linting errors and format code according to project standards"
+
+# Execution mode: "read-only" or "write"
+mode: write
+
+# Safety constraints to prevent runaway execution
+constraints:
+  # Maximum number of files that can be modified
+  max_files: 10
+  
+  # Maximum total lines changed across all files
+  max_lines_changed: 500
+  
+  # File patterns - restrict which files can be modified
+  allowed_patterns:
+    - "**/*.go"
+    - "**/*.md"
+    - "**/*.yaml"
+  
+  denied_patterns:
+    - "**/vendor/**"
+    - "**/.git/**"
+    - "**/node_modules/**"
+  
+  # Tools that are allowed to be used
+  allowed_tools:
+    - task_completion
+    - read_file
+    - write_file
+    - apply_diff
+    - search_files
+    - list_files
+    - execute_command
+  
+  # Resource limits
+  max_tokens: 50000
+  timeout: 5m
+
+# Quality gates - validation steps before committing
+quality_gates:
+  # Linting check (required)
+  - name: "Go Lint"
+    command: "golangci-lint run ./..."
+    required: true
+  
+  # Tests (required)
+  - name: "Go Test"
+    command: "go test -v ./..."
+    required: true
+  
+  # Build check (required)
+  - name: "Go Build"
+    command: "go build ./..."
+    required: true
+  
+  # Format check (optional - informational)
+  - name: "Go Format"
+    command: "gofmt -l ."
+    required: false
+
+# Git configuration
+git:
+  # Whether to automatically commit changes
+  auto_commit: true
+  
+  # Commit message template
+  commit_message: "chore: automated linting fixes via Forge"
+  
+  # Branch to use (leave empty to use current branch)
+  branch: ""
+  
+  # Git author information
+  author_name: "Forge AI"
+  author_email: "forge@example.com"
+
+# Artifact generation
+artifacts:
+  enabled: true
+  output_dir: ".forge/artifacts"
+  formats:
+    - "execution.json"
+    - "summary.md"
+    - "metrics.json"
+
+# Workspace directory (can be overridden by CLI flag)
+workspace_dir: "."

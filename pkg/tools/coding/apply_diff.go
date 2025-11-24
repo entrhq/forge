@@ -64,8 +64,10 @@ func (t *ApplyDiffTool) Schema() map[string]interface{} {
 	)
 }
 
-// Execute performs the search/replace operations on the file.
-func (t *ApplyDiffTool) Execute(ctx context.Context, argsXML []byte) (string, error) {
+// Execute performs the search/replace operations and returns metadata about the changes.
+//
+//nolint:gocyclo // TODO: refactor to reduce complexity
+func (t *ApplyDiffTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
 	var input struct {
 		XMLName xml.Name `xml:"arguments"`
 		Path    string   `xml:"path"`
@@ -76,32 +78,32 @@ func (t *ApplyDiffTool) Execute(ctx context.Context, argsXML []byte) (string, er
 	}
 
 	if err := tools.UnmarshalXMLWithFallback(argsXML, &input); err != nil {
-		return "", fmt.Errorf("invalid arguments: %w", err)
+		return "", nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 
 	if input.Path == "" {
-		return "", fmt.Errorf("path is required")
+		return "", nil, fmt.Errorf("path is required")
 	}
 
 	if len(input.Edits) == 0 {
-		return "", fmt.Errorf("at least one edit is required")
+		return "", nil, fmt.Errorf("at least one edit is required")
 	}
 
 	// Resolve path to absolute path
 	absPath, err := t.guard.ResolvePath(input.Path)
 	if err != nil {
-		return "", fmt.Errorf("failed to resolve path: %w", err)
+		return "", nil, fmt.Errorf("failed to resolve path: %w", err)
 	}
 
 	// Validate path is within workspace
 	if validateErr := t.guard.ValidatePath(input.Path); validateErr != nil {
-		return "", fmt.Errorf("invalid path: %w", validateErr)
+		return "", nil, fmt.Errorf("invalid path: %w", validateErr)
 	}
 
 	// Read current file content
 	content, err := os.ReadFile(absPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to read file: %w", err)
+		return "", nil, fmt.Errorf("failed to read file: %w", err)
 	}
 
 	fileContent := string(content)
@@ -109,20 +111,33 @@ func (t *ApplyDiffTool) Execute(ctx context.Context, argsXML []byte) (string, er
 
 	// Apply each edit in sequence
 	appliedEdits := 0
+	totalLinesAdded := 0
+	totalLinesRemoved := 0
+
 	for i, edit := range input.Edits {
 		if edit.Search == "" {
-			return "", fmt.Errorf("edit %d: search text cannot be empty", i+1)
+			return "", nil, fmt.Errorf("edit %d: search text cannot be empty", i+1)
 		}
 
 		// Check if search text exists
 		if !strings.Contains(fileContent, edit.Search) {
-			return "", fmt.Errorf("edit %d: search text not found in file:\n%s", i+1, edit.Search)
+			return "", nil, fmt.Errorf("edit %d: search text not found in file:\n%s", i+1, edit.Search)
 		}
 
 		// Count occurrences to warn about multiple matches
 		count := strings.Count(fileContent, edit.Search)
 		if count > 1 {
-			return "", fmt.Errorf("edit %d: search text appears %d times in file, must be unique", i+1, count)
+			return "", nil, fmt.Errorf("edit %d: search text appears %d times in file, must be unique", i+1, count)
+		}
+
+		// Track line changes for this edit
+		searchLines := strings.Count(edit.Search, "\n") + 1
+		replaceLines := strings.Count(edit.Replace, "\n") + 1
+
+		if replaceLines > searchLines {
+			totalLinesAdded += replaceLines - searchLines
+		} else if searchLines > replaceLines {
+			totalLinesRemoved += searchLines - replaceLines
 		}
 
 		// Apply the replacement
@@ -132,18 +147,18 @@ func (t *ApplyDiffTool) Execute(ctx context.Context, argsXML []byte) (string, er
 
 	// Only write if changes were made
 	if fileContent == originalContent {
-		return "No changes made to file", nil
+		return "No changes made to file", nil, nil
 	}
 
 	// Write the modified content atomically
 	tmpPath := absPath + ".tmp"
 	if writeErr := os.WriteFile(tmpPath, []byte(fileContent), 0600); writeErr != nil {
-		return "", fmt.Errorf("failed to write temporary file: %w", writeErr)
+		return "", nil, fmt.Errorf("failed to write temporary file: %w", writeErr)
 	}
 
 	if renameErr := os.Rename(tmpPath, absPath); renameErr != nil {
 		os.Remove(tmpPath)
-		return "", fmt.Errorf("failed to rename temporary file: %w", renameErr)
+		return "", nil, fmt.Errorf("failed to rename temporary file: %w", renameErr)
 	}
 
 	// Get relative path for response
@@ -152,7 +167,15 @@ func (t *ApplyDiffTool) Execute(ctx context.Context, argsXML []byte) (string, er
 		relPath = input.Path
 	}
 
-	return fmt.Sprintf("Successfully applied %d edit(s) to %s", appliedEdits, relPath), nil
+	// Build metadata about the changes
+	metadata := map[string]interface{}{
+		"edits_applied": appliedEdits,
+		"lines_added":   totalLinesAdded,
+		"lines_removed": totalLinesRemoved,
+		"file_path":     relPath,
+	}
+
+	return fmt.Sprintf("Successfully applied %d edit(s) to %s", appliedEdits, relPath), metadata, nil
 }
 
 // IsLoopBreaking returns whether this tool should break the agent loop.

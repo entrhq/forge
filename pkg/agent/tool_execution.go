@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"maps"
 
 	"github.com/entrhq/forge/pkg/agent/prompts"
 	"github.com/entrhq/forge/pkg/agent/tools"
@@ -11,11 +12,12 @@ import (
 )
 
 // executeToolCall emits events, executes the tool, and handles execution errors
-// Returns (result, shouldContinue, errorContext)
-func (a *DefaultAgent) executeToolCall(ctx context.Context, tool tools.Tool, toolCall tools.ToolCall) (string, bool, string) {
-	// Emit tool call event
-	var argsMap map[string]interface{}
-	if err := tools.UnmarshalXMLWithFallback(toolCall.GetArgumentsXML(), &argsMap); err != nil {
+// Returns (result, metadata, shouldContinue, errorContext)
+func (a *DefaultAgent) executeToolCall(ctx context.Context, tool tools.Tool, toolCall tools.ToolCall) (string, map[string]interface{}, bool, string) {
+	// Emit tool call event - parse arguments to map for event emission
+	argsMap, err := tools.XMLToMap(toolCall.GetArgumentsXML())
+	if err != nil {
+		// If parsing fails, emit empty map - the actual tool execution will handle the raw XML
 		argsMap = make(map[string]interface{})
 	}
 	a.emitEvent(types.NewToolCallEvent(toolCall.ToolName, argsMap))
@@ -25,7 +27,8 @@ func (a *DefaultAgent) executeToolCall(ctx context.Context, tool tools.Tool, too
 	ctxWithRegistry := context.WithValue(ctxWithEmitter, coding.CommandRegistryKey, &a.activeCommands)
 
 	// Execute the tool
-	result, toolErr := tool.Execute(ctxWithRegistry, toolCall.GetArgumentsXML())
+	result, metadata, toolErr := tool.Execute(ctxWithRegistry, toolCall.GetArgumentsXML())
+
 	if toolErr != nil {
 		a.emitEvent(types.NewToolResultErrorEvent(toolCall.ToolName, toolErr))
 		errMsg := prompts.BuildErrorRecoveryMessage(prompts.ErrorRecoveryContext{
@@ -37,20 +40,25 @@ func (a *DefaultAgent) executeToolCall(ctx context.Context, tool tools.Tool, too
 		// Track error and check circuit breaker
 		if a.trackError(errMsg) {
 			a.emitEvent(types.NewErrorEvent(fmt.Errorf("circuit breaker triggered: 5 consecutive tool execution errors")))
-			return "", false, ""
+			return "", nil, false, ""
 		}
 
 		a.emitEvent(types.NewErrorEvent(fmt.Errorf("tool execution failed: %w", toolErr)))
-		return "", true, errMsg
+		return "", nil, true, errMsg
 	}
 
-	return result, true, ""
+	return result, metadata, true, ""
 }
 
 // processToolResult handles successful tool execution results
 // Returns (shouldContinue, errorContext)
-func (a *DefaultAgent) processToolResult(tool tools.Tool, toolCall tools.ToolCall, result string) (bool, string) {
-	a.emitEvent(types.NewToolResultEvent(toolCall.ToolName, result))
+func (a *DefaultAgent) processToolResult(tool tools.Tool, toolCall tools.ToolCall, result string, metadata map[string]interface{}) (bool, string) {
+	event := types.NewToolResultEvent(toolCall.ToolName, result)
+	// Add metadata to the event if present
+	if len(metadata) > 0 {
+		maps.Copy(event.Metadata, metadata)
+	}
+	a.emitEvent(event)
 
 	// Success! Reset error tracking
 	a.resetErrorTracking()
@@ -145,11 +153,11 @@ func (a *DefaultAgent) executeTool(ctx context.Context, toolCall tools.ToolCall)
 	}
 
 	// Execute the tool call
-	result, shouldContinue, errCtx := a.executeToolCall(ctx, tool, toolCall)
+	result, metadata, shouldContinue, errCtx := a.executeToolCall(ctx, tool, toolCall)
 	if !shouldContinue || errCtx != "" {
 		return shouldContinue, errCtx
 	}
 
 	// Process the successful result
-	return a.processToolResult(tool, toolCall, result)
+	return a.processToolResult(tool, toolCall, result, metadata)
 }
