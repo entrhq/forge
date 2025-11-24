@@ -1,6 +1,10 @@
 package main
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/entrhq/forge/pkg/executor/headless"
+)
 
 // HeadlessIdentity defines the core identity and purpose of the headless agent.
 const HeadlessIdentity = `
@@ -58,12 +62,46 @@ const HeadlessCodeStandards = `
 -   **Automated Verification**: Changes should be verifiable through automated checks (tests, linting, builds).
 `
 
+// ReadOnlyModeGuidance provides specific instructions for read-only mode execution.
+const ReadOnlyModeGuidance = `
+# Read-Only Mode
+
+⚠️ **CRITICAL: You are operating in READ-ONLY mode.**
+
+**Restrictions:**
+-   **NO file modifications**: You CANNOT create, modify, or delete any files
+-   **NO code changes**: You CANNOT use write_file, apply_diff, or any file-modifying tools
+-   **NO command execution**: You CANNOT run commands that modify the workspace
+
+**Your Role:**
+-   **Analysis and Observation**: Read files, search code, list directories to understand the codebase
+-   **Information Gathering**: Examine code structure, dependencies, configuration, and documentation
+-   **Reporting**: Provide detailed analysis, findings, recommendations, and observations
+-   **Read-Only Tools**: Use read_file, list_files, search_files to gather information
+
+**What You Can Do:**
+-   Analyze code quality, architecture, and patterns
+-   Identify issues, bugs, or improvement opportunities
+-   Generate reports, documentation suggestions, or refactoring recommendations
+-   Answer questions about the codebase structure and content
+-   Provide code review feedback and best practice suggestions
+
+**Remember:** Any attempt to modify files will be automatically rejected. Focus on thorough analysis and insightful reporting.
+`
+
 // composeHeadlessSystemPrompt combines the modular prompt sections for headless mode.
-func composeHeadlessSystemPrompt() string {
+// The mode parameter allows customization of the prompt based on execution mode.
+func composeHeadlessSystemPrompt(mode headless.ExecutionMode) string {
 	var builder strings.Builder
 	builder.WriteString(HeadlessIdentity)
 	builder.WriteString(HeadlessPrinciples)
 	builder.WriteString(HeadlessConstraints)
+	
+	// Add mode-specific guidance
+	if mode == headless.ModeReadOnly {
+		builder.WriteString(ReadOnlyModeGuidance)
+	}
+	
 	builder.WriteString(HeadlessWorkflow)
 	builder.WriteString(HeadlessCodeStandards)
 	return builder.String()

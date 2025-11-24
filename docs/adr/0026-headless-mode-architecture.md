@@ -478,10 +478,9 @@ git:
 artifacts:
   enabled: true
   output_dir: ".forge/artifacts"
-  formats:
-    - execution.json
-    - summary.md
-    - metrics.json
+  json: true      # execution.json with full details
+  markdown: true  # summary.md for human reading
+  metrics: true   # metrics.json for analytics
 ```
 
 ### CLI Interface

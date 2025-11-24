@@ -76,9 +76,13 @@ type GitConfig struct {
 
 // ArtifactConfig defines artifact generation configuration
 type ArtifactConfig struct {
-	Enabled   bool     `yaml:"enabled" json:"enabled"`
-	OutputDir string   `yaml:"output_dir" json:"output_dir"`
-	Formats   []string `yaml:"formats" json:"formats"`
+	Enabled   bool   `yaml:"enabled" json:"enabled"`
+	OutputDir string `yaml:"output_dir" json:"output_dir"`
+	
+	// Individual format flags
+	JSON     bool `yaml:"json" json:"json"`
+	Markdown bool `yaml:"markdown" json:"markdown"`
+	Metrics  bool `yaml:"metrics" json:"metrics"`
 }
 
 // Validate validates the configuration
@@ -143,7 +147,9 @@ func DefaultConfig() *Config {
 		Artifacts: ArtifactConfig{
 			Enabled:   true,
 			OutputDir: ".forge/artifacts",
-			Formats:   []string{"execution.json", "summary.md"},
+			JSON:      true,
+			Markdown:  true,
+			Metrics:   true,
 		},
 	}
 }

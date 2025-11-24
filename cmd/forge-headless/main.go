@@ -175,8 +175,8 @@ func run(ctx context.Context, cliConfig *CLIConfig) error {
 		return fmt.Errorf("failed to create workspace guard: %w", err)
 	}
 
-	// Compose the headless system prompt
-	systemPrompt := composeHeadlessSystemPrompt()
+	// Compose the headless system prompt with mode-specific guidance
+	systemPrompt := composeHeadlessSystemPrompt(execConfig.Mode)
 
 	// Create agent with headless system prompt, disabled interactive tools, and context management
 	ag := agent.NewDefaultAgent(

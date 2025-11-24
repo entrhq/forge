@@ -36,8 +36,8 @@ func NewExecutor(ag agent.Agent, config *Config) (*Executor, error) {
 		return nil, fmt.Errorf("invalid configuration: %w", err)
 	}
 
-	// Create constraint manager
-	constraintMgr, err := NewConstraintManager(config.Constraints)
+	// Create constraint manager with execution mode
+	constraintMgr, err := NewConstraintManager(config.Constraints, config.Mode)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create constraint manager: %w", err)
 	}
@@ -48,7 +48,7 @@ func NewExecutor(ag agent.Agent, config *Config) (*Executor, error) {
 
 	// Create artifact writer with workspace-relative path
 	artifactOutputDir := filepath.Join(config.WorkspaceDir, config.Artifacts.OutputDir)
-	artifactWriter := NewArtifactWriter(artifactOutputDir)
+	artifactWriter := NewArtifactWriter(artifactOutputDir, config.Artifacts)
 
 	// Create git manager
 	gitManager := NewGitManager(config.WorkspaceDir, config.Git)

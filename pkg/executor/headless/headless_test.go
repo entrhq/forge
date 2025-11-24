@@ -100,7 +100,7 @@ func TestConstraintManager_ValidateToolCall(t *testing.T) {
 		AllowedTools: []string{"read_file", "write_file"},
 	}
 
-	cm, err := NewConstraintManager(config)
+	cm, err := NewConstraintManager(config, "write")
 	if err != nil {
 		t.Fatalf("NewConstraintManager() error = %v", err)
 	}
@@ -138,7 +138,7 @@ func TestConstraintManager_RecordFileModification(t *testing.T) {
 		MaxLinesChanged: 50,
 	}
 
-	cm, err := NewConstraintManager(config)
+	cm, err := NewConstraintManager(config, "write")
 	if err != nil {
 		t.Fatalf("NewConstraintManager() error = %v", err)
 	}
@@ -178,7 +178,7 @@ func TestConstraintManager_TokenUsage(t *testing.T) {
 		MaxTokens: 100,
 	}
 
-	cm, err := NewConstraintManager(config)
+	cm, err := NewConstraintManager(config, "write")
 	if err != nil {
 		t.Fatalf("NewConstraintManager() error = %v", err)
 	}
@@ -207,7 +207,7 @@ func TestConstraintManager_Timeout(t *testing.T) {
 		Timeout: 100 * time.Millisecond,
 	}
 
-	cm, err := NewConstraintManager(config)
+	cm, err := NewConstraintManager(config, "write")
 	if err != nil {
 		t.Fatalf("NewConstraintManager() error = %v", err)
 	}

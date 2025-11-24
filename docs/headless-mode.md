@@ -161,9 +161,9 @@ git:
 artifacts:
   enabled: true                   # Generate execution artifacts
   output_dir: ".forge/artifacts"  # Where to write artifacts
-  formats:                        # Artifact formats to generate
-    - "execution.json"            # Detailed execution log
-    - "summary.md"                # Human-readable summary
+  json: true                      # execution.json - Detailed execution log
+  markdown: true                  # summary.md - Human-readable summary
+  metrics: true                   # metrics.json - Execution metrics
 ```
 
 ### Default Values
@@ -201,9 +201,9 @@ git:
 artifacts:
   enabled: true
   output_dir: ".forge/artifacts"
-  formats:
-    - "execution.json"
-    - "summary.md"
+  json: true      # execution.json with full details
+  markdown: true  # summary.md for human reading
+  metrics: true   # metrics.json for analytics
 ```
 
 ### Minimal Configuration

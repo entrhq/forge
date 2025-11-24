@@ -12,35 +12,47 @@ import (
 // ArtifactWriter handles writing execution artifacts
 type ArtifactWriter struct {
 	outputDir string
+	config    ArtifactConfig
 }
 
 // NewArtifactWriter creates a new artifact writer
-func NewArtifactWriter(outputDir string) *ArtifactWriter {
+func NewArtifactWriter(outputDir string, config ArtifactConfig) *ArtifactWriter {
 	return &ArtifactWriter{
 		outputDir: outputDir,
+		config:    config,
 	}
 }
 
 // WriteAll writes all configured artifact formats
 func (w *ArtifactWriter) WriteAll(summary *ExecutionSummary) error {
+	if !w.config.Enabled {
+		return nil
+	}
+
 	// Ensure output directory exists
 	if err := os.MkdirAll(w.outputDir, 0755); err != nil {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 
-	// Write JSON execution report
-	if err := w.WriteExecutionJSON(summary); err != nil {
-		return fmt.Errorf("failed to write execution JSON: %w", err)
+	// Write JSON execution report if enabled
+	if w.config.JSON {
+		if err := w.WriteExecutionJSON(summary); err != nil {
+			return fmt.Errorf("failed to write execution JSON: %w", err)
+		}
 	}
 
-	// Write markdown summary
-	if err := w.WriteSummaryMarkdown(summary); err != nil {
-		return fmt.Errorf("failed to write summary markdown: %w", err)
+	// Write markdown summary if enabled
+	if w.config.Markdown {
+		if err := w.WriteSummaryMarkdown(summary); err != nil {
+			return fmt.Errorf("failed to write summary markdown: %w", err)
+		}
 	}
 
-	// Write metrics JSON
-	if err := w.WriteMetricsJSON(summary); err != nil {
-		return fmt.Errorf("failed to write metrics JSON: %w", err)
+	// Write metrics JSON if enabled
+	if w.config.Metrics {
+		if err := w.WriteMetricsJSON(summary); err != nil {
+			return fmt.Errorf("failed to write metrics JSON: %w", err)
+		}
 	}
 
 	return nil

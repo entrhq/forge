@@ -1,0 +1,29 @@
+# Read-Only Analysis Example
+# This configuration demonstrates using Forge in read-only mode to analyze code
+# without making any modifications to the workspace.
+
+mode: read-only
+workspace_dir: "."
+
+task: |
+  Analyze the codebase structure and provide a comprehensive report including:
+  1. Overall architecture and design patterns used
+  2. Key components and their responsibilities
+  3. Code quality observations (complexity, maintainability)
+  4. Potential issues or technical debt
+  5. Suggestions for improvements
+
+constraints:
+  allowed_tools:
+    - read_file
+    - list_files
+    - search_files
+  max_tokens: 100000
+  timeout: 10m
+
+artifacts:
+  enabled: true
+  output_dir: ./headless-output/analysis
+  json: true      # execution.json with full details
+  markdown: true  # summary.md for human reading
+  metrics: true   # metrics.json for analytics

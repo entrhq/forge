@@ -4,151 +4,237 @@ import (
 	"testing"
 )
 
-func TestIsLoopBreakingTool(t *testing.T) {
-	tests := []struct {
-		name     string
-		toolName string
-		expected bool
-	}{
-		{
-			name:     "task_completion is loop-breaking",
-			toolName: "task_completion",
-			expected: true,
-		},
-		{
-			name:     "ask_question is loop-breaking",
-			toolName: "ask_question",
-			expected: true,
-		},
-		{
-			name:     "converse is loop-breaking",
-			toolName: "converse",
-			expected: true,
-		},
-		{
-			name:     "write_file is not loop-breaking",
-			toolName: "write_file",
-			expected: false,
-		},
-		{
-			name:     "execute_command is not loop-breaking",
-			toolName: "execute_command",
-			expected: false,
-		},
-		{
-			name:     "read_file is not loop-breaking",
-			toolName: "read_file",
-			expected: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := isLoopBreakingTool(tt.toolName)
-			if result != tt.expected {
-				t.Errorf("isLoopBreakingTool(%q) = %v, expected %v", tt.toolName, result, tt.expected)
-			}
-		})
-	}
-}
-
-func TestConstraintManager_ValidateToolCall_LoopBreakingTools(t *testing.T) {
-	// Create a constraint manager with a restricted allowed_tools list
+func TestConstraintManager_ReadOnlyMode(t *testing.T) {
 	config := ConstraintConfig{
-		AllowedTools: []string{"read_file", "write_file"},
+		AllowedTools: []string{}, // Empty means all tools allowed by default
 	}
 
-	cm, err := NewConstraintManager(config)
+	// Create constraint manager in read-only mode
+	cm, err := NewConstraintManager(config, ModeReadOnly)
 	if err != nil {
 		t.Fatalf("Failed to create constraint manager: %v", err)
 	}
 
 	tests := []struct {
-		name        string
-		toolName    string
-		shouldError bool
+		name      string
+		toolName  string
+		wantError bool
+		errType   ViolationType
 	}{
 		{
-			name:        "task_completion should always be allowed",
-			toolName:    "task_completion",
-			shouldError: false,
+			name:      "read_file allowed in read-only mode",
+			toolName:  "read_file",
+			wantError: false,
 		},
 		{
-			name:        "ask_question should always be allowed",
-			toolName:    "ask_question",
-			shouldError: false,
+			name:      "list_files allowed in read-only mode",
+			toolName:  "list_files",
+			wantError: false,
 		},
 		{
-			name:        "converse should always be allowed",
-			toolName:    "converse",
-			shouldError: false,
+			name:      "search_files allowed in read-only mode",
+			toolName:  "search_files",
+			wantError: false,
 		},
 		{
-			name:        "read_file is in allowed list",
-			toolName:    "read_file",
-			shouldError: false,
+			name:      "write_file blocked in read-only mode",
+			toolName:  "write_file",
+			wantError: true,
+			errType:   ViolationReadOnlyMode,
 		},
 		{
-			name:        "write_file is in allowed list",
-			toolName:    "write_file",
-			shouldError: false,
+			name:      "apply_diff blocked in read-only mode",
+			toolName:  "apply_diff",
+			wantError: true,
+			errType:   ViolationReadOnlyMode,
 		},
 		{
-			name:        "execute_command is not in allowed list",
-			toolName:    "execute_command",
-			shouldError: true,
+			name:      "execute_command blocked in read-only mode",
+			toolName:  "execute_command",
+			wantError: true,
+			errType:   ViolationReadOnlyMode,
 		},
 		{
-			name:        "list_files is not in allowed list",
-			toolName:    "list_files",
-			shouldError: true,
+			name:      "task_completion allowed (loop-breaking tool)",
+			toolName:  "task_completion",
+			wantError: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := cm.ValidateToolCall(tt.toolName, nil)
-
-			if tt.shouldError {
+			if tt.wantError {
 				if err == nil {
-					t.Errorf("Expected error for tool %q, but got nil", tt.toolName)
+					t.Errorf("Expected error for tool %s in read-only mode, got nil", tt.toolName)
+					return
+				}
+				violation, ok := err.(*ConstraintViolation)
+				if !ok {
+					t.Errorf("Expected ConstraintViolation error, got %T", err)
+					return
+				}
+				if violation.Type != tt.errType {
+					t.Errorf("Expected violation type %s, got %s", tt.errType, violation.Type)
 				}
 			} else {
 				if err != nil {
-					t.Errorf("Expected no error for tool %q, but got: %v", tt.toolName, err)
+					t.Errorf("Unexpected error for tool %s: %v", tt.toolName, err)
 				}
 			}
 		})
 	}
 }
 
-func TestConstraintManager_ValidateToolCall_EmptyAllowedTools(t *testing.T) {
+func TestConstraintManager_WriteMode(t *testing.T) {
+	config := ConstraintConfig{
+		AllowedTools: []string{}, // Empty means all tools allowed
+	}
+
+	// Create constraint manager in write mode
+	cm, err := NewConstraintManager(config, ModeWrite)
+	if err != nil {
+		t.Fatalf("Failed to create constraint manager: %v", err)
+	}
+
+	// In write mode, all tools should be allowed (when allowed_tools is empty)
+	tools := []string{
+		"read_file",
+		"write_file",
+		"apply_diff",
+		"execute_command",
+		"list_files",
+		"search_files",
+	}
+
+	for _, tool := range tools {
+		t.Run(tool, func(t *testing.T) {
+			err := cm.ValidateToolCall(tool, nil)
+			if err != nil {
+				t.Errorf("Tool %s should be allowed in write mode, got error: %v", tool, err)
+			}
+		})
+	}
+}
+
+func TestConstraintManager_AllowedToolsRestriction(t *testing.T) {
+	// Create a constraint manager with a restricted allowed_tools list
+	config := ConstraintConfig{
+		AllowedTools: []string{"read_file", "write_file"},
+	}
+
+	cm, err := NewConstraintManager(config, "write")
+	if err != nil {
+		t.Fatalf("Failed to create constraint manager: %v", err)
+	}
+
+	tests := []struct {
+		name      string
+		toolName  string
+		wantError bool
+	}{
+		{
+			name:      "allowed tool: read_file",
+			toolName:  "read_file",
+			wantError: false,
+		},
+		{
+			name:      "allowed tool: write_file",
+			toolName:  "write_file",
+			wantError: false,
+		},
+		{
+			name:      "disallowed tool: execute_command",
+			toolName:  "execute_command",
+			wantError: true,
+		},
+		{
+			name:      "disallowed tool: list_files",
+			toolName:  "list_files",
+			wantError: true,
+		},
+		{
+			name:      "loop-breaking tool always allowed: task_completion",
+			toolName:  "task_completion",
+			wantError: false,
+		},
+		{
+			name:      "loop-breaking tool always allowed: ask_question",
+			toolName:  "ask_question",
+			wantError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := cm.ValidateToolCall(tt.toolName, nil)
+			if tt.wantError && err == nil {
+				t.Errorf("Expected error for disallowed tool %s, got nil", tt.toolName)
+			}
+			if !tt.wantError && err != nil {
+				t.Errorf("Unexpected error for allowed tool %s: %v", tt.toolName, err)
+			}
+		})
+	}
+}
+
+func TestConstraintManager_EmptyAllowedTools(t *testing.T) {
 	// When allowed_tools is empty, all tools should be allowed
 	config := ConstraintConfig{
 		AllowedTools: []string{},
 	}
 
-	cm, err := NewConstraintManager(config)
+	cm, err := NewConstraintManager(config, "write")
 	if err != nil {
 		t.Fatalf("Failed to create constraint manager: %v", err)
 	}
 
 	tools := []string{
-		"task_completion",
-		"ask_question",
-		"converse",
 		"read_file",
 		"write_file",
 		"execute_command",
 		"list_files",
+		"search_files",
+		"apply_diff",
 	}
 
-	for _, toolName := range tools {
-		t.Run(toolName, func(t *testing.T) {
-			err := cm.ValidateToolCall(toolName, nil)
-			if err != nil {
-				t.Errorf("Expected no error for tool %q when allowed_tools is empty, but got: %v", toolName, err)
-			}
-		})
+	for _, tool := range tools {
+		err := cm.ValidateToolCall(tool, nil)
+		if err != nil {
+			t.Errorf("Tool %s should be allowed when allowed_tools is empty, got error: %v", tool, err)
+		}
+	}
+}
+
+func TestConstraintManager_ReadOnlyModeWithAllowedTools(t *testing.T) {
+	// Test that read-only mode enforcement takes precedence over allowed_tools list
+	config := ConstraintConfig{
+		AllowedTools: []string{"read_file", "write_file"}, // write_file is in allowed list
+	}
+
+	cm, err := NewConstraintManager(config, ModeReadOnly)
+	if err != nil {
+		t.Fatalf("Failed to create constraint manager: %v", err)
+	}
+
+	// write_file should still be blocked because of read-only mode
+	err = cm.ValidateToolCall("write_file", nil)
+	if err == nil {
+		t.Error("write_file should be blocked in read-only mode even if in allowed_tools list")
+	}
+
+	violation, ok := err.(*ConstraintViolation)
+	if !ok {
+		t.Errorf("Expected ConstraintViolation error, got %T", err)
+		return
+	}
+	if violation.Type != ViolationReadOnlyMode {
+		t.Errorf("Expected ViolationReadOnlyMode, got %s", violation.Type)
+	}
+
+	// read_file should still work
+	err = cm.ValidateToolCall("read_file", nil)
+	if err != nil {
+		t.Errorf("read_file should be allowed: %v", err)
 	}
 }

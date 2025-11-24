@@ -74,6 +74,6 @@ git:
 artifacts:
   enabled: true                    # Generate execution artifacts
   output_dir: ".forge/artifacts"   # Where to save artifacts
-  formats:
-    - "execution.json"             # Detailed JSON execution log
-    - "summary.md"                 # Human-readable markdown summary
+  json: true                       # execution.json - Detailed JSON execution log
+  markdown: true                   # summary.md - Human-readable markdown summary
+  metrics: true                    # metrics.json - Execution metrics for analytics

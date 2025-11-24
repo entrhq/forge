@@ -13,6 +13,7 @@ import (
 // ConstraintManager enforces safety limits during headless execution
 type ConstraintManager struct {
 	config *ConstraintConfig
+	mode   ExecutionMode // Track execution mode for validation
 
 	// Runtime state tracking
 	filesModified map[string]*FileModification
@@ -53,10 +54,11 @@ const (
 	ViolationToolRestriction ViolationType = "tool_restriction"
 	ViolationTokenLimit      ViolationType = "token_limit"
 	ViolationTimeout         ViolationType = "timeout"
+	ViolationReadOnlyMode    ViolationType = "read_only_mode"
 )
 
 // NewConstraintManager creates a new constraint manager
-func NewConstraintManager(config ConstraintConfig) (*ConstraintManager, error) {
+func NewConstraintManager(config ConstraintConfig, mode ExecutionMode) (*ConstraintManager, error) {
 	// Create pattern matcher
 	patternMatcher, err := NewPatternMatcher(config.AllowedPatterns, config.DeniedPatterns)
 	if err != nil {
@@ -65,6 +67,7 @@ func NewConstraintManager(config ConstraintConfig) (*ConstraintManager, error) {
 
 	return &ConstraintManager{
 		config:         &config,
+		mode:           mode,
 		filesModified:  make(map[string]*FileModification),
 		startTime:      time.Now(),
 		patternMatcher: patternMatcher,
@@ -79,6 +82,18 @@ func (cm *ConstraintManager) ValidateToolCall(toolName string, args interface{})
 	// Loop-breaking tools are always allowed and should not be restricted
 	if isLoopBreakingTool(toolName) {
 		return nil
+	}
+
+	// Enforce read-only mode: reject all file-modifying tools
+	if cm.mode == ModeReadOnly && isFileModifyingTool(toolName) {
+		return &ConstraintViolation{
+			Type:    ViolationReadOnlyMode,
+			Message: fmt.Sprintf("tool '%s' is not allowed in read-only mode", toolName),
+			Details: map[string]interface{}{
+				"tool": toolName,
+				"mode": string(cm.mode),
+			},
+		}
 	}
 
 	// Check if tool is allowed
@@ -273,10 +288,10 @@ func (cm *ConstraintManager) calculateTotalLinesRemoved() int {
 	return total
 }
 
-// isFileModifyingTool returns true if the tool modifies files
+// isFileModifyingTool returns true if the tool modifies files or executes commands
 func isFileModifyingTool(toolName string) bool {
 	switch toolName {
-	case "write_file", "apply_diff":
+	case "write_file", "apply_diff", "execute_command":
 		return true
 	default:
 		return false

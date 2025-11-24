@@ -29,9 +29,9 @@ git:
 artifacts:
   enabled: true
   output_dir: ".forge/artifacts"
-  formats:
-    - "execution.json"
-    - "summary.md"
+  json: true      # execution.json with full details
+  markdown: true  # summary.md for human reading
+  metrics: false  # metrics.json disabled for this simple test
 
 workspace_dir: "test-workspace"
 
