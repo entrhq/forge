@@ -70,6 +70,7 @@ type QualityGateConfig struct {
 // GitConfig defines git operation configuration
 type GitConfig struct {
 	AutoCommit    bool   `yaml:"auto_commit" json:"auto_commit"`
+	AutoPush      bool   `yaml:"auto_push" json:"auto_push"`
 	CommitMessage string `yaml:"commit_message" json:"commit_message"`
 	Branch        string `yaml:"branch" json:"branch"`
 	AuthorName    string `yaml:"author_name" json:"author_name"`

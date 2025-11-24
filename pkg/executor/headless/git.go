@@ -81,6 +81,13 @@ func (g *GitManager) Commit(ctx context.Context, message string) error {
 		return fmt.Errorf("failed to create commit: %w", err)
 	}
 
+	// Auto-push if configured
+	if g.config.AutoPush {
+		if err := g.Push(ctx); err != nil {
+			return fmt.Errorf("failed to auto-push: %w", err)
+		}
+	}
+
 	return nil
 }
 
@@ -118,6 +125,23 @@ func (g *GitManager) GetDiffStat(ctx context.Context) (string, error) {
 	}
 
 	return output, nil
+}
+
+// Push pushes the current branch to the remote
+func (g *GitManager) Push(ctx context.Context) error {
+	// Get current branch
+	branch, err := g.GetCurrentBranch(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get current branch: %w", err)
+	}
+
+	// Push to remote
+	_, err = g.execGit(ctx, "push", "origin", branch)
+	if err != nil {
+		return fmt.Errorf("failed to push branch '%s': %w", branch, err)
+	}
+
+	return nil
 }
 
 // Rollback rolls back all uncommitted changes
