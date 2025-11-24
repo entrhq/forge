@@ -133,24 +133,6 @@ func run(ctx context.Context, cliConfig *CLIConfig) error {
 		return fmt.Errorf("failed to initialize configuration: %w", initErr)
 	}
 
-	// Enable auto-approval for all tools in headless mode
-	// This allows the agent to operate autonomously without user prompts
-	autoApproval := appconfig.GetAutoApproval()
-	if autoApproval != nil {
-		for _, toolName := range []string{
-			"read_file",
-			"write_file",
-			"list_files",
-			"search_files",
-			"apply_diff",
-			"task_completion",
-		} {
-			autoApproval.SetToolAutoApproval(toolName, true)
-		}
-		// Note: execute_command is NOT auto-approved - it requires whitelist
-		log.Printf("[Headless] Auto-approval enabled for file operation tools")
-	}
-
 	// Create LLM provider
 	providerOpts := []openai.ProviderOption{
 		openai.WithModel(cliConfig.Model),

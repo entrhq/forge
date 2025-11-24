@@ -279,10 +279,9 @@ func (e *Executor) finalize(ctx context.Context) error {
 			e.summary.Error = results.FormatErrorMessage()
 			log.Printf("[Headless] Quality gates failed")
 
-			// Rollback changes on quality gate failure
-			if err := e.gitManager.Rollback(ctx); err != nil {
-				log.Printf("[Headless] Warning: failed to rollback changes: %v", err)
-			}
+			// Note: Rollback is disabled to preserve work done by the agent
+			// The task will fail but changes will be kept for inspection
+			log.Printf("[Headless] Rollback disabled - preserving changes for inspection")
 		} else {
 			e.summary.Status = statusSuccess
 			log.Printf("[Headless] Quality gates passed")

@@ -11,6 +11,7 @@ import (
 // It maintains state across multiple content chunks to handle tags that span chunks.
 type ThinkingParser struct {
 	buffer     strings.Builder
+	tagBuffer  strings.Builder // Buffer for potential tag content between < and >
 	inThinking bool
 	inTag      bool // true when we're buffering a potential tag (saw '<' but not yet '>')
 }
@@ -21,7 +22,7 @@ func NewThinkingParser() *ThinkingParser {
 }
 
 // Parse processes a content chunk and returns separate chunks for thinking and message content.
-// It handles <thinking> tags that may span multiple chunks by buffering from '<' to '>'.
+// It handles <thinking> tags that may span multiple chunks by buffering potential tags.
 //
 // Returns:
 //   - thinkingChunk: Non-nil if thinking content is found (with Type = ContentTypeThinking)
@@ -32,75 +33,82 @@ func (p *ThinkingParser) Parse(content string) (thinkingChunk, messageChunk *llm
 	}
 
 	for _, ch := range content {
-		p.buffer.WriteRune(ch)
-
 		if ch == '<' {
-			chunk := p.handleTagStart()
-			thinkingChunk, messageChunk = p.appendChunk(thinkingChunk, messageChunk, chunk)
+			// If we're already in a tag, the previous < wasn't a real tag
+			if p.inTag {
+				// Flush the previous buffered tag as regular content
+				chunk := p.flushTagBuffer()
+				thinkingChunk, messageChunk = p.appendChunk(thinkingChunk, messageChunk, chunk)
+			}
+
+			// Flush any accumulated non-tag content before starting new tag
+			if p.buffer.Len() > 0 {
+				chunk := p.createChunk(p.buffer.String())
+				p.buffer.Reset()
+				thinkingChunk, messageChunk = p.appendChunk(thinkingChunk, messageChunk, chunk)
+			}
+
+			// Start buffering potential tag
+			p.inTag = true
+			p.tagBuffer.Reset()
+			p.tagBuffer.WriteRune(ch)
 			continue
 		}
 
 		if ch == '>' && p.inTag {
-			chunk := p.handleTagEnd()
+			// Complete the tag
+			p.tagBuffer.WriteRune(ch)
+			tag := p.tagBuffer.String()
+			p.tagBuffer.Reset()
+			p.inTag = false
+
+			// Check if this is a thinking tag
+			if tag == "<thinking>" {
+				p.inThinking = true
+				// Don't emit anything - just change state
+				continue
+			}
+
+			if tag == "</thinking>" {
+				p.inThinking = false
+				// Don't emit anything - just change state
+				continue
+			}
+
+			// Not a thinking tag - treat as regular content
+			chunk := p.createChunk(tag)
 			thinkingChunk, messageChunk = p.appendChunk(thinkingChunk, messageChunk, chunk)
 			continue
 		}
+
+		// Regular character
+		if p.inTag {
+			// Accumulate into tag buffer
+			p.tagBuffer.WriteRune(ch)
+		} else {
+			// Accumulate into regular buffer
+			p.buffer.WriteRune(ch)
+		}
 	}
 
-	// Emit accumulated non-tag content at end of chunk
-	chunk := p.flushBufferIfNotInTag()
-	thinkingChunk, messageChunk = p.appendChunk(thinkingChunk, messageChunk, chunk)
+	// Emit any accumulated regular content at end of chunk
+	if p.buffer.Len() > 0 {
+		chunk := p.createChunk(p.buffer.String())
+		p.buffer.Reset()
+		thinkingChunk, messageChunk = p.appendChunk(thinkingChunk, messageChunk, chunk)
+	}
 
 	return
 }
 
-// handleTagStart processes the start of a potential tag
-func (p *ThinkingParser) handleTagStart() *llm.StreamChunk {
-	// If we were buffering non-tag content, emit it first
-	if p.buffer.Len() > 1 && !p.inTag {
-		text := p.buffer.String()[:p.buffer.Len()-1] // Exclude the '<'
-
-		chunk := p.createChunk(text)
-
-		p.buffer.Reset()
-		p.buffer.WriteRune('<')
-		p.inTag = true
-
-		return chunk
-	}
-
-	p.inTag = true
-	return nil
-}
-
-// handleTagEnd processes the end of a tag
-func (p *ThinkingParser) handleTagEnd() *llm.StreamChunk {
-	p.inTag = false
-	tag := p.buffer.String()
-	p.buffer.Reset()
-
-	if tag == "<thinking>" {
-		p.inThinking = true
+// flushTagBuffer flushes the current tag buffer as regular content
+func (p *ThinkingParser) flushTagBuffer() *llm.StreamChunk {
+	if p.tagBuffer.Len() == 0 {
 		return nil
 	}
-
-	if tag == "</thinking>" {
-		p.inThinking = false
-		return nil
-	}
-
-	// Not a thinking tag, treat as regular content
-	return p.createChunk(tag)
-}
-
-// flushBufferIfNotInTag flushes buffer content if not currently in a tag
-func (p *ThinkingParser) flushBufferIfNotInTag() *llm.StreamChunk {
-	if !p.inTag && p.buffer.Len() > 0 {
-		text := p.buffer.String()
-		p.buffer.Reset()
-		return p.createChunk(text)
-	}
-	return nil
+	text := p.tagBuffer.String()
+	p.tagBuffer.Reset()
+	return p.createChunk(text)
 }
 
 // createChunk creates a chunk with appropriate type based on current mode
@@ -151,31 +159,28 @@ func (p *ThinkingParser) IsInThinking() bool {
 // Flush returns any buffered content that hasn't been emitted yet.
 // This should be called at the end of a stream to ensure all content is processed.
 func (p *ThinkingParser) Flush() (thinkingChunk, messageChunk *llm.StreamChunk) {
-	text := p.buffer.String()
-	if len(text) == 0 {
-		return nil, nil
+	// Flush any incomplete tag first
+	if p.inTag && p.tagBuffer.Len() > 0 {
+		chunk := p.flushTagBuffer()
+		thinkingChunk, messageChunk = p.appendChunk(thinkingChunk, messageChunk, chunk)
+		p.inTag = false
 	}
 
-	// Emit whatever is in the buffer
-	p.buffer.Reset()
-	p.inTag = false
-
-	if p.inThinking {
-		return &llm.StreamChunk{
-			Content: text,
-			Type:    llm.ContentTypeThinking,
-		}, nil
+	// Flush regular buffer
+	if p.buffer.Len() > 0 {
+		text := p.buffer.String()
+		p.buffer.Reset()
+		chunk := p.createChunk(text)
+		thinkingChunk, messageChunk = p.appendChunk(thinkingChunk, messageChunk, chunk)
 	}
 
-	return nil, &llm.StreamChunk{
-		Content: text,
-		Type:    llm.ContentTypeMessage,
-	}
+	return thinkingChunk, messageChunk
 }
 
 // Reset resets the parser state for a new stream.
 func (p *ThinkingParser) Reset() {
 	p.buffer.Reset()
+	p.tagBuffer.Reset()
 	p.inThinking = false
 	p.inTag = false
 }
