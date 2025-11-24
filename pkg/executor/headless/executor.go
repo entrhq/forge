@@ -152,6 +152,18 @@ func (e *Executor) Run(ctx context.Context) error {
 			if event.Type == types.EventTypeTokenUsage && event.TokenUsage != nil {
 				if err := e.constraintMgr.RecordTokenUsage(event.TokenUsage.TotalTokens); err != nil {
 					log.Printf("[Headless] Token limit exceeded: %v", err)
+					// Set execution to failed state
+					e.summary.Status = "failed"
+					e.summary.Error = fmt.Sprintf("Token limit constraint violated: %v", err)
+					// Trigger graceful shutdown via agent's Shutdown channel
+					// This prevents "send on closed channel" panics
+					select {
+					case e.agent.GetChannels().Shutdown <- struct{}{}:
+						log.Printf("[Headless] Shutdown signal sent to agent")
+					default:
+						log.Printf("[Headless] Shutdown channel already signaled")
+					}
+					return
 				}
 			}
 
@@ -159,9 +171,13 @@ func (e *Executor) Run(ctx context.Context) error {
 			if event.Type == types.EventTypeTurnEnd {
 				turnEndReceived = true
 				log.Printf("[Headless] Turn end received")
-				// Close input channel to signal agent to shut down
-				// This causes the agent's event loop to terminate and close Done channel
-				close(channels.Input)
+				// Signal graceful shutdown
+				select {
+				case e.agent.GetChannels().Shutdown <- struct{}{}:
+					log.Printf("[Headless] Shutdown signal sent to agent on turn end")
+				default:
+					log.Printf("[Headless] Shutdown channel already signaled on turn end")
+				}
 			}
 
 			// Log event details if verbose
