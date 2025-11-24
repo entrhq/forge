@@ -64,12 +64,11 @@ func (a *DefaultAgent) executeIteration(ctx context.Context, errorContext string
 // emitEvent sends an event on the event channel.
 // This is a blocking send to ensure critical events like TurnEnd are not dropped.
 // It safely handles the case where the event channel may be closed during shutdown.
+//
+//nolint:errcheck // Recover is intentionally ignored - panic during shutdown is expected
 func (a *DefaultAgent) emitEvent(event *types.AgentEvent) {
 	defer func() {
-		if r := recover(); r != nil {
-			// Event channel was closed during shutdown - this is expected
-			// Log at debug level only as this is a normal shutdown scenario
-		}
+		_ = recover() // Event channel was closed during shutdown - this is expected
 	}()
 	a.channels.Event <- event
 }

@@ -77,10 +77,8 @@ func TestConstraintManager_ReadOnlyMode(t *testing.T) {
 				if violation.Type != tt.errType {
 					t.Errorf("Expected violation type %s, got %s", tt.errType, violation.Type)
 				}
-			} else {
-				if err != nil {
-					t.Errorf("Unexpected error for tool %s: %v", tt.toolName, err)
-				}
+			} else if err != nil {
+				t.Errorf("Unexpected error for tool %s: %v", tt.toolName, err)
 			}
 		})
 	}

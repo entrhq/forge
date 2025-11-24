@@ -96,12 +96,12 @@ func composeHeadlessSystemPrompt(mode headless.ExecutionMode) string {
 	builder.WriteString(HeadlessIdentity)
 	builder.WriteString(HeadlessPrinciples)
 	builder.WriteString(HeadlessConstraints)
-	
+
 	// Add mode-specific guidance
 	if mode == headless.ModeReadOnly {
 		builder.WriteString(ReadOnlyModeGuidance)
 	}
-	
+
 	builder.WriteString(HeadlessWorkflow)
 	builder.WriteString(HeadlessCodeStandards)
 	return builder.String()

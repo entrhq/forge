@@ -13,6 +13,7 @@ import (
 
 const (
 	statusSuccess = "success"
+	statusFailed  = "failed"
 )
 
 // Executor implements the headless mode executor
@@ -153,7 +154,7 @@ func (e *Executor) Run(ctx context.Context) error {
 				if err := e.constraintMgr.RecordTokenUsage(event.TokenUsage.TotalTokens); err != nil {
 					log.Printf("[Headless] Token limit exceeded: %v", err)
 					// Set execution to failed state
-					e.summary.Status = "failed"
+					e.summary.Status = statusFailed
 					e.summary.Error = fmt.Sprintf("Token limit constraint violated: %v", err)
 					// Trigger graceful shutdown via agent's Shutdown channel
 					// This prevents "send on closed channel" panics
@@ -291,7 +292,7 @@ func (e *Executor) finalize(ctx context.Context) error {
 		e.summary.QualityGateResults = results
 
 		if !results.AllPassed {
-			e.summary.Status = "failed"
+			e.summary.Status = statusFailed
 			e.summary.Error = results.FormatErrorMessage()
 			log.Printf("[Headless] Quality gates failed")
 
@@ -349,7 +350,7 @@ func (e *Executor) commitChanges(ctx context.Context) error {
 
 // fail marks the execution as failed and returns an error
 func (e *Executor) fail(err error) error {
-	e.summary.Status = "failed"
+	e.summary.Status = statusFailed
 	e.summary.Error = err.Error()
 	e.summary.EndTime = time.Now()
 	e.summary.Duration = e.summary.EndTime.Sub(e.startTime)

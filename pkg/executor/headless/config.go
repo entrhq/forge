@@ -78,7 +78,7 @@ type GitConfig struct {
 type ArtifactConfig struct {
 	Enabled   bool   `yaml:"enabled" json:"enabled"`
 	OutputDir string `yaml:"output_dir" json:"output_dir"`
-	
+
 	// Individual format flags
 	JSON     bool `yaml:"json" json:"json"`
 	Markdown bool `yaml:"markdown" json:"markdown"`

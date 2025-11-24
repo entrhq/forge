@@ -35,70 +35,50 @@ Headless mode is designed for:
 
 ### Installation
 
+Forge headless mode is built into the main `forge` binary - no separate installation needed!
+
 ```bash
-go install github.com/entrhq/forge/cmd/forge-headless@latest
+go install github.com/entrhq/forge/cmd/forge@latest
 ```
 
 ### Basic Usage
 
-Run with an inline task:
+Run headless mode with a configuration file:
 
 ```bash
 export OPENAI_API_KEY=your-api-key
-forge-headless -task "Fix all linting errors"
+forge -headless -headless-config config.yaml
 ```
 
-Run with a configuration file:
+Or use the legacy standalone binary (deprecated):
 
 ```bash
-forge-headless -config forge-headless.yaml
+forge-headless -config config.yaml
 ```
 
-### Example Configuration
+### Minimal Configuration
 
-Create `forge-headless.yaml`:
+Create a `config.yaml`:
 
 ```yaml
-task: "Fix all golangci-lint errors"
-mode: write
-
-constraints:
-  max_files: 10
-  max_lines_changed: 500
-  allowed_patterns:
-    - "**/*.go"
-  timeout: 5m
-
-quality_gates:
-  - name: "Go Lint"
-    command: "golangci-lint run ./..."
-    required: true
-  - name: "Go Test"
-    command: "go test ./..."
-    required: true
-
-git:
-  auto_commit: true
-  commit_message: "chore: automated linting fixes"
-  author_name: "Forge AI"
-  author_email: "forge@example.com"
-
-artifacts:
-  enabled: true
-  output_dir: ".forge/artifacts"
+task: "Fix all linting errors"
+workspace_dir: .
 ```
+
+Everything else will use defaults.
 
 ## Configuration
 
-### Complete Configuration Schema
+### Configuration File Format
 
-Here is the complete YAML configuration schema with all available options:
+Headless mode uses YAML configuration files:
 
 ```yaml
-# Task description (REQUIRED)
-task: "Your task description here"
+# Task to execute (REQUIRED)
+task: "Analyze the codebase and suggest improvements"
 
-# Execution mode: "read-only" or "write" (default: "write")
+# Execution mode (default: write)
+# Options: read-only, write
 mode: write
 
 # Workspace directory (REQUIRED if not using CLI flag)
@@ -107,460 +87,337 @@ workspace_dir: /path/to/workspace
 # Enable verbose logging (default: false)
 verbose: false
 
+# Output directory for artifacts (default: ./headless-output)
+output_dir: ./output
+
 # Safety constraints
 constraints:
-  # File modification limits
-  max_files: 10                    # Maximum number of files that can be modified
-  max_lines_changed: 500           # Maximum total lines added/removed
-  
-  # File access patterns (glob syntax)
-  allowed_patterns:                # Only allow modifications to these patterns
-    - "src/**/*.go"
-    - "pkg/**/*.go"
-    - "docs/**/*.md"
-  
-  denied_patterns:                 # Never allow modifications to these patterns
-    - "vendor/**"
-    - ".git/**"
-    - "node_modules/**"
-    - "**/*_generated.*"
-  
-  # Tool restrictions
-  allowed_tools:                   # Whitelist of allowed tools
-    - task_completion
-    - read_file
-    - write_file
-    - apply_diff
-    - search_files
-    - list_files
-    - execute_command
-  
-  # Resource limits
-  max_tokens: 50000               # Maximum LLM tokens to consume
-  timeout: 5m                     # Maximum execution time (e.g., "5m", "300s", "1h30m")
-
-# Quality gates (commands to run before committing)
-quality_gates:
-  - name: "Run tests"
-    command: "go test ./..."
-    required: true                # If true, failure aborts execution
-  
-  - name: "Lint"
-    command: "golangci-lint run"
-    required: false               # Optional quality gate
-
-# Git configuration
-git:
-  auto_commit: false              # Automatically commit changes if quality gates pass
-  commit_message: "chore: automated changes via Forge"
-  branch: ""                      # Branch to commit to (empty = current branch)
-  author_name: "Forge AI"
-  author_email: "forge@example.com"
-
-# Artifact generation
-artifacts:
-  enabled: true                   # Generate execution artifacts
-  output_dir: ".forge/artifacts"  # Where to write artifacts
-  json: true                      # execution.json - Detailed execution log
-  markdown: true                  # summary.md - Human-readable summary
-  metrics: true                   # metrics.json - Execution metrics
-```
-
-### Default Values
-
-If you don't specify certain fields, these defaults are used:
-
-```yaml
-mode: write
-
-constraints:
+  # Maximum number of files that can be modified (default: 10)
   max_files: 10
-  max_lines_changed: 500
+  
+  # Maximum number of lines that can be modified per file (default: 500)
+  max_lines_per_file: 500
+  
+  # Maximum total lines that can be modified across all files (default: 2000)
+  max_total_lines: 2000
+  
+  # Maximum execution time (default: 5m)
+  # Format: duration string like "5m", "1h", "30s"
   timeout: 5m
-  max_tokens: 50000
-  allowed_tools:
-    - task_completion
-    - read_file
-    - write_file
-    - apply_diff
-    - search_files
-    - list_files
-    - execute_command
-  denied_patterns:
-    - ".git/**"
-    - "vendor/**"
-    - "node_modules/**"
-    - "**/*_generated.*"
+  
+  # Maximum number of iterations (tool calls) (default: 100)
+  max_iterations: 100
+  
+  # Token usage limit (default: 100000)
+  token_limit: 100000
 
+# Quality gates (all optional)
+quality_gates:
+  # Require tests to pass before committing
+  require_tests: true
+  
+  # Test command to run (default: "go test ./...")
+  test_command: "go test ./..."
+  
+  # Require linting to pass before committing
+  require_lint: true
+  
+  # Lint command to run (default: "golangci-lint run")
+  lint_command: "golangci-lint run"
+  
+  # Require build to succeed before committing
+  require_build: true
+  
+  # Build command to run (default: "go build ./...")
+  build_command: "go build ./..."
+  
+  # Custom validation commands (all must succeed)
+  custom_validations:
+    - command: "npm run type-check"
+      description: "TypeScript type checking"
+    - command: "npm run format-check"
+      description: "Code formatting validation"
+
+# Git integration (optional)
 git:
-  auto_commit: false
-  commit_message: "chore: automated changes via Forge"
-  author_name: "Forge AI"
-  author_email: "forge@example.com"
-
-artifacts:
+  # Enable automatic git operations (default: false)
   enabled: true
-  output_dir: ".forge/artifacts"
-  json: true      # execution.json with full details
-  markdown: true  # summary.md for human reading
-  metrics: true   # metrics.json for analytics
+  
+  # Commit changes automatically (default: false)
+  auto_commit: true
+  
+  # Commit message template (optional, uses generated message if not provided)
+  commit_message: "feat: {{.Task}}"
+  
+  # Git author name (optional, uses git config if not provided)
+  author_name: "Forge Bot"
+  
+  # Git author email (optional, uses git config if not provided)
+  author_email: "forge@example.com"
+  
+  # Create a new branch for changes (optional)
+  branch: "forge/auto-improvements"
+  
+  # Push changes automatically (default: false)
+  auto_push: false
+  
+  # Remote to push to (default: "origin")
+  remote: "origin"
 ```
 
-### Minimal Configuration
+### CLI Overrides
 
-The absolute minimum required configuration is:
+Command-line flags override configuration file values:
 
-```yaml
-task: "Fix linting errors"
-workspace_dir: .
+```bash
+forge -headless -headless-config config.yaml -workspace /custom/path
 ```
 
-Everything else will use defaults.
-
-### Timeout Format
-
-The `timeout` field accepts Go duration strings:
-- `300s` - 300 seconds
-- `5m` - 5 minutes
-- `1h30m` - 1 hour 30 minutes
-- `2h` - 2 hours
+Available flags:
+- `-headless`: Enable headless mode
+- `-headless-config`: Path to YAML configuration file
+- `-workspace`: Override workspace directory
+- `-model`: Override LLM model
+- `-api-key`: Override API key
+- `-base-url`: Override API base URL
 
 ### Execution Modes
 
-#### Write Mode
+#### Write Mode (Default)
 
-Allows code modifications:
+Full autonomous execution with code modification permissions:
 
 ```yaml
 mode: write
 ```
 
+- Can modify files
+- Can execute commands
+- Subject to safety constraints
+- Requires quality gates to pass (if configured)
+
 #### Read-Only Mode
 
-Analysis only, no modifications:
+Safe analysis mode without modification permissions:
 
 ```yaml
 mode: read-only
 ```
 
-### Task Description
-
-Clear, specific task descriptions yield better results:
-
-```yaml
-# Good ✅
-task: "Add error handling to all database queries in pkg/db/"
-
-# Bad ❌
-task: "Make the code better"
-```
-
-### Workspace Directory
-
-Specify the working directory:
-
-```yaml
-workspace_dir: "/path/to/project"
-```
-
-Or use CLI flag:
-
-```bash
-forge-headless -workspace /path/to/project -task "..."
-```
+- Cannot modify files
+- Cannot execute write operations
+- Useful for code analysis, documentation, and audits
+- No quality gates required
 
 ## Safety Constraints
 
-Constraints prevent runaway execution and limit scope.
+Safety constraints prevent runaway execution and protect your codebase.
 
-### File Limits
-
-```yaml
-constraints:
-  # Maximum files that can be modified
-  max_files: 10
-  
-  # Maximum total lines changed
-  max_lines_changed: 500
-```
-
-### File Patterns
-
-Use glob patterns to control which files can be modified:
+### File Modification Limits
 
 ```yaml
 constraints:
-  # Allow only these patterns
-  allowed_patterns:
-    - "pkg/**/*.go"
-    - "internal/**/*.go"
-    - "**/*.md"
-  
-  # Deny these patterns (takes precedence)
-  denied_patterns:
-    - "**/vendor/**"
-    - "**/.git/**"
-    - "**/node_modules/**"
+  max_files: 10              # Max files to modify
+  max_lines_per_file: 500    # Max lines per file
+  max_total_lines: 2000      # Max total lines
 ```
 
-### Tool Restrictions
-
-Limit which tools the agent can use:
-
-```yaml
-constraints:
-  allowed_tools:
-    - task_completion
-    - read_file
-    - write_file
-    - apply_diff
-    - search_files
-    - list_files
-    # execute_command not included - disabled
-```
+When limits are reached:
+- Execution stops immediately
+- Partial changes are preserved
+- Error is logged with details
+- Exit code indicates constraint violation
 
 ### Resource Limits
 
 ```yaml
 constraints:
-  # Maximum LLM tokens
-  max_tokens: 50000
-  
-  # Execution timeout
-  timeout: 5m
+  timeout: 5m           # Maximum execution time
+  max_iterations: 100   # Maximum tool calls
+  token_limit: 100000   # Maximum tokens used
+```
+
+### Working Within Constraints
+
+For large tasks, break them into smaller chunks:
+
+```bash
+# Instead of: "Refactor entire codebase"
+# Use multiple focused tasks:
+forge -headless -headless-config refactor-auth.yaml
+forge -headless -headless-config refactor-api.yaml
+forge -headless -headless-config refactor-db.yaml
 ```
 
 ## Quality Gates
 
-Quality gates validate changes before they're committed.
+Quality gates ensure changes meet your standards before committing.
 
-### Required Gates
-
-Execution fails if required gates don't pass:
+### Built-in Gates
 
 ```yaml
 quality_gates:
-  - name: "Unit Tests"
-    command: "go test ./..."
-    required: true
+  require_tests: true
+  test_command: "go test ./..."
+  
+  require_lint: true
+  lint_command: "golangci-lint run"
+  
+  require_build: true
+  build_command: "go build ./..."
 ```
 
-### Optional Gates
+### Custom Validations
 
-Informational only, don't block execution:
+Add project-specific checks:
 
 ```yaml
 quality_gates:
-  - name: "Code Coverage"
-    command: "go test -cover ./..."
-    required: false
+  custom_validations:
+    - command: "npm run type-check"
+      description: "TypeScript type checking"
+    
+    - command: "npm run security-scan"
+      description: "Security vulnerability scan"
+    
+    - command: "./scripts/validate-migrations.sh"
+      description: "Database migration validation"
 ```
 
-### Common Quality Gates
+### Gate Behavior
 
-#### Go Projects
+- All gates must pass for changes to be committed
+- Gates run in order: tests → lint → build → custom
+- First failure stops execution
+- Detailed logs show which gate failed and why
+
+### Skipping Gates (Not Recommended)
+
+For non-critical environments only:
 
 ```yaml
 quality_gates:
-  - name: "Go Lint"
-    command: "golangci-lint run ./..."
-    required: true
-  
-  - name: "Go Test"
-    command: "go test -v ./..."
-    required: true
-  
-  - name: "Go Build"
-    command: "go build ./..."
-    required: true
-  
-  - name: "Go Format"
-    command: "gofmt -l ."
-    required: false
-```
-
-#### JavaScript/TypeScript Projects
-
-```yaml
-quality_gates:
-  - name: "ESLint"
-    command: "npm run lint"
-    required: true
-  
-  - name: "Prettier"
-    command: "npm run format:check"
-    required: true
-  
-  - name: "TypeScript Check"
-    command: "npm run type-check"
-    required: true
-  
-  - name: "Tests"
-    command: "npm test"
-    required: true
-```
-
-#### Python Projects
-
-```yaml
-quality_gates:
-  - name: "Black"
-    command: "black --check ."
-    required: true
-  
-  - name: "Flake8"
-    command: "flake8 ."
-    required: true
-  
-  - name: "MyPy"
-    command: "mypy ."
-    required: true
-  
-  - name: "Pytest"
-    command: "pytest"
-    required: true
-```
-
-### Rollback on Failure
-
-If a required quality gate fails, changes are automatically rolled back:
-
-```bash
-[Headless] Quality gates failed
-[Headless] Warning: failed to rollback changes: ...
+  require_tests: false
+  require_lint: false
+  require_build: false
 ```
 
 ## Git Integration
 
-### Automatic Commits
+Automate git operations for seamless CI/CD integration.
 
-Enable automatic git commits:
+### Basic Git Setup
 
 ```yaml
 git:
+  enabled: true
   auto_commit: true
-  commit_message: "chore: automated fixes via Forge"
+  commit_message: "chore: automated code improvements"
 ```
 
-### Custom Attribution
+### Branch Management
 
-Set git author information:
+Create a dedicated branch for changes:
 
 ```yaml
 git:
-  author_name: "Forge Bot"
-  author_email: "forge-bot@company.com"
-```
-
-### Dynamic Commit Messages
-
-The commit message can reference the task:
-
-```yaml
-git:
-  commit_message: "chore: {task}"
-```
-
-Or provide a static message:
-
-```yaml
-git:
-  commit_message: "chore: automated linting fixes"
-```
-
-### Branch Strategy
-
-Create changes on a feature branch:
-
-```yaml
-git:
-  branch: "forge/automated-fixes"
+  enabled: true
   auto_commit: true
+  branch: "forge/improvements-{{.Timestamp}}"
+  auto_push: true
+  remote: "origin"
 ```
 
-**Note**: In v1.0, automatic push is disabled for safety. You must manually push changes.
+Template variables:
+- `{{.Task}}`: The task description
+- `{{.Timestamp}}`: Unix timestamp
+- `{{.Date}}`: Current date (YYYY-MM-DD)
+
+### Commit Message Templates
+
+Dynamic commit messages:
+
+```yaml
+git:
+  commit_message: |
+    feat: {{.Task}}
+    
+    Generated by Forge autonomous execution
+    
+    Files modified: {{.FilesModified}}
+    Lines changed: {{.LinesChanged}}
+```
+
+### Author Attribution
+
+```yaml
+git:
+  author_name: "Forge CI Bot"
+  author_email: "ci-bot@company.com"
+```
+
+### Safety Features
+
+- Git operations only run if quality gates pass
+- Changes are staged but not pushed by default
+- Failed quality gates trigger automatic rollback
+- All git operations are logged
 
 ## CI/CD Integration
 
 ### GitHub Actions
 
-Create `.github/workflows/forge-autofix.yml`:
-
 ```yaml
-name: Forge Auto-Fix
-
+name: Forge Automated Improvements
 on:
   schedule:
-    - cron: '0 2 * * *'  # 2 AM daily
-  workflow_dispatch:
+    - cron: '0 2 * * *'  # Daily at 2 AM
+  workflow_dispatch:      # Manual trigger
 
 jobs:
-  autofix:
+  improve:
     runs-on: ubuntu-latest
-    
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
           go-version: '1.21'
       
-      - name: Install Tools
-        run: |
-          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-          go install github.com/entrhq/forge/cmd/forge-headless@latest
+      - name: Install Forge
+        run: go install github.com/entrhq/forge/cmd/forge@latest
       
       - name: Run Forge Headless
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          forge-headless -config .forge/headless-config.yaml
-      
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v3
-        if: always()
-        with:
-          name: forge-artifacts
-          path: .forge/artifacts/
+          forge -headless -headless-config .forge/daily-improvements.yaml
       
       - name: Create Pull Request
-        if: success()
         uses: peter-evans/create-pull-request@v5
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore: automated fixes via Forge"
-          title: "🤖 Automated code improvements"
-          body: |
-            Automated changes from Forge headless mode.
-            
-            See artifacts for execution details.
-          branch: forge-autofix
+          commit-message: 'chore: automated improvements'
+          branch: forge/auto-improvements
+          title: 'Automated Code Improvements'
+          body: 'Generated by Forge autonomous execution'
 ```
 
 ### GitLab CI
 
-Create `.gitlab-ci.yml`:
-
 ```yaml
-forge-autofix:
-  stage: maintenance
+forge_improvements:
   image: golang:1.21
-  
-  before_script:
-    - go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-    - go install github.com/entrhq/forge/cmd/forge-headless@latest
-  
+  stage: improve
   script:
-    - forge-headless -config .forge/headless-config.yaml
-  
-  artifacts:
-    paths:
-      - .forge/artifacts/
-    expire_in: 1 week
-  
+    - go install github.com/entrhq/forge/cmd/forge@latest
+    - forge -headless -headless-config .forge/config.yaml
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
+  artifacts:
+    paths:
+      - headless-output/
+    expire_in: 7 days
 ```
 
 ### Jenkins
@@ -569,30 +426,30 @@ forge-autofix:
 pipeline {
     agent any
     
-    environment {
-        OPENAI_API_KEY = credentials('openai-api-key')
-    }
-    
     triggers {
         cron('H 2 * * *')
     }
     
+    environment {
+        OPENAI_API_KEY = credentials('openai-api-key')
+    }
+    
     stages {
-        stage('Setup') {
+        stage('Install Forge') {
             steps {
-                sh 'go install github.com/entrhq/forge/cmd/forge-headless@latest'
+                sh 'go install github.com/entrhq/forge/cmd/forge@latest'
             }
         }
         
-        stage('Run Forge') {
+        stage('Run Headless') {
             steps {
-                sh 'forge-headless -config forge-headless.yaml'
+                sh 'forge -headless -headless-config .forge/config.yaml'
             }
         }
         
         stage('Archive Artifacts') {
             steps {
-                archiveArtifacts artifacts: '.forge/artifacts/**/*'
+                archiveArtifacts artifacts: 'headless-output/**/*'
             }
         }
     }
@@ -601,226 +458,239 @@ pipeline {
 
 ## Best Practices
 
-### 1. Start Conservative
+### Task Design
 
-Begin with tight constraints:
-
+✅ **Good Tasks**
 ```yaml
-constraints:
-  max_files: 5
-  max_lines_changed: 100
-  timeout: 2m
+task: "Add error handling to all database operations in pkg/db/"
+task: "Update deprecated API calls in controllers/"
+task: "Add unit tests for authentication functions"
 ```
 
-Gradually increase as you gain confidence.
-
-### 2. Use Required Quality Gates
-
-Always validate critical changes:
-
+❌ **Poor Tasks**
 ```yaml
-quality_gates:
-  - name: "Tests"
-    command: "go test ./..."
-    required: true
+task: "Fix everything"
+task: "Make it better"
+task: "Refactor"  # Too vague
 ```
 
-### 3. Enable Artifacts
+### Configuration Management
 
-Keep execution history:
+Store configurations in version control:
 
-```yaml
-artifacts:
-  enabled: true
-  output_dir: ".forge/artifacts"
+```
+.forge/
+├── daily-improvements.yaml
+├── security-updates.yaml
+├── test-coverage.yaml
+└── documentation.yaml
 ```
 
-### 4. Test Locally First
+### Monitoring and Alerts
 
-Before deploying to CI, test locally:
+Parse execution artifacts for monitoring:
 
 ```bash
-forge-headless -config forge-headless.yaml
-cat .forge/artifacts/summary.md
+# Check if execution succeeded
+if [ $? -eq 0 ]; then
+  echo "✓ Forge execution succeeded"
+else
+  echo "✗ Forge execution failed"
+  # Send alert
+fi
+
+# Extract metrics
+cat headless-output/metrics.json | jq '.files_modified'
 ```
 
-### 5. Use Specific Tasks
+### Incremental Adoption
 
-Clear tasks yield better results:
+Start with read-only mode:
 
 ```yaml
-# Good ✅
-task: "Add nil checks to all pointer dereferences in pkg/handler/"
-
-# Better ✅✅
-task: "Add nil checks before dereferencing pointers in pkg/handler/user.go and pkg/handler/auth.go"
-```
-
-### 6. Isolate Changes with Branches
-
-Use feature branches for review:
-
-```yaml
-git:
-  branch: "forge/automated-fixes"
-```
-
-### 7. Monitor Resource Usage
-
-Check token usage in artifacts:
-
-```bash
-cat .forge/artifacts/metrics.json | jq '.tokens_used'
-```
-
-### 8. Use Read-Only Mode for Learning
-
-When experimenting, use read-only mode:
-
-```yaml
+# Phase 1: Analysis only
 mode: read-only
+task: "Analyze code quality and suggest improvements"
+```
+
+```yaml
+# Phase 2: Small changes with approval
+mode: write
+git:
+  auto_commit: false  # Manual review required
+```
+
+```yaml
+# Phase 3: Fully automated
+mode: write
+git:
+  auto_commit: true
+  auto_push: true
 ```
 
 ## Troubleshooting
 
-### Constraint Violations
+### Common Issues
 
-**Error**: `constraint violation (file_count): maximum file count exceeded`
+#### Constraint Violations
 
-**Solution**: Increase `max_files` or narrow task scope:
+```
+Error: constraint violation (max_files): modified 15 files, limit is 10
+```
+
+**Solution**: Increase limits or break task into smaller chunks:
 
 ```yaml
 constraints:
-  max_files: 20  # Increased from 10
+  max_files: 20  # Increase limit
 ```
 
-### Quality Gate Failures
-
-**Error**: Quality gates failed
-
-**Solution**: Check the summary for details:
+Or:
 
 ```bash
-cat .forge/artifacts/summary.md
+# Break into smaller tasks
+forge -headless -headless-config task1.yaml
+forge -headless -headless-config task2.yaml
 ```
 
-Fix the underlying issues or adjust quality gates.
+#### Quality Gate Failures
 
-### Timeout Issues
-
-**Error**: `execution timeout exceeded`
-
-**Solution**: Increase timeout or simplify task:
-
-```yaml
-constraints:
-  timeout: 10m  # Increased from 5m
+```
+Error: quality gate failed: tests
+Exit code: 1
 ```
 
-### File Pattern Mismatches
-
-**Error**: `file does not match allowed patterns`
-
-**Solution**: Adjust allowed patterns:
-
-```yaml
-constraints:
-  allowed_patterns:
-    - "**/*.go"      # All Go files
-    - "pkg/**/*"     # Everything in pkg/
-```
-
-### Git Commit Failures
-
-**Error**: `failed to create commit`
-
-**Solution**: Ensure git is configured:
+**Solution**: Check test output in artifacts:
 
 ```bash
-git config user.name "Forge AI"
-git config user.email "forge@example.com"
+cat headless-output/quality-gates/tests.log
 ```
 
-Or configure in YAML:
-
-```yaml
-git:
-  author_name: "Forge AI"
-  author_email: "forge@example.com"
-```
-
-## Advanced Topics
-
-### Custom Quality Gates
-
-Create custom validation scripts:
-
-```bash
-#!/bin/bash
-# custom-gate.sh
-set -e
-
-# Run custom validation
-go test -race ./...
-go vet ./...
-staticcheck ./...
-```
-
-Add to configuration:
+Fix issues and re-run, or temporarily disable gate:
 
 ```yaml
 quality_gates:
-  - name: "Custom Validation"
-    command: "./scripts/custom-gate.sh"
-    required: true
+  require_tests: false  # Only for debugging
 ```
+
+#### Token Limit Exceeded
+
+```
+Error: constraint violation (token_limit): used 105000 tokens, limit is 100000
+```
+
+**Solution**: Increase limit or reduce task scope:
+
+```yaml
+constraints:
+  token_limit: 150000
+```
+
+#### Git Conflicts
+
+```
+Error: failed to commit changes: uncommitted changes exist
+```
+
+**Solution**: Ensure clean working directory before running:
+
+```bash
+git status  # Check for uncommitted changes
+git stash   # Stash if needed
+forge -headless -headless-config config.yaml
+```
+
+### Debug Mode
+
+Enable verbose logging:
+
+```yaml
+verbose: true
+```
+
+Or via CLI:
+
+```bash
+FORGE_LOG_LEVEL=debug forge -headless -headless-config config.yaml
+```
+
+### Artifact Inspection
+
+Check execution artifacts for details:
+
+```bash
+# Execution summary
+cat headless-output/execution.json | jq .
+
+# Metrics
+cat headless-output/metrics.json | jq .
+
+# Agent conversation log
+cat headless-output/conversation.json | jq .
+
+# Quality gate results
+ls -la headless-output/quality-gates/
+```
+
+### Getting Help
+
+1. Check logs in `headless-output/`
+2. Review configuration validation errors
+3. Test with a simpler task first
+4. Open an issue with:
+   - Configuration file
+   - Error message
+   - Execution artifacts
+
+## Advanced Usage
 
 ### Multiple Configurations
 
-Maintain separate configs for different use cases:
-
-```
-.forge/
-├── lint-fixes.yaml
-├── test-generation.yaml
-├── doc-updates.yaml
-└── security-audit.yaml
-```
-
-Run specific configurations:
+Run different tasks in sequence:
 
 ```bash
-forge-headless -config .forge/lint-fixes.yaml
+for config in .forge/*.yaml; do
+  forge -headless -headless-config "$config"
+done
 ```
 
-### Artifact Analysis
+### Custom Validation Scripts
 
-Parse execution artifacts programmatically:
+```yaml
+quality_gates:
+  custom_validations:
+    - command: "./scripts/check-api-compatibility.sh"
+      description: "API backward compatibility check"
+    
+    - command: "docker-compose -f test-compose.yml up --abort-on-container-exit"
+      description: "Integration test suite"
+```
+
+### Conditional Execution
+
+Use environment variables:
+
+```yaml
+task: "{{.TASK_DESCRIPTION}}"
+workspace_dir: "{{.WORKSPACE_PATH}}"
+```
 
 ```bash
-# Get files modified
-jq '.files_modified[].path' .forge/artifacts/execution.json
-
-# Get total lines changed
-jq '.metrics.total_lines_changed' .forge/artifacts/execution.json
-
-# Check if quality gates passed
-jq '.quality_gate_results.all_passed' .forge/artifacts/execution.json
+export TASK_DESCRIPTION="Update dependencies"
+export WORKSPACE_PATH="/path/to/project"
+forge -headless -headless-config config.yaml
 ```
 
-## Security Considerations
+### Artifact Post-Processing
 
-1. **API Keys**: Use secret management (GitHub Secrets, etc.)
-2. **Workspace Isolation**: Run in isolated directories
-3. **Tool Restrictions**: Only enable necessary tools
-4. **File Patterns**: Use strict allowlists
-5. **Quality Gates**: Validate all changes
-6. **Review Changes**: Always review before merging
+```bash
+# Generate reports from artifacts
+forge -headless -headless-config analyze.yaml
 
-## Further Reading
+# Extract insights
+jq -r '.summary' headless-output/execution.json > report.txt
 
-- [ADR-0026: Headless Mode Architecture](../docs/adr/0026-headless-mode-architecture.md)
-- [ADR-0027: Safety Constraint System](../docs/adr/0027-safety-constraint-system.md)
-- [ADR-0028: Quality Gate Architecture](../docs/adr/0028-quality-gate-architecture.md)
-- [ADR-0029: Headless Git Integration](../docs/adr/0029-headless-git-integration.md)
-- [Examples](../examples/headless/)
+# Send to monitoring
+curl -X POST https://monitoring.example.com/metrics \
+  -d @headless-output/metrics.json
+```

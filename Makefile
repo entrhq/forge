@@ -1,4 +1,4 @@
-.PHONY: test lint fmt clean examples run-example help install-tools tidy install uninstall
+.PHONY: test lint fmt clean examples run-example help install-tools tidy install uninstall build
 
 # Go parameters
 GOCMD=go
@@ -74,6 +74,12 @@ run: ## Run the forge TUI coding agent
 	@echo "Running forge..."
 	@echo "Note: Make sure OPENAI_API_KEY is set in your environment"
 	$(GOCMD) run ./cmd/forge
+
+build: ## Build forge binary to .bin directory
+	@echo "Building forge..."
+	@mkdir -p .bin
+	$(GOBUILD) -o .bin/forge ./cmd/forge
+	@echo "✓ forge built successfully at .bin/forge"
 
 install: ## Install forge binary to GOPATH/bin
 	@echo "Installing forge to $(shell go env GOPATH)/bin..."

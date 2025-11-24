@@ -15,7 +15,7 @@ func TestThinkingParserWithLessThanGreaterThan(t *testing.T) {
 		"<thinking>",
 		"Looking at code:\n",
 		"1. Line 8: `var x int=5`\n",
-		"2. Line 11: `if x>3{`\n",          // Contains >
+		"2. Line 11: `if x>3{`\n",            // Contains >
 		"3. Line 15: `for i:=0;i<10;i++{`\n", // Contains <
 		"</thinking>",
 		"\n\n<tool>test</tool>",
@@ -27,20 +27,30 @@ func TestThinkingParserWithLessThanGreaterThan(t *testing.T) {
 
 	for i, chunk := range chunks {
 		thinking, message := parser.Parse(chunk)
-		
+
 		if thinking != nil {
 			thinkingContent += thinking.Content
 		}
 		if message != nil {
 			messageContent += message.Content
 		}
-		
+
 		stillInThinking = parser.IsInThinking()
-		
-		t.Logf("Chunk %d: inThinking=%v, thinking=%q, message=%q", 
-			i, stillInThinking, 
-			func() string { if thinking != nil { return thinking.Content }; return "" }(),
-			func() string { if message != nil { return message.Content }; return "" }())
+
+		t.Logf("Chunk %d: inThinking=%v, thinking=%q, message=%q",
+			i, stillInThinking,
+			func() string {
+				if thinking != nil {
+					return thinking.Content
+				}
+				return ""
+			}(),
+			func() string {
+				if message != nil {
+					return message.Content
+				}
+				return ""
+			}())
 	}
 
 	// Flush any remaining content
