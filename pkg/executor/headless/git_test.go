@@ -84,8 +84,8 @@ func TestGitManager_CheckWorkspaceClean(t *testing.T) {
 
 	// Create uncommitted file
 	testFile := filepath.Join(testDir, "test.txt")
-	if err := os.WriteFile(testFile, []byte("test content\n"), 0644); err != nil {
-		t.Fatalf("failed to write test file: %v", err)
+	if writeErr := os.WriteFile(testFile, []byte("test content\n"), 0644); writeErr != nil {
+		t.Fatalf("failed to write test file: %v", writeErr)
 	}
 
 	// Test dirty workspace
@@ -208,14 +208,14 @@ func TestGitManager_GetChangedFiles(t *testing.T) {
 
 	// Modify a file
 	readmePath := filepath.Join(testDir, "README.md")
-	if err := os.WriteFile(readmePath, []byte("# Modified README\n"), 0644); err != nil {
-		t.Fatalf("failed to modify README: %v", err)
+	if writeErr := os.WriteFile(readmePath, []byte("# Modified README\n"), 0644); writeErr != nil {
+		t.Fatalf("failed to modify README: %v", writeErr)
 	}
 
 	// Add a new file
 	newFile := filepath.Join(testDir, "new.txt")
-	if err := os.WriteFile(newFile, []byte("new content\n"), 0644); err != nil {
-		t.Fatalf("failed to write new file: %v", err)
+	if writeErr := os.WriteFile(newFile, []byte("new content\n"), 0644); writeErr != nil {
+		t.Fatalf("failed to write new file: %v", writeErr)
 	}
 
 	// Get changed files - note: git diff only shows tracked files by default
@@ -263,7 +263,7 @@ func TestGitManager_Rollback(t *testing.T) {
 	}
 
 	// Verify new file was removed
-	if _, err := os.Stat(newFile); !os.IsNotExist(err) {
+	if _, statErr := os.Stat(newFile); !os.IsNotExist(statErr) {
 		t.Error("expected new file to be removed after rollback")
 	}
 
@@ -366,7 +366,7 @@ func TestGitManager_WorkspaceStateValidation(t *testing.T) {
 	// Test 2: Create feature branch and commit
 	t.Run("branch workflow", func(t *testing.T) {
 		branchName := GenerateBranchName("forge/test")
-		
+
 		// Create branch
 		err := gm.CreateBranch(ctx, branchName)
 		if err != nil {
@@ -384,8 +384,8 @@ func TestGitManager_WorkspaceStateValidation(t *testing.T) {
 
 		// Make changes
 		testFile := filepath.Join(testDir, "feature.txt")
-		if err := os.WriteFile(testFile, []byte("feature content\n"), 0644); err != nil {
-			t.Fatalf("failed to write file: %v", err)
+		if writeErr := os.WriteFile(testFile, []byte("feature content\n"), 0644); writeErr != nil {
+			t.Fatalf("failed to write file: %v", writeErr)
 		}
 
 		// Commit changes
@@ -422,20 +422,20 @@ func TestGitManager_DetachedHeadDetection(t *testing.T) {
 
 	// Create a commit to get a commit hash
 	testFile := filepath.Join(testDir, "test.txt")
-	if err := os.WriteFile(testFile, []byte("test\n"), 0644); err != nil {
-		t.Fatalf("failed to write file: %v", err)
+	if writeErr := os.WriteFile(testFile, []byte("test\n"), 0644); writeErr != nil {
+		t.Fatalf("failed to write file: %v", writeErr)
 	}
 
 	cmd := exec.Command("git", "add", "test.txt")
 	cmd.Dir = testDir
-	if err := cmd.Run(); err != nil {
-		t.Fatalf("failed to add file: %v", err)
+	if runErr := cmd.Run(); runErr != nil {
+		t.Fatalf("failed to add file: %v", runErr)
 	}
 
 	cmd = exec.Command("git", "commit", "-m", "test commit")
 	cmd.Dir = testDir
-	if err := cmd.Run(); err != nil {
-		t.Fatalf("failed to commit: %v", err)
+	if runErr := cmd.Run(); runErr != nil {
+		t.Fatalf("failed to commit: %v", runErr)
 	}
 
 	// Get commit hash
@@ -450,8 +450,8 @@ func TestGitManager_DetachedHeadDetection(t *testing.T) {
 	// Checkout detached HEAD
 	cmd = exec.Command("git", "checkout", commitHash)
 	cmd.Dir = testDir
-	if err := cmd.Run(); err != nil {
-		t.Fatalf("failed to checkout detached HEAD: %v", err)
+	if runErr := cmd.Run(); runErr != nil {
+		t.Fatalf("failed to checkout detached HEAD: %v", runErr)
 	}
 
 	// Get current branch should return empty for detached HEAD

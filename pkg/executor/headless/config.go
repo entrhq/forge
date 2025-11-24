@@ -17,8 +17,8 @@ type Config struct {
 	Constraints ConstraintConfig `yaml:"constraints" json:"constraints"`
 
 	// Quality gates
-	QualityGates         []QualityGateConfig `yaml:"quality_gates" json:"quality_gates"`
-	QualityGateMaxRetries int                `yaml:"quality_gate_max_retries" json:"quality_gate_max_retries"` // Global max retries for quality gates (default: 3)
+	QualityGates          []QualityGateConfig `yaml:"quality_gates" json:"quality_gates"`
+	QualityGateMaxRetries int                 `yaml:"quality_gate_max_retries" json:"quality_gate_max_retries"` // Global max retries for quality gates (default: 3)
 
 	// Git configuration
 	Git GitConfig `yaml:"git" json:"git"`
@@ -69,12 +69,13 @@ type QualityGateConfig struct {
 
 // GitConfig defines git operation configuration
 type GitConfig struct {
-	AutoCommit    bool   `yaml:"auto_commit" json:"auto_commit"`
-	AutoPush      bool   `yaml:"auto_push" json:"auto_push"`
-	CommitMessage string `yaml:"commit_message" json:"commit_message"`
-	Branch        string `yaml:"branch" json:"branch"`
-	AuthorName    string `yaml:"author_name" json:"author_name"`
-	AuthorEmail   string `yaml:"author_email" json:"author_email"`
+	AutoCommit          bool   `yaml:"auto_commit" json:"auto_commit"`
+	AutoPush            bool   `yaml:"auto_push" json:"auto_push"`
+	CommitOnQualityFail bool   `yaml:"commit_on_quality_fail" json:"commit_on_quality_fail"` // Whether to commit partial work when quality gates fail
+	CommitMessage       string `yaml:"commit_message" json:"commit_message"`
+	Branch              string `yaml:"branch" json:"branch"`
+	AuthorName          string `yaml:"author_name" json:"author_name"`
+	AuthorEmail         string `yaml:"author_email" json:"author_email"`
 }
 
 // ArtifactConfig defines artifact generation configuration

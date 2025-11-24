@@ -12,8 +12,9 @@ import (
 )
 
 const (
-	statusSuccess = "success"
-	statusFailed  = "failed"
+	statusSuccess        = "success"
+	statusFailed         = "failed"
+	statusPartialSuccess = "partial_success"
 )
 
 // Executor implements the headless mode executor
@@ -26,9 +27,9 @@ type Executor struct {
 	gitManager     *GitManager
 
 	// Execution state
-	startTime              time.Time
-	summary                *ExecutionSummary
-	qualityGateRetryCount  int
+	startTime             time.Time
+	summary               *ExecutionSummary
+	qualityGateRetryCount int
 }
 
 // NewExecutor creates a new headless executor with a pre-configured agent
@@ -179,21 +180,33 @@ func (e *Executor) Run(ctx context.Context) error {
 			if event.Type == types.EventTypeTurnEnd {
 				turnEndReceived = true
 				log.Printf("[Headless] Turn end received, running quality gates")
-				
+
 				// Run quality gates before shutdown
 				if len(e.qualityGates.gates) > 0 {
 					results := e.qualityGates.RunAll(ctx, e.config.WorkspaceDir)
-					
+
 					if !results.AllPassed {
 						e.qualityGateRetryCount++
 						log.Printf("[Headless] Quality gates failed (attempt %d/%d)", e.qualityGateRetryCount, e.config.QualityGateMaxRetries)
-						
+
+						// Store quality gate results for later use in finalize
+						e.summary.QualityGateResults = results
+
 						// Check if we've exceeded max retries
 						if e.qualityGateRetryCount >= e.config.QualityGateMaxRetries {
-							log.Printf("[Headless] Max quality gate retries exceeded, failing execution")
-							e.summary.Status = statusFailed
-							e.summary.Error = fmt.Sprintf("Quality gates failed after %d attempts:\n%s", e.qualityGateRetryCount, results.FormatErrorMessage())
-							
+							log.Printf("[Headless] Max quality gate retries exceeded")
+
+							// Set status based on commit_on_quality_fail configuration
+							if e.config.Git.CommitOnQualityFail {
+								log.Printf("[Headless] Will commit partial work despite quality gate failures")
+								e.summary.Status = statusPartialSuccess
+								e.summary.Error = fmt.Sprintf("Quality gates failed after %d attempts, but changes were committed:\n%s", e.qualityGateRetryCount, results.FormatErrorMessage())
+							} else {
+								log.Printf("[Headless] Failing execution without commit")
+								e.summary.Status = statusFailed
+								e.summary.Error = fmt.Sprintf("Quality gates failed after %d attempts:\n%s", e.qualityGateRetryCount, results.FormatErrorMessage())
+							}
+
 							// Signal shutdown after max retries
 							select {
 							case e.agent.GetChannels().Shutdown <- struct{}{}:
@@ -205,7 +218,7 @@ func (e *Executor) Run(ctx context.Context) error {
 							// Send feedback to agent for retry
 							feedbackMsg := results.FormatFeedbackMessage(e.qualityGateRetryCount, e.config.QualityGateMaxRetries)
 							log.Printf("[Headless] Sending quality gate feedback to agent for retry")
-							
+
 							select {
 							case e.agent.GetChannels().Input <- types.NewUserInput(feedbackMsg):
 								log.Printf("[Headless] Quality gate feedback sent to agent")
@@ -318,13 +331,13 @@ func (e *Executor) validateWorkspace() {
 	// Check git status if git operations are enabled
 	if e.config.Git.AutoCommit {
 		ctx := context.Background()
-		
+
 		// Check if workspace is clean
 		if err := e.gitManager.CheckWorkspaceClean(ctx); err != nil {
 			log.Printf("[Headless] Warning: Workspace has uncommitted changes: %v", err)
 			log.Printf("[Headless] Continuing with execution - changes will be included in auto-commit")
 		}
-		
+
 		// Get current branch
 		currentBranch, err := e.gitManager.GetCurrentBranch(ctx)
 		if err != nil {
@@ -332,7 +345,7 @@ func (e *Executor) validateWorkspace() {
 		} else {
 			log.Printf("[Headless] Current branch: %s", currentBranch)
 		}
-		
+
 		log.Printf("[Headless] Git auto-commit enabled")
 	}
 }
@@ -367,20 +380,21 @@ func (e *Executor) finalize(ctx context.Context) error {
 	// This finalize step just needs to check if gates were run and set final status
 	if len(e.qualityGates.gates) > 0 {
 		// If we got here, either gates passed or we exceeded max retries
-		if e.summary.Status != statusFailed {
+		if e.summary.Status != statusFailed && e.summary.Status != statusPartialSuccess {
 			// Gates must have passed (or never run)
 			e.summary.Status = statusSuccess
 			log.Printf("[Headless] Finalize: Quality gates passed during execution")
 		} else {
-			// Status was already set to failed during turn end processing
-			log.Printf("[Headless] Finalize: Quality gates failed, status already set")
+			// Status was already set to failed or partial_success during turn end processing
+			log.Printf("[Headless] Finalize: Quality gates failed or partial success, status already set to: %s", e.summary.Status)
 		}
 	} else {
 		e.summary.Status = statusSuccess
 	}
 
-	// Commit changes if configured and gates passed
-	if e.config.Git.AutoCommit && e.summary.Status == statusSuccess {
+	// Commit changes if configured and status allows it
+	// Commit on: statusSuccess or partial_success (when commit_on_quality_fail is true)
+	if e.config.Git.AutoCommit && (e.summary.Status == statusSuccess || e.summary.Status == statusPartialSuccess) {
 		if err := e.commitChanges(ctx); err != nil {
 			log.Printf("[Headless] Warning: failed to commit changes: %v", err)
 			// Don't fail the execution, just log the warning
@@ -399,7 +413,8 @@ func (e *Executor) finalize(ctx context.Context) error {
 	// Log final status
 	log.Printf("[Headless] Execution completed: %s (duration: %s)", e.summary.Status, e.summary.Duration)
 
-	if e.summary.Status != statusSuccess {
+	// Return error only for complete failures, not partial success
+	if e.summary.Status == statusFailed {
 		return fmt.Errorf("execution failed: %s", e.summary.Error)
 	}
 
@@ -413,14 +428,14 @@ func (e *Executor) commitChanges(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to check for changes: %w", err)
 	}
-	
+
 	if len(changedFiles) == 0 {
 		log.Printf("[Headless] No changes to commit")
 		return nil
 	}
-	
+
 	log.Printf("[Headless] Found %d changed file(s): %v", len(changedFiles), changedFiles)
-	
+
 	// Generate commit message
 	message := e.gitManager.GenerateCommitMessage(ctx, e.config.Task)
 

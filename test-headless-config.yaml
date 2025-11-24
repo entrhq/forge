@@ -13,6 +13,7 @@ constraints:
 git:
   auto_commit: true
   auto_push: false
+  commit_on_quality_fail: true
   commit_message: "test: Add hello.txt via headless executor"
   author_name: "Forge Headless"
   author_email: "forge@example.com"

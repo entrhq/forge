@@ -9,10 +9,10 @@ import (
 
 func TestQualityGateRunner_RunAll(t *testing.T) {
 	tests := []struct {
-		name           string
-		gates          []QualityGate
-		wantAllPassed  bool
-		wantFailedLen  int
+		name          string
+		gates         []QualityGate
+		wantAllPassed bool
+		wantFailedLen int
 	}{
 		{
 			name:          "no gates",
@@ -53,16 +53,16 @@ func TestQualityGateRunner_RunAll(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			runner := NewQualityGateRunner(tt.gates)
 			ctx := context.Background()
-			
+
 			// Create temp workspace
 			tmpDir := t.TempDir()
-			
+
 			results := runner.RunAll(ctx, tmpDir)
-			
+
 			if results.AllPassed != tt.wantAllPassed {
 				t.Errorf("AllPassed = %v, want %v", results.AllPassed, tt.wantAllPassed)
 			}
-			
+
 			failedGates := results.GetFailedGates()
 			if len(failedGates) != tt.wantFailedLen {
 				t.Errorf("failed gates len = %d, want %d", len(failedGates), tt.wantFailedLen)
@@ -91,11 +91,11 @@ func TestQualityGateResults_FormatFeedbackMessage(t *testing.T) {
 	}
 
 	msg := results.FormatFeedbackMessage(1, 3)
-	
+
 	if msg == "" {
 		t.Error("Expected non-empty feedback message")
 	}
-	
+
 	// Check that message contains key elements
 	expectedParts := []string{
 		"attempt 1/3",
@@ -103,7 +103,7 @@ func TestQualityGateResults_FormatFeedbackMessage(t *testing.T) {
 		"❌ test",
 		"task_completion",
 	}
-	
+
 	for _, part := range expectedParts {
 		if !contains(msg, part) {
 			t.Errorf("Message missing expected part: %s\nMessage: %s", part, msg)
@@ -139,18 +139,18 @@ func TestCommandQualityGate_Execute(t *testing.T) {
 			tmpDir := t.TempDir()
 			ctx := context.Background()
 			err := tt.gate.Execute(ctx, tmpDir)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Execute() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			
+
 			// For error cases, check that we get a QualityGateError
 			if err != nil {
 				if _, ok := err.(*QualityGateError); !ok {
 					t.Errorf("Expected QualityGateError, got %T", err)
 				}
 			}
-			
+
 			// For the file creation test, verify the file was created
 			if tt.name == "command that creates file" {
 				testFile := filepath.Join(tmpDir, "test.txt")
@@ -163,7 +163,7 @@ func TestCommandQualityGate_Execute(t *testing.T) {
 }
 
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && 
+	return len(s) >= len(substr) &&
 		(s == substr || len(s) > len(substr) && findSubstring(s, substr))
 }
 
