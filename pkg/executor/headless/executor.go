@@ -26,8 +26,9 @@ type Executor struct {
 	gitManager     *GitManager
 
 	// Execution state
-	startTime time.Time
-	summary   *ExecutionSummary
+	startTime              time.Time
+	summary                *ExecutionSummary
+	qualityGateRetryCount  int
 }
 
 // NewExecutor creates a new headless executor with a pre-configured agent
@@ -35,6 +36,11 @@ func NewExecutor(ag agent.Agent, config *Config) (*Executor, error) {
 	// Validate configuration
 	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid configuration: %w", err)
+	}
+
+	// Set default max retries if not configured
+	if config.QualityGateMaxRetries == 0 {
+		config.QualityGateMaxRetries = 3
 	}
 
 	// Create constraint manager with execution mode
@@ -55,12 +61,13 @@ func NewExecutor(ag agent.Agent, config *Config) (*Executor, error) {
 	gitManager := NewGitManager(config.WorkspaceDir, config.Git)
 
 	return &Executor{
-		agent:          ag,
-		config:         config,
-		constraintMgr:  constraintMgr,
-		qualityGates:   qualityGateRunner,
-		artifactWriter: artifactWriter,
-		gitManager:     gitManager,
+		agent:                 ag,
+		config:                config,
+		constraintMgr:         constraintMgr,
+		qualityGates:          qualityGateRunner,
+		artifactWriter:        artifactWriter,
+		gitManager:            gitManager,
+		qualityGateRetryCount: 0,
 		summary: &ExecutionSummary{
 			Task:   config.Task,
 			Status: "running",
@@ -171,13 +178,70 @@ func (e *Executor) Run(ctx context.Context) error {
 			// Track turn end - this signals task completion
 			if event.Type == types.EventTypeTurnEnd {
 				turnEndReceived = true
-				log.Printf("[Headless] Turn end received")
-				// Signal graceful shutdown
-				select {
-				case e.agent.GetChannels().Shutdown <- struct{}{}:
-					log.Printf("[Headless] Shutdown signal sent to agent on turn end")
-				default:
-					log.Printf("[Headless] Shutdown channel already signaled on turn end")
+				log.Printf("[Headless] Turn end received, running quality gates")
+				
+				// Run quality gates before shutdown
+				if len(e.qualityGates.gates) > 0 {
+					results := e.qualityGates.RunAll(ctx, e.config.WorkspaceDir)
+					
+					if !results.AllPassed {
+						e.qualityGateRetryCount++
+						log.Printf("[Headless] Quality gates failed (attempt %d/%d)", e.qualityGateRetryCount, e.config.QualityGateMaxRetries)
+						
+						// Check if we've exceeded max retries
+						if e.qualityGateRetryCount >= e.config.QualityGateMaxRetries {
+							log.Printf("[Headless] Max quality gate retries exceeded, failing execution")
+							e.summary.Status = statusFailed
+							e.summary.Error = fmt.Sprintf("Quality gates failed after %d attempts:\n%s", e.qualityGateRetryCount, results.FormatErrorMessage())
+							
+							// Signal shutdown after max retries
+							select {
+							case e.agent.GetChannels().Shutdown <- struct{}{}:
+								log.Printf("[Headless] Shutdown signal sent after max quality gate retries")
+							default:
+								log.Printf("[Headless] Shutdown channel already signaled")
+							}
+						} else {
+							// Send feedback to agent for retry
+							feedbackMsg := results.FormatFeedbackMessage(e.qualityGateRetryCount, e.config.QualityGateMaxRetries)
+							log.Printf("[Headless] Sending quality gate feedback to agent for retry")
+							
+							select {
+							case e.agent.GetChannels().Input <- types.NewUserInput(feedbackMsg):
+								log.Printf("[Headless] Quality gate feedback sent to agent")
+								// Don't shutdown - let the agent retry
+								turnEndReceived = false // Reset to allow another turn
+							default:
+								log.Printf("[Headless] Failed to send quality gate feedback, input channel blocked")
+								e.summary.Status = statusFailed
+								e.summary.Error = "Failed to send quality gate feedback to agent"
+								select {
+								case e.agent.GetChannels().Shutdown <- struct{}{}:
+									log.Printf("[Headless] Shutdown signal sent after feedback failure")
+								default:
+									log.Printf("[Headless] Shutdown channel already signaled")
+								}
+							}
+						}
+					} else {
+						log.Printf("[Headless] Quality gates passed")
+						// Signal graceful shutdown on success
+						select {
+						case e.agent.GetChannels().Shutdown <- struct{}{}:
+							log.Printf("[Headless] Shutdown signal sent to agent on turn end")
+						default:
+							log.Printf("[Headless] Shutdown channel already signaled on turn end")
+						}
+					}
+				} else {
+					// No quality gates configured, proceed with normal shutdown
+					log.Printf("[Headless] No quality gates configured, proceeding with shutdown")
+					select {
+					case e.agent.GetChannels().Shutdown <- struct{}{}:
+						log.Printf("[Headless] Shutdown signal sent to agent on turn end")
+					default:
+						log.Printf("[Headless] Shutdown channel already signaled on turn end")
+					}
 				}
 			}
 
@@ -285,23 +349,17 @@ func (e *Executor) finalize(ctx context.Context) error {
 		Iterations:        e.summary.ToolCallCount, // Each tool call represents one iteration of the agent loop
 	}
 
-	// Run quality gates if configured
+	// Quality gates have already been run during the event loop at turn end
+	// This finalize step just needs to check if gates were run and set final status
 	if len(e.qualityGates.gates) > 0 {
-		log.Printf("[Headless] Running quality gates...")
-		results := e.qualityGates.RunAll(ctx, e.config.WorkspaceDir)
-		e.summary.QualityGateResults = results
-
-		if !results.AllPassed {
-			e.summary.Status = statusFailed
-			e.summary.Error = results.FormatErrorMessage()
-			log.Printf("[Headless] Quality gates failed")
-
-			// Note: Rollback is disabled to preserve work done by the agent
-			// The task will fail but changes will be kept for inspection
-			log.Printf("[Headless] Rollback disabled - preserving changes for inspection")
-		} else {
+		// If we got here, either gates passed or we exceeded max retries
+		if e.summary.Status != statusFailed {
+			// Gates must have passed (or never run)
 			e.summary.Status = statusSuccess
-			log.Printf("[Headless] Quality gates passed")
+			log.Printf("[Headless] Finalize: Quality gates passed during execution")
+		} else {
+			// Status was already set to failed during turn end processing
+			log.Printf("[Headless] Finalize: Quality gates failed, status already set")
 		}
 	} else {
 		e.summary.Status = statusSuccess

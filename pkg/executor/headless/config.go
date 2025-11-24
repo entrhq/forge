@@ -17,7 +17,8 @@ type Config struct {
 	Constraints ConstraintConfig `yaml:"constraints" json:"constraints"`
 
 	// Quality gates
-	QualityGates []QualityGateConfig `yaml:"quality_gates" json:"quality_gates"`
+	QualityGates         []QualityGateConfig `yaml:"quality_gates" json:"quality_gates"`
+	QualityGateMaxRetries int                `yaml:"quality_gate_max_retries" json:"quality_gate_max_retries"` // Global max retries for quality gates (default: 3)
 
 	// Git configuration
 	Git GitConfig `yaml:"git" json:"git"`
@@ -60,9 +61,10 @@ type ConstraintConfig struct {
 
 // QualityGateConfig defines a quality gate to run before committing changes
 type QualityGateConfig struct {
-	Name     string `yaml:"name" json:"name"`
-	Command  string `yaml:"command" json:"command"`
-	Required bool   `yaml:"required" json:"required"`
+	Name       string `yaml:"name" json:"name"`
+	Command    string `yaml:"command" json:"command"`
+	Required   bool   `yaml:"required" json:"required"`
+	MaxRetries int    `yaml:"max_retries" json:"max_retries"` // Maximum number of retry attempts (default: 3)
 }
 
 // GitConfig defines git operation configuration

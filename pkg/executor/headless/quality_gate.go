@@ -3,6 +3,7 @@ package headless
 import (
 	"context"
 	"fmt"
+	"log"
 	"os/exec"
 	"strings"
 	"time"
@@ -209,6 +210,31 @@ func (r *QualityGateResults) FormatErrorMessage() string {
 		}
 	}
 
+	return msg.String()
+}
+
+// FormatFeedbackMessage creates a feedback message for the agent to fix quality gate failures
+func (r *QualityGateResults) FormatFeedbackMessage(retryCount, maxRetries int) string {
+	failed := r.GetFailedGates()
+	if len(failed) == 0 {
+		return ""
+	}
+
+	var msg strings.Builder
+	msg.WriteString(fmt.Sprintf("Your previous task completion failed quality gates (attempt %d/%d).\n\n", retryCount, maxRetries))
+	msg.WriteString("Please review and fix the following issues:\n\n")
+
+	for _, result := range failed {
+		msg.WriteString(fmt.Sprintf("❌ %s\n", result.Name))
+		if result.Error != "" {
+			// Extract useful error information from QualityGateError
+			msg.WriteString(fmt.Sprintf("   %s\n\n", result.Error))
+		}
+	}
+
+	msg.WriteString("\nAfter fixing these issues, use task_completion again to revalidate your changes.")
+
+	log.Printf("Quality gate failed, sending message to agent:\n%s", msg.String())
 	return msg.String()
 }
 
