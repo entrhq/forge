@@ -317,8 +317,22 @@ func (e *Executor) validateWorkspace() {
 
 	// Check git status if git operations are enabled
 	if e.config.Git.AutoCommit {
-		// Note: We're being lenient here - workspace doesn't need to be clean
-		// We'll handle uncommitted changes appropriately
+		ctx := context.Background()
+		
+		// Check if workspace is clean
+		if err := e.gitManager.CheckWorkspaceClean(ctx); err != nil {
+			log.Printf("[Headless] Warning: Workspace has uncommitted changes: %v", err)
+			log.Printf("[Headless] Continuing with execution - changes will be included in auto-commit")
+		}
+		
+		// Get current branch
+		currentBranch, err := e.gitManager.GetCurrentBranch(ctx)
+		if err != nil {
+			log.Printf("[Headless] Warning: Could not determine current branch: %v", err)
+		} else {
+			log.Printf("[Headless] Current branch: %s", currentBranch)
+		}
+		
 		log.Printf("[Headless] Git auto-commit enabled")
 	}
 }
@@ -394,6 +408,19 @@ func (e *Executor) finalize(ctx context.Context) error {
 
 // commitChanges creates a git commit with the changes
 func (e *Executor) commitChanges(ctx context.Context) error {
+	// Check if there are any changes to commit
+	changedFiles, err := e.gitManager.GetChangedFiles(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to check for changes: %w", err)
+	}
+	
+	if len(changedFiles) == 0 {
+		log.Printf("[Headless] No changes to commit")
+		return nil
+	}
+	
+	log.Printf("[Headless] Found %d changed file(s): %v", len(changedFiles), changedFiles)
+	
 	// Generate commit message
 	message := e.gitManager.GenerateCommitMessage(ctx, e.config.Task)
 
@@ -402,7 +429,7 @@ func (e *Executor) commitChanges(ctx context.Context) error {
 		return fmt.Errorf("failed to create commit: %w", err)
 	}
 
-	log.Printf("[Headless] Created git commit")
+	log.Printf("[Headless] Created git commit with message: %s", message)
 	return nil
 }
 

@@ -1,0 +1,28 @@
+task: "Create a simple test file called hello.txt with the content 'Hello, World!'"
+
+mode: "write"
+
+workspace_dir: "/tmp/forge-headless-test"
+
+constraints:
+  max_files: 5
+  max_lines_changed: 100
+  max_tokens: 50000
+  timeout: "60s"
+
+git:
+  auto_commit: true
+  commit_message: "test: Add hello.txt via headless executor"
+  author_name: "Forge Headless"
+  author_email: "forge@example.com"
+
+artifacts:
+  enabled: true
+  output_dir: "artifacts"
+  json: true
+  markdown: true
+  metrics: true
+
+quality_gate_max_retries: 3
+
+verbose: true

@@ -84,9 +84,10 @@ func (g *GitManager) Commit(ctx context.Context, message string) error {
 	return nil
 }
 
-// GetChangedFiles returns a list of files that have been modified
+// GetChangedFiles returns a list of files that have been modified or are untracked
 func (g *GitManager) GetChangedFiles(ctx context.Context) ([]string, error) {
-	output, err := g.execGit(ctx, "diff", "--name-only", "HEAD")
+	// Use git status --porcelain to get both modified and untracked files
+	output, err := g.execGit(ctx, "status", "--porcelain")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get changed files: %w", err)
 	}
@@ -94,8 +95,15 @@ func (g *GitManager) GetChangedFiles(ctx context.Context) ([]string, error) {
 	lines := strings.Split(strings.TrimSpace(output), "\n")
 	files := make([]string, 0, len(lines))
 	for _, line := range lines {
-		if line != "" {
-			files = append(files, line)
+		if line == "" {
+			continue
+		}
+		// Parse git status format: "XY filename"
+		// X shows the status of the index, Y shows the status of the work tree
+		// We want files with any status (modified, added, untracked, etc.)
+		if len(line) > 3 {
+			filename := strings.TrimSpace(line[3:])
+			files = append(files, filename)
 		}
 	}
 
