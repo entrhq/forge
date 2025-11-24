@@ -90,6 +90,141 @@ artifacts:
 
 ## Configuration
 
+### Complete Configuration Schema
+
+Here is the complete YAML configuration schema with all available options:
+
+```yaml
+# Task description (REQUIRED)
+task: "Your task description here"
+
+# Execution mode: "read-only" or "write" (default: "write")
+mode: write
+
+# Workspace directory (REQUIRED if not using CLI flag)
+workspace_dir: /path/to/workspace
+
+# Enable verbose logging (default: false)
+verbose: false
+
+# Safety constraints
+constraints:
+  # File modification limits
+  max_files: 10                    # Maximum number of files that can be modified
+  max_lines_changed: 500           # Maximum total lines added/removed
+  
+  # File access patterns (glob syntax)
+  allowed_patterns:                # Only allow modifications to these patterns
+    - "src/**/*.go"
+    - "pkg/**/*.go"
+    - "docs/**/*.md"
+  
+  denied_patterns:                 # Never allow modifications to these patterns
+    - "vendor/**"
+    - ".git/**"
+    - "node_modules/**"
+    - "**/*_generated.*"
+  
+  # Tool restrictions
+  allowed_tools:                   # Whitelist of allowed tools
+    - task_completion
+    - read_file
+    - write_file
+    - apply_diff
+    - search_files
+    - list_files
+    - execute_command
+  
+  # Resource limits
+  max_tokens: 50000               # Maximum LLM tokens to consume
+  timeout: 5m                     # Maximum execution time (e.g., "5m", "300s", "1h30m")
+
+# Quality gates (commands to run before committing)
+quality_gates:
+  - name: "Run tests"
+    command: "go test ./..."
+    required: true                # If true, failure aborts execution
+  
+  - name: "Lint"
+    command: "golangci-lint run"
+    required: false               # Optional quality gate
+
+# Git configuration
+git:
+  auto_commit: false              # Automatically commit changes if quality gates pass
+  commit_message: "chore: automated changes via Forge"
+  branch: ""                      # Branch to commit to (empty = current branch)
+  author_name: "Forge AI"
+  author_email: "forge@example.com"
+
+# Artifact generation
+artifacts:
+  enabled: true                   # Generate execution artifacts
+  output_dir: ".forge/artifacts"  # Where to write artifacts
+  formats:                        # Artifact formats to generate
+    - "execution.json"            # Detailed execution log
+    - "summary.md"                # Human-readable summary
+```
+
+### Default Values
+
+If you don't specify certain fields, these defaults are used:
+
+```yaml
+mode: write
+
+constraints:
+  max_files: 10
+  max_lines_changed: 500
+  timeout: 5m
+  max_tokens: 50000
+  allowed_tools:
+    - task_completion
+    - read_file
+    - write_file
+    - apply_diff
+    - search_files
+    - list_files
+    - execute_command
+  denied_patterns:
+    - ".git/**"
+    - "vendor/**"
+    - "node_modules/**"
+    - "**/*_generated.*"
+
+git:
+  auto_commit: false
+  commit_message: "chore: automated changes via Forge"
+  author_name: "Forge AI"
+  author_email: "forge@example.com"
+
+artifacts:
+  enabled: true
+  output_dir: ".forge/artifacts"
+  formats:
+    - "execution.json"
+    - "summary.md"
+```
+
+### Minimal Configuration
+
+The absolute minimum required configuration is:
+
+```yaml
+task: "Fix linting errors"
+workspace_dir: .
+```
+
+Everything else will use defaults.
+
+### Timeout Format
+
+The `timeout` field accepts Go duration strings:
+- `300s` - 300 seconds
+- `5m` - 5 minutes
+- `1h30m` - 1 hour 30 minutes
+- `2h` - 2 hours
+
 ### Execution Modes
 
 #### Write Mode

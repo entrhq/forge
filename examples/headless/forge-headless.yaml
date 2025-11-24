@@ -1,91 +1,79 @@
-# Forge Headless Configuration Example
-# This configuration file demonstrates how to configure the headless executor
-# for autonomous CI/CD execution with safety constraints and quality gates.
+# Forge Headless Mode - Base Configuration Template
+# Copy this file and customize it for your project
 
-# Task description - what the agent should accomplish
-task: "Fix all linting errors and format code according to project standards"
+# REQUIRED: Describe what you want the AI to do
+task: "Fix all linting errors in the project"
 
-# Execution mode: "read-only" or "write"
+# Execution mode: "read-only" (analysis only) or "write" (make changes)
 mode: write
+
+# REQUIRED: Path to your project workspace
+workspace_dir: .
+
+# Enable detailed logging (useful for debugging)
+verbose: false
 
 # Safety constraints to prevent runaway execution
 constraints:
-  # Maximum number of files that can be modified
-  max_files: 10
+  # File modification limits
+  max_files: 10                    # Maximum number of files that can be modified
+  max_lines_changed: 500           # Maximum total lines that can be added/removed
   
-  # Maximum total lines changed across all files
-  max_lines_changed: 500
-  
-  # File patterns - restrict which files can be modified
+  # File access patterns (glob syntax)
+  # Only allow modifications to files matching these patterns
   allowed_patterns:
-    - "**/*.go"
-    - "**/*.md"
-    - "**/*.yaml"
+    - "**/*.go"                    # All Go files
+    - "**/*.md"                    # All Markdown files
+    - "pkg/**/*"                   # Everything in pkg/ directory
   
+  # Deny modifications to these patterns (takes precedence over allowed_patterns)
   denied_patterns:
-    - "**/vendor/**"
-    - "**/.git/**"
-    - "**/node_modules/**"
+    - "vendor/**"                  # Third-party dependencies
+    - ".git/**"                    # Git metadata
+    - "node_modules/**"            # Node modules
+    - "**/*_generated.*"           # Generated files
+    - "**/*.pb.go"                 # Protocol buffer generated files
   
-  # Tools that are allowed to be used
+  # Tool restrictions - only allow these tools to be used
   allowed_tools:
-    - task_completion
-    - read_file
-    - write_file
-    - apply_diff
-    - search_files
-    - list_files
-    - execute_command
+    - read_file                    # Read file contents
+    - write_file                   # Create or overwrite files
+    - apply_diff                   # Make surgical edits to files
+    - search_files                 # Search for patterns in files
+    - list_files                   # List directory contents
+    - execute_command              # Run shell commands
   
   # Resource limits
-  max_tokens: 50000
-  timeout: 5m
+  max_tokens: 50000                # Maximum LLM tokens to consume
+  timeout: 5m                      # Maximum execution time (5 minutes)
 
-# Quality gates - validation steps before committing
+# Quality gates - commands to validate changes before committing
+# These run after the AI makes changes but before auto-commit
 quality_gates:
-  # Linting check (required)
-  - name: "Go Lint"
-    command: "golangci-lint run ./..."
-    required: true
-  
-  # Tests (required)
-  - name: "Go Test"
-    command: "go test -v ./..."
-    required: true
-  
-  # Build check (required)
   - name: "Go Build"
     command: "go build ./..."
+    required: true                 # Execution fails if this gate fails
+  
+  - name: "Go Test"
+    command: "go test ./..."
     required: true
   
-  # Format check (optional - informational)
-  - name: "Go Format"
-    command: "gofmt -l ."
-    required: false
+  - name: "Go Lint"
+    command: "golangci-lint run"
+    required: false                # Optional gate - logs results but doesn't fail
 
-# Git configuration
+# Git integration - automatically commit changes if quality gates pass
 git:
-  # Whether to automatically commit changes
-  auto_commit: true
-  
-  # Commit message template
-  commit_message: "chore: automated linting fixes via Forge"
-  
-  # Branch to use (leave empty to use current branch)
-  branch: ""
-  
-  # Git author information
+  auto_commit: false               # Set to true to enable automatic commits
+  commit_message: "chore: automated changes via Forge"
+  branch: ""                       # Leave empty to use current branch
   author_name: "Forge AI"
   author_email: "forge@example.com"
 
-# Artifact generation
+# Artifact generation - execution logs and reports
 artifacts:
-  enabled: true
-  output_dir: ".forge/artifacts"
+  enabled: true                    # Generate execution artifacts
+  output_dir: ".forge/artifacts"   # Where to save artifacts
   formats:
-    - "execution.json"
-    - "summary.md"
-    - "metrics.json"
-
-# Workspace directory (can be overridden by CLI flag)
-workspace_dir: "."
+    - "execution.json"             # Detailed JSON execution log
+    - "summary.md"                 # Human-readable markdown summary

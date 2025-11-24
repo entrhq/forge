@@ -28,28 +28,17 @@ forge-headless -config forge-headless.yaml
 
 ### Configuration File
 
-The `forge-headless.yaml` file demonstrates a complete configuration:
+The `forge-headless.yaml` file in this directory is a fully-commented template configuration that you can copy and customize for your project. It includes all available configuration options with explanations.
 
-```yaml
-task: "Fix all linting errors"
-mode: write
+To get started, copy it to your project:
 
-constraints:
-  max_files: 10
-  max_lines_changed: 500
-  allowed_patterns:
-    - "**/*.go"
-  timeout: 5m
-
-quality_gates:
-  - name: "Go Lint"
-    command: "golangci-lint run ./..."
-    required: true
-
-git:
-  auto_commit: true
-  commit_message: "chore: automated fixes"
+```bash
+cp examples/headless/forge-headless.yaml .forge/headless-config.yaml
 ```
+
+Then customize the task, constraints, and quality gates for your needs.
+
+For complete configuration documentation, see the [Headless Mode Guide](../../docs/headless-mode.md#configuration).
 
 ## Use Cases
 
