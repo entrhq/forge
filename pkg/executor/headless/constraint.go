@@ -338,15 +338,6 @@ func extractFilePath(args interface{}) (string, error) {
 	return path, nil
 }
 
-// getMapKeys is a helper function to get all keys from a map for debugging
-func getMapKeys(m map[string]interface{}) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	return keys
-}
-
 // PatternMatcher handles glob pattern matching for file access control
 type PatternMatcher struct {
 	allowedPatterns []glob.Glob
