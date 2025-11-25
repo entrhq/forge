@@ -83,10 +83,12 @@ func (t *WriteFileTool) Execute(ctx context.Context, argsXML []byte) (string, ma
 		return "", nil, fmt.Errorf("failed to create directories: %w", mkdirErr)
 	}
 
-	// Check if file exists
+	// Check if file exists and read original content BEFORE writing
 	fileExists := false
-	if _, statErr := os.Stat(absPath); statErr == nil {
+	var originalContent string
+	if existingContent, statErr := os.ReadFile(absPath); statErr == nil {
 		fileExists = true
+		originalContent = string(existingContent)
 	}
 
 	// Write file atomically using a temporary file
@@ -102,18 +104,8 @@ func (t *WriteFileTool) Execute(ctx context.Context, argsXML []byte) (string, ma
 		return "", nil, fmt.Errorf("failed to rename temporary file: %w", renameErr)
 	}
 
-	// Calculate line changes
-	var lineChanges LineChanges
-	if fileExists {
-		// Read the original content to calculate diff
-		originalContent, readErr := os.ReadFile(absPath)
-		if readErr == nil {
-			lineChanges = CalculateLineChanges(string(originalContent), input.Content)
-		}
-	} else {
-		// New file - all lines are added
-		lineChanges = CalculateLineChanges("", input.Content)
-	}
+	// Calculate line changes using the original content read before writing
+	lineChanges := CalculateLineChanges(originalContent, input.Content)
 
 	// Get file info for metadata
 	fileInfo, err := os.Stat(absPath)

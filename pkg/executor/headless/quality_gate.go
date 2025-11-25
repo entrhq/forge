@@ -109,7 +109,8 @@ func NewQualityGateRunner(gates []QualityGate) *QualityGateRunner {
 // RunAll executes all quality gates and returns results
 func (r *QualityGateRunner) RunAll(ctx context.Context, workspaceDir string) *QualityGateResults {
 	results := &QualityGateResults{
-		Results: make([]QualityGateResult, 0, len(r.gates)),
+		Results:   make([]QualityGateResult, 0, len(r.gates)),
+		AllPassed: true, // Start optimistic
 	}
 
 	for _, gate := range r.gates {
@@ -123,11 +124,6 @@ func (r *QualityGateRunner) RunAll(ctx context.Context, workspaceDir string) *Qu
 		if err != nil {
 			result.Passed = false
 			result.Error = err.Error()
-
-			// If gate is required and failed, mark overall failure
-			if gate.Required() {
-				results.AllPassed = false
-			}
 		} else {
 			result.Passed = true
 		}
@@ -135,35 +131,13 @@ func (r *QualityGateRunner) RunAll(ctx context.Context, workspaceDir string) *Qu
 		results.Results = append(results.Results, result)
 	}
 
-	// If no required gates failed, mark as passed
-	switch {
-	case !results.AllPassed && len(results.Results) > 0:
-		// Check if any required gate exists
-		hasRequired := false
-		for _, result := range results.Results {
-			if result.Required {
-				hasRequired = true
-				if !result.Passed {
-					results.AllPassed = false
-					return results
-				}
-			}
+	// Calculate overall pass/fail based on required gates
+	// AllPassed is true only if all required gates passed
+	for _, result := range results.Results {
+		if result.Required && !result.Passed {
+			results.AllPassed = false
+			break
 		}
-		if hasRequired {
-			results.AllPassed = true
-		}
-	case len(results.Results) == 0:
-		results.AllPassed = true
-	default:
-		// Check if all gates passed
-		allPassed := true
-		for _, result := range results.Results {
-			if result.Required && !result.Passed {
-				allPassed = false
-				break
-			}
-		}
-		results.AllPassed = allPassed
 	}
 
 	return results

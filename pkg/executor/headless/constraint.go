@@ -2,7 +2,6 @@ package headless
 
 import (
 	"fmt"
-	"log"
 	"path/filepath"
 	"sync"
 	"time"
@@ -313,41 +312,29 @@ func isLoopBreakingTool(toolName string) bool {
 // extractFilePath extracts the file path from tool arguments.
 // Returns the path and an error if extraction fails.
 func extractFilePath(args interface{}) (string, error) {
-	log.Printf("[extractFilePath] Called with args type: %T, value: %+v", args, args)
-
 	if args == nil {
-		log.Printf("[extractFilePath] Error: tool arguments are nil")
 		return "", fmt.Errorf("tool arguments are nil")
 	}
 
 	argsMap, ok := args.(map[string]interface{})
 	if !ok {
-		log.Printf("[extractFilePath] Error: tool arguments are not a map, got type %T", args)
 		return "", fmt.Errorf("tool arguments are not a map[string]interface{}, got type %T", args)
 	}
 
-	log.Printf("[extractFilePath] Args map keys: %v", getMapKeys(argsMap))
-
 	pathValue, exists := argsMap["path"]
 	if !exists {
-		log.Printf("[extractFilePath] Error: 'path' field not found in arguments")
 		return "", fmt.Errorf("'path' field not found in tool arguments")
 	}
 
-	log.Printf("[extractFilePath] Path value type: %T, value: %+v", pathValue, pathValue)
-
 	path, ok := pathValue.(string)
 	if !ok {
-		log.Printf("[extractFilePath] Error: 'path' field is not a string, got type %T", pathValue)
 		return "", fmt.Errorf("'path' field is not a string, got type %T", pathValue)
 	}
 
 	if path == "" {
-		log.Printf("[extractFilePath] Error: 'path' field is empty")
 		return "", fmt.Errorf("'path' field is empty")
 	}
 
-	log.Printf("[extractFilePath] Successfully extracted path: %s", path)
 	return path, nil
 }
 
