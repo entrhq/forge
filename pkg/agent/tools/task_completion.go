@@ -44,22 +44,22 @@ func (t *TaskCompletionTool) Schema() map[string]interface{} {
 }
 
 // Execute runs the tool and returns the result
-func (t *TaskCompletionTool) Execute(ctx context.Context, argsXML []byte) (string, error) {
+func (t *TaskCompletionTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
 	var args struct {
 		XMLName xml.Name `xml:"arguments"`
 		Result  string   `xml:"result"`
 	}
 
 	if err := UnmarshalXMLWithFallback(argsXML, &args); err != nil {
-		return "", fmt.Errorf("invalid arguments for %s: %w", taskCompletionToolName, err)
+		return "", nil, fmt.Errorf("invalid arguments for %s: %w", taskCompletionToolName, err)
 	}
 
 	if args.Result == "" {
-		return "", fmt.Errorf("result cannot be empty")
+		return "", nil, fmt.Errorf("result cannot be empty")
 	}
 
 	// Return the result - this will be presented to the user
-	return args.Result, nil
+	return args.Result, nil, nil
 }
 
 // IsLoopBreaking returns true because this tool terminates the agent loop

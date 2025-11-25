@@ -64,7 +64,7 @@ func (t *ExecuteCommandTool) Schema() map[string]interface{} {
 // Execute runs the command with streaming output support
 //
 //nolint:gocyclo // Complexity is acceptable for command execution logic
-func (t *ExecuteCommandTool) Execute(ctx context.Context, argsXML []byte) (string, error) {
+func (t *ExecuteCommandTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
 	var input struct {
 		XMLName    xml.Name `xml:"arguments"`
 		Command    string   `xml:"command"`
@@ -72,12 +72,12 @@ func (t *ExecuteCommandTool) Execute(ctx context.Context, argsXML []byte) (strin
 		WorkingDir string   `xml:"working_dir"`
 	}
 	if err := tools.UnmarshalXMLWithFallback(argsXML, &input); err != nil {
-		return "", fmt.Errorf("failed to parse input: %w", err)
+		return "", nil, fmt.Errorf("failed to parse input: %w", err)
 	}
 
 	// Validate required fields
 	if input.Command == "" {
-		return "", fmt.Errorf("command cannot be empty")
+		return "", nil, fmt.Errorf("command cannot be empty")
 	}
 
 	// Determine timeout
@@ -91,13 +91,13 @@ func (t *ExecuteCommandTool) Execute(ctx context.Context, argsXML []byte) (strin
 	if input.WorkingDir != "" {
 		// Validate working directory is within workspace
 		if validateErr := t.guard.ValidatePath(input.WorkingDir); validateErr != nil {
-			return "", fmt.Errorf("invalid working directory: %w", validateErr)
+			return "", nil, fmt.Errorf("invalid working directory: %w", validateErr)
 		}
 
 		// Resolve to absolute path
 		absWorkDir, resolveErr := t.guard.ResolvePath(input.WorkingDir)
 		if resolveErr != nil {
-			return "", fmt.Errorf("failed to resolve working directory: %w", resolveErr)
+			return "", nil, fmt.Errorf("failed to resolve working directory: %w", resolveErr)
 		}
 		workDir = absWorkDir
 	}
@@ -184,7 +184,15 @@ func (t *ExecuteCommandTool) Execute(ctx context.Context, argsXML []byte) (strin
 	// Add exit code info
 	result += fmt.Sprintf("\n\nExit code: %d", exitCode)
 
-	return result, nil
+	// Build metadata
+	metadata := map[string]interface{}{
+		"command":     input.Command,
+		"exit_code":   exitCode,
+		"duration_ms": duration.Milliseconds(),
+		"working_dir": workDir,
+	}
+
+	return result, metadata, nil
 }
 
 // runCommand executes the command and captures output

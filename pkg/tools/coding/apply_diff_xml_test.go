@@ -118,7 +118,7 @@ const oldValue = 42
 </arguments>`
 
 	// Execute tool
-	result, err := tool.Execute(context.Background(), []byte(xmlInput))
+	result, _, err := tool.Execute(context.Background(), []byte(xmlInput))
 	if err != nil {
 		t.Fatalf("Tool execution failed: %v", err)
 	}

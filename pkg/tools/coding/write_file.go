@@ -51,7 +51,7 @@ func (t *WriteFileTool) Schema() map[string]interface{} {
 }
 
 // Execute writes content to the specified file.
-func (t *WriteFileTool) Execute(ctx context.Context, argsXML []byte) (string, error) {
+func (t *WriteFileTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
 	var input struct {
 		XMLName xml.Name `xml:"arguments"`
 		Path    string   `xml:"path"`
@@ -59,47 +59,58 @@ func (t *WriteFileTool) Execute(ctx context.Context, argsXML []byte) (string, er
 	}
 
 	if err := tools.UnmarshalXMLWithFallback(argsXML, &input); err != nil {
-		return "", fmt.Errorf("invalid arguments: %w", err)
+		return "", nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 
 	if input.Path == "" {
-		return "", fmt.Errorf("missing required parameter: path")
+		return "", nil, fmt.Errorf("missing required parameter: path")
 	}
 
 	// Validate path with workspace guard
 	if err := t.guard.ValidatePath(input.Path); err != nil {
-		return "", fmt.Errorf("invalid path: %w", err)
+		return "", nil, fmt.Errorf("invalid path: %w", err)
 	}
 
 	// Resolve to absolute path
 	absPath, err := t.guard.ResolvePath(input.Path)
 	if err != nil {
-		return "", fmt.Errorf("failed to resolve path: %w", err)
+		return "", nil, fmt.Errorf("failed to resolve path: %w", err)
 	}
 
 	// Create parent directories if they don't exist
 	dir := filepath.Dir(absPath)
 	if mkdirErr := os.MkdirAll(dir, 0755); mkdirErr != nil {
-		return "", fmt.Errorf("failed to create directories: %w", mkdirErr)
+		return "", nil, fmt.Errorf("failed to create directories: %w", mkdirErr)
 	}
 
-	// Check if file exists
+	// Check if file exists and read original content BEFORE writing
 	fileExists := false
-	if _, statErr := os.Stat(absPath); statErr == nil {
+	var originalContent string
+	if existingContent, statErr := os.ReadFile(absPath); statErr == nil {
 		fileExists = true
+		originalContent = string(existingContent)
 	}
 
 	// Write file atomically using a temporary file
 	tmpPath := absPath + ".tmp"
 	if writeErr := os.WriteFile(tmpPath, []byte(input.Content), 0600); writeErr != nil {
-		return "", fmt.Errorf("failed to write temporary file: %w", writeErr)
+		return "", nil, fmt.Errorf("failed to write temporary file: %w", writeErr)
 	}
 
 	// Rename temporary file to target file (atomic operation)
 	if renameErr := os.Rename(tmpPath, absPath); renameErr != nil {
 		// Clean up temporary file on error
 		os.Remove(tmpPath)
-		return "", fmt.Errorf("failed to rename temporary file: %w", renameErr)
+		return "", nil, fmt.Errorf("failed to rename temporary file: %w", renameErr)
+	}
+
+	// Calculate line changes using the original content read before writing
+	lineChanges := CalculateLineChanges(originalContent, input.Content)
+
+	// Get file info for metadata
+	fileInfo, err := os.Stat(absPath)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to get file info: %w", err)
 	}
 
 	// Get relative path for output message
@@ -110,12 +121,23 @@ func (t *WriteFileTool) Execute(ctx context.Context, argsXML []byte) (string, er
 
 	var message string
 	if fileExists {
-		message = fmt.Sprintf("File '%s' overwritten successfully", relPath)
+		message = fmt.Sprintf("File '%s' overwritten successfully (+%d/-%d lines)",
+			relPath, lineChanges.LinesAdded, lineChanges.LinesRemoved)
 	} else {
-		message = fmt.Sprintf("File '%s' created successfully", relPath)
+		message = fmt.Sprintf("File '%s' created successfully (+%d lines)",
+			relPath, lineChanges.LinesAdded)
 	}
 
-	return message, nil
+	// Build metadata
+	metadata := map[string]interface{}{
+		"file_path":     input.Path,
+		"file_exists":   fileExists,
+		"lines_added":   lineChanges.LinesAdded,
+		"lines_removed": lineChanges.LinesRemoved,
+		"size_bytes":    fileInfo.Size(),
+	}
+
+	return message, metadata, nil
 }
 
 // IsLoopBreaking returns false as this tool doesn't break the agent loop.

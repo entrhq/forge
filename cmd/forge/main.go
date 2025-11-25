@@ -39,12 +39,14 @@ const (
 
 // Config holds the application configuration
 type Config struct {
-	APIKey       string
-	BaseURL      string
-	Model        string
-	WorkspaceDir string
-	SystemPrompt string
-	ShowVersion  bool
+	APIKey         string
+	BaseURL        string
+	Model          string
+	WorkspaceDir   string
+	SystemPrompt   string
+	ShowVersion    bool
+	Headless       bool
+	HeadlessConfig string
 }
 
 func main() {
@@ -91,6 +93,8 @@ func parseFlags() *Config {
 	flag.StringVar(&config.WorkspaceDir, "workspace", ".", "Workspace directory (default: current directory)")
 	flag.StringVar(&config.SystemPrompt, "prompt", "", "Custom instructions for the agent (optional, overrides default)")
 	flag.BoolVar(&config.ShowVersion, "version", false, "Show version and exit")
+	flag.BoolVar(&config.Headless, "headless", false, "Run in headless mode (non-interactive)")
+	flag.StringVar(&config.HeadlessConfig, "headless-config", "", "Path to headless mode configuration file (YAML)")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Forge - A TUI coding agent\n\n")
@@ -101,10 +105,14 @@ func parseFlags() *Config {
 		fmt.Fprintf(os.Stderr, "  OPENAI_API_KEY     OpenAI API key\n")
 		fmt.Fprintf(os.Stderr, "  OPENAI_BASE_URL    OpenAI API base URL (for compatible APIs)\n")
 		fmt.Fprintf(os.Stderr, "\nExamples:\n")
+		fmt.Fprintf(os.Stderr, "  # TUI Mode (default)\n")
 		fmt.Fprintf(os.Stderr, "  forge                                    # Start in current directory\n")
 		fmt.Fprintf(os.Stderr, "  forge -workspace /path/to/project\n")
 		fmt.Fprintf(os.Stderr, "  forge -model gpt-4-turbo\n")
 		fmt.Fprintf(os.Stderr, "  forge -base-url https://api.openrouter.ai/api/v1\n")
+		fmt.Fprintf(os.Stderr, "\n  # Headless Mode (CI/CD)\n")
+		fmt.Fprintf(os.Stderr, "  forge -headless -headless-config config.yaml\n")
+		fmt.Fprintf(os.Stderr, "  forge -headless -headless-config config.yaml -workspace /path/to/project\n")
 	}
 
 	flag.Parse()
@@ -117,13 +125,20 @@ func (c *Config) validate() error {
 		return fmt.Errorf("API key is required. Set OPENAI_API_KEY environment variable or use -api-key flag")
 	}
 
-	// Verify workspace directory exists
-	info, err := os.Stat(c.WorkspaceDir)
-	if err != nil {
-		return fmt.Errorf("workspace directory error: %w", err)
+	// Headless mode requires config file
+	if c.Headless && c.HeadlessConfig == "" {
+		return fmt.Errorf("headless mode requires a configuration file (use -headless-config flag)")
 	}
-	if !info.IsDir() {
-		return fmt.Errorf("workspace path '%s' is not a directory", c.WorkspaceDir)
+
+	// Verify workspace directory exists (unless using headless config which will be validated later)
+	if !c.Headless || c.WorkspaceDir != "." {
+		info, err := os.Stat(c.WorkspaceDir)
+		if err != nil {
+			return fmt.Errorf("workspace directory error: %w", err)
+		}
+		if !info.IsDir() {
+			return fmt.Errorf("workspace path '%s' is not a directory", c.WorkspaceDir)
+		}
 	}
 
 	return nil
@@ -131,6 +146,17 @@ func (c *Config) validate() error {
 
 // run executes the main application logic
 func run(ctx context.Context, config *Config) error {
+	// Check if headless mode is requested
+	if config.Headless {
+		return runHeadless(ctx, config)
+	}
+
+	// Run TUI mode (default)
+	return runTUI(ctx, config)
+}
+
+// runTUI executes the TUI mode
+func runTUI(ctx context.Context, config *Config) error {
 	// Initialize global configuration (for auto-approval and command whitelist)
 	if err := appconfig.Initialize(""); err != nil {
 		return fmt.Errorf("failed to initialize configuration: %w", err)

@@ -3,6 +3,7 @@ package tools
 import (
 	"encoding/xml"
 	"fmt"
+	"io"
 	"regexp"
 	"strings"
 )
@@ -10,6 +11,7 @@ import (
 const (
 	defaultServerName = "local"
 	maxXMLSize        = 10 * 1024 * 1024 // 10MB limit for XML tool calls
+	argumentsTagName  = "arguments"
 )
 
 // Compile regex once at package level for efficiency
@@ -169,4 +171,62 @@ func escapeUnescapedAmpersands(data []byte) []byte {
 	}
 
 	return []byte(result.String())
+}
+
+// XMLToMap converts XML bytes to a map[string]interface{} by parsing the XML structure.
+// This is useful for extracting arguments from tool calls in a generic way.
+func XMLToMap(data []byte) (map[string]interface{}, error) {
+	decoder := xml.NewDecoder(strings.NewReader(string(data)))
+	result := make(map[string]interface{})
+
+	var currentPath []string
+	var currentText strings.Builder
+
+	for {
+		token, err := decoder.Token()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse XML: %w", err)
+		}
+
+		switch t := token.(type) {
+		case xml.StartElement:
+			// Skip the root <arguments> tag
+			if t.Name.Local == argumentsTagName && len(currentPath) == 0 {
+				currentPath = append(currentPath, t.Name.Local)
+				continue
+			}
+			currentPath = append(currentPath, t.Name.Local)
+			currentText.Reset()
+
+		case xml.EndElement:
+			if len(currentPath) == 0 {
+				continue
+			}
+
+			elementName := currentPath[len(currentPath)-1]
+			currentPath = currentPath[:len(currentPath)-1]
+
+			// Skip the root </arguments> tag
+			if elementName == "arguments" && len(currentPath) == 0 {
+				continue
+			}
+
+			// Only process elements that are direct children of <arguments>
+			if len(currentPath) == 1 && currentPath[0] == "arguments" {
+				text := strings.TrimSpace(currentText.String())
+				if text != "" {
+					result[elementName] = text
+				}
+			}
+			currentText.Reset()
+
+		case xml.CharData:
+			currentText.Write(t)
+		}
+	}
+
+	return result, nil
 }

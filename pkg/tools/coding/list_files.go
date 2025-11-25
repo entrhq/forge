@@ -57,7 +57,7 @@ func (t *ListFilesTool) Schema() map[string]interface{} {
 }
 
 // Execute lists files in the specified directory.
-func (t *ListFilesTool) Execute(ctx context.Context, argsXML []byte) (string, error) {
+func (t *ListFilesTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
 	// Parse arguments
 	var input struct {
 		XMLName   xml.Name `xml:"arguments"`
@@ -67,7 +67,7 @@ func (t *ListFilesTool) Execute(ctx context.Context, argsXML []byte) (string, er
 	}
 
 	if err := tools.UnmarshalXMLWithFallback(argsXML, &input); err != nil {
-		return "", fmt.Errorf("invalid arguments: %w", err)
+		return "", nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 
 	// Default to workspace root if no path provided
@@ -77,22 +77,22 @@ func (t *ListFilesTool) Execute(ctx context.Context, argsXML []byte) (string, er
 
 	// Validate path with workspace guard
 	if err := t.guard.ValidatePath(input.Path); err != nil {
-		return "", fmt.Errorf("invalid path: %w", err)
+		return "", nil, fmt.Errorf("invalid path: %w", err)
 	}
 
 	// Resolve to absolute path
 	absPath, err := t.guard.ResolvePath(input.Path)
 	if err != nil {
-		return "", fmt.Errorf("failed to resolve path: %w", err)
+		return "", nil, fmt.Errorf("failed to resolve path: %w", err)
 	}
 
 	// Check if path exists and is a directory
 	info, err := os.Stat(absPath)
 	if err != nil {
-		return "", fmt.Errorf("path does not exist: %w", err)
+		return "", nil, fmt.Errorf("path does not exist: %w", err)
 	}
 	if !info.IsDir() {
-		return "", fmt.Errorf("path is not a directory: %s", input.Path)
+		return "", nil, fmt.Errorf("path is not a directory: %s", input.Path)
 	}
 
 	// List files
@@ -103,11 +103,23 @@ func (t *ListFilesTool) Execute(ctx context.Context, argsXML []byte) (string, er
 		entries, err = t.listDirectory(absPath, input.Pattern)
 	}
 	if err != nil {
-		return "", fmt.Errorf("failed to list files: %w", err)
+		return "", nil, fmt.Errorf("failed to list files: %w", err)
 	}
 
 	// Format output
-	return t.formatEntries(entries)
+	result := t.formatEntries(entries)
+
+	// Build metadata
+	metadata := map[string]interface{}{
+		"path":       input.Path,
+		"recursive":  input.Recursive,
+		"file_count": len(entries),
+	}
+	if input.Pattern != "" {
+		metadata["pattern"] = input.Pattern
+	}
+
+	return result, metadata, nil
 }
 
 // IsLoopBreaking returns false as this tool doesn't break the agent loop.
@@ -215,9 +227,9 @@ func (t *ListFilesTool) listRecursive(rootPath string, pattern string) ([]fileEn
 }
 
 // formatEntries formats file entries into a readable string.
-func (t *ListFilesTool) formatEntries(entries []fileEntry) (string, error) {
+func (t *ListFilesTool) formatEntries(entries []fileEntry) string {
 	if len(entries) == 0 {
-		return "No files found", nil
+		return "No files found"
 	}
 
 	// Sort entries: directories first, then by name
@@ -252,7 +264,7 @@ func (t *ListFilesTool) formatEntries(entries []fileEntry) (string, error) {
 	// Add summary
 	builder.WriteString(fmt.Sprintf("\nTotal: %d files, %d directories", totalFiles, totalDirs))
 
-	return builder.String(), nil
+	return builder.String()
 }
 
 // formatFileSize formats a file size in bytes to a human-readable string.

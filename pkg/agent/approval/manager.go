@@ -124,9 +124,9 @@ func (m *Manager) cleanupPendingApproval(responseChannel chan *types.ApprovalRes
 
 // parseToolArguments safely parses tool call arguments into a map
 func parseToolArguments(toolCall tools.ToolCall) map[string]interface{} {
-	var argsMap map[string]interface{}
-	if err := tools.UnmarshalXMLWithFallback(toolCall.GetArgumentsXML(), &argsMap); err != nil {
-		argsMap = make(map[string]interface{})
+	argsMap, err := tools.XMLToMap(toolCall.GetArgumentsXML())
+	if err != nil {
+		return make(map[string]interface{})
 	}
 	return argsMap
 }

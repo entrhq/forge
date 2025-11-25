@@ -48,7 +48,7 @@ func (m *model) executeBashCommand(command string) tea.Cmd {
 		}))
 
 		// Execute the tool
-		result, err := tool.Execute(ctx, []byte(argsXML))
+		result, _, err := tool.Execute(ctx, []byte(argsXML))
 
 		// Send completion or error event
 		if err != nil {

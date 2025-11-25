@@ -53,7 +53,7 @@ func (t *AskQuestionTool) Schema() map[string]interface{} {
 }
 
 // Execute runs the tool and returns the question for the user
-func (t *AskQuestionTool) Execute(ctx context.Context, argsXML []byte) (string, error) {
+func (t *AskQuestionTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
 	var args struct {
 		XMLName     xml.Name `xml:"arguments"`
 		Question    string   `xml:"question"`
@@ -61,11 +61,11 @@ func (t *AskQuestionTool) Execute(ctx context.Context, argsXML []byte) (string, 
 	}
 
 	if err := UnmarshalXMLWithFallback(argsXML, &args); err != nil {
-		return "", fmt.Errorf("invalid arguments for %s: %w", askQuestionToolName, err)
+		return "", nil, fmt.Errorf("invalid arguments for %s: %w", askQuestionToolName, err)
 	}
 
 	if args.Question == "" {
-		return "", fmt.Errorf("question cannot be empty")
+		return "", nil, fmt.Errorf("question cannot be empty")
 	}
 
 	// Format the question with suggestions if provided
@@ -77,7 +77,7 @@ func (t *AskQuestionTool) Execute(ctx context.Context, argsXML []byte) (string, 
 		}
 	}
 
-	return result, nil
+	return result, nil, nil
 }
 
 // IsLoopBreaking returns true because this tool terminates the agent loop

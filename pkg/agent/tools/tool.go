@@ -32,7 +32,9 @@ type Tool interface {
 
 	// Execute runs the tool with the given XML arguments and returns a result string
 	// The arguments should be unmarshaled from XML into the tool's argument struct
-	Execute(ctx context.Context, argumentsXML []byte) (string, error)
+	// Returns: (result string, metadata map, error)
+	// Metadata is optional and can be nil - it will be included in tool result events
+	Execute(ctx context.Context, argumentsXML []byte) (string, map[string]interface{}, error)
 
 	// IsLoopBreaking indicates whether this tool should terminate the agent loop
 	// Loop-breaking tools (like task_completion, ask_question, converse) will
