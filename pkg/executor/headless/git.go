@@ -46,10 +46,20 @@ func (g *GitManager) GetCurrentBranch(ctx context.Context) (string, error) {
 	return strings.TrimSpace(output), nil
 }
 
-// CreateBranch creates a new git branch
+// CreateBranch creates a new git branch and switches to it
+// If the branch already exists, it just switches to it
 func (g *GitManager) CreateBranch(ctx context.Context, branchName string) error {
+	// Try to create and checkout the branch
 	_, err := g.execGit(ctx, "checkout", "-b", branchName)
 	if err != nil {
+		// If branch already exists, try to just switch to it
+		if strings.Contains(err.Error(), "already exists") {
+			_, err = g.execGit(ctx, "checkout", branchName)
+			if err != nil {
+				return fmt.Errorf("failed to checkout existing branch '%s': %w", branchName, err)
+			}
+			return nil
+		}
 		return fmt.Errorf("failed to create branch '%s': %w", branchName, err)
 	}
 

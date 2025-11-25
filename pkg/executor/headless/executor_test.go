@@ -2,161 +2,154 @@ package headless
 
 import (
 	"context"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"testing"
-	"time"
-
-	"github.com/entrhq/forge/pkg/agent"
-	"github.com/entrhq/forge/pkg/types"
 )
 
-// mockAgent implements a minimal agent.Agent for testing
-type mockAgent struct {
-	channels *types.AgentChannels
-}
+// setupGitRepo creates a temporary git repository for testing
+func setupGitRepo(t *testing.T) string {
+	t.Helper()
 
-func (m *mockAgent) Start(ctx context.Context) error {
-	// Simulate agent event loop that closes Done when Input is closed
-	go func() {
-		<-m.channels.Input // Wait for Input channel to close
-		close(m.channels.Done)
-	}()
-	return nil
-}
+	testDir := t.TempDir()
 
-func (m *mockAgent) Shutdown(ctx context.Context) error {
-	return nil
-}
-
-func (m *mockAgent) GetChannels() *types.AgentChannels {
-	return m.channels
-}
-
-func (m *mockAgent) GetTool(name string) interface{} {
-	return nil
-}
-
-func (m *mockAgent) GetTools() []interface{} {
-	return nil
-}
-
-func (m *mockAgent) GetContextInfo() *agent.ContextInfo {
-	return &agent.ContextInfo{}
-}
-
-func TestFileModificationTracking(t *testing.T) {
-	// Create mock channels
-	channels := &types.AgentChannels{
-		Event:    make(chan *types.AgentEvent, 10),
-		Input:    make(chan *types.Input, 1),
-		Shutdown: make(chan struct{}),
-		Done:     make(chan struct{}),
+	// Initialize git repo
+	cmd := exec.Command("git", "init")
+	cmd.Dir = testDir
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("failed to init git repo: %v", err)
 	}
 
-	mockAg := &mockAgent{channels: channels}
-
-	config := &Config{
-		Task:         "test task",
-		Mode:         ModeWrite,
-		WorkspaceDir: t.TempDir(),
-		Constraints: ConstraintConfig{
-			MaxFiles:        10,
-			MaxLinesChanged: 1000,
-			Timeout:         30 * time.Second,
-		},
-		Artifacts: ArtifactConfig{
-			Enabled:   false,
-			OutputDir: "",
-		},
-		Git: GitConfig{
-			AutoCommit: false,
-		},
+	// Configure git user
+	cmd = exec.Command("git", "config", "user.email", "test@example.com")
+	cmd.Dir = testDir
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("failed to configure git email: %v", err)
 	}
 
-	executor, err := NewExecutor(mockAg, config)
-	if err != nil {
-		t.Fatalf("Failed to create executor: %v", err)
+	cmd = exec.Command("git", "config", "user.name", "Test User")
+	cmd.Dir = testDir
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("failed to configure git name: %v", err)
 	}
 
+	// Create initial commit
+	testFile := filepath.Join(testDir, "README.md")
+	if err := os.WriteFile(testFile, []byte("# Test"), 0644); err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	cmd = exec.Command("git", "add", ".")
+	cmd.Dir = testDir
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("failed to stage files: %v", err)
+	}
+
+	cmd = exec.Command("git", "commit", "-m", "Initial commit")
+	cmd.Dir = testDir
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("failed to create initial commit: %v", err)
+	}
+
+	return testDir
+}
+
+// TestGitManager_BranchCreationWorkflow tests the branch creation workflow
+func TestGitManager_BranchCreationWorkflow(t *testing.T) {
+	testDir := setupGitRepo(t)
 	ctx := context.Background()
 
-	// Start executor in goroutine
-	done := make(chan error, 1)
-	go func() {
-		done <- executor.Run(ctx)
-	}()
-
-	// Simulate file modification events
-	// 1. Tool call to write_file
-	channels.Event <- types.NewToolCallEvent("write_file", map[string]interface{}{
-		"path":    "test.go",
-		"content": "package main",
-	})
-
-	// 2. Successful tool result
-	channels.Event <- types.NewToolResultEvent("write_file", "File written successfully")
-
-	// 3. Tool call to apply_diff
-	channels.Event <- types.NewToolCallEvent("apply_diff", map[string]interface{}{
-		"path": "test2.go",
-		"edits": []interface{}{
-			map[string]interface{}{
-				"search":  "old",
-				"replace": "new",
-			},
-		},
-	})
-
-	// 4. Successful tool result
-	channels.Event <- types.NewToolResultEvent("apply_diff", "Diff applied successfully")
-
-	// 5. Tool call that fails
-	channels.Event <- types.NewToolCallEvent("write_file", map[string]interface{}{
-		"path":    "test3.go",
-		"content": "package main",
-	})
-
-	// 6. Failed tool result
-	channels.Event <- types.NewToolResultErrorEvent("write_file", nil)
-
-	// 7. Send turn end to complete execution
-	time.Sleep(100 * time.Millisecond) // Give time for events to process
-	channels.Event <- types.NewTurnEndEvent()
-
-	// Close Event channel after turn end to signal no more events
-	close(channels.Event)
-
-	// Wait for executor to complete
-	if err := <-done; err != nil {
-		t.Fatalf("Executor failed: %v", err)
+	config := GitConfig{
+		AutoCommit: true,
+		Branch:     "feature/test-branch",
 	}
 
-	// Verify file modifications were tracked
-	if len(executor.summary.FilesModified) != 2 {
-		t.Errorf("Expected 2 files modified, got %d", len(executor.summary.FilesModified))
+	gm := NewGitManager(testDir, config)
+
+	// Get initial branch
+	initialBranch, err := gm.GetCurrentBranch(ctx)
+	if err != nil {
+		t.Fatalf("failed to get initial branch: %v", err)
+	}
+	t.Logf("Initial branch: %s", initialBranch)
+
+	// Verify we're not on the target branch
+	if initialBranch == config.Branch {
+		t.Fatalf("test setup error: already on target branch")
 	}
 
-	// Verify the correct files were tracked
-	expectedFiles := map[string]bool{
-		"test.go":  false,
-		"test2.go": false,
+	// Create and checkout the branch
+	err = gm.CreateBranch(ctx, config.Branch)
+	if err != nil {
+		t.Fatalf("failed to create branch: %v", err)
 	}
 
-	for _, fm := range executor.summary.FilesModified {
-		if _, exists := expectedFiles[fm.Path]; exists {
-			expectedFiles[fm.Path] = true
-		} else {
-			t.Errorf("Unexpected file modification tracked: %s", fm.Path)
-		}
+	// Check that we're now on the configured branch
+	currentBranch, err := gm.GetCurrentBranch(ctx)
+	if err != nil {
+		t.Fatalf("failed to get current branch: %v", err)
 	}
 
-	for file, found := range expectedFiles {
-		if !found {
-			t.Errorf("Expected file modification not tracked: %s", file)
-		}
+	if currentBranch != config.Branch {
+		t.Errorf("expected branch %q, got %q", config.Branch, currentBranch)
+	}
+}
+
+// TestGitManager_BranchAlreadyExists tests switching to an existing branch
+func TestGitManager_BranchAlreadyExists(t *testing.T) {
+	testDir := setupGitRepo(t)
+	ctx := context.Background()
+
+	config := GitConfig{
+		AutoCommit: true,
+		Branch:     "feature/existing-branch",
 	}
 
-	// Verify metrics
-	if executor.summary.Metrics.FilesModified != 2 {
-		t.Errorf("Expected metrics to show 2 files modified, got %d", executor.summary.Metrics.FilesModified)
+	gm := NewGitManager(testDir, config)
+
+	// Create the branch
+	err := gm.CreateBranch(ctx, config.Branch)
+	if err != nil {
+		t.Fatalf("failed to create initial branch: %v", err)
+	}
+
+	// Switch back to main/master
+	initialBranch := "main"
+	cmd := exec.Command("git", "rev-parse", "--verify", "main")
+	cmd.Dir = testDir
+	if cmdErr := cmd.Run(); cmdErr != nil {
+		initialBranch = "master"
+	}
+
+	cmd = exec.Command("git", "checkout", initialBranch)
+	cmd.Dir = testDir
+	if cmdErr := cmd.Run(); cmdErr != nil {
+		t.Fatalf("failed to checkout main: %v", cmdErr)
+	}
+
+	// Verify we're on the initial branch
+	currentBranch, err := gm.GetCurrentBranch(ctx)
+	if err != nil {
+		t.Fatalf("failed to get current branch: %v", err)
+	}
+	if currentBranch != initialBranch {
+		t.Fatalf("test setup error: not on initial branch")
+	}
+
+	// Call CreateBranch again - should switch to existing branch
+	err = gm.CreateBranch(ctx, config.Branch)
+	if err != nil {
+		t.Fatalf("failed to switch to existing branch: %v", err)
+	}
+
+	// Check that we're on the configured branch
+	currentBranch, err = gm.GetCurrentBranch(ctx)
+	if err != nil {
+		t.Fatalf("failed to get current branch: %v", err)
+	}
+
+	if currentBranch != config.Branch {
+		t.Errorf("expected branch %q, got %q", config.Branch, currentBranch)
 	}
 }

@@ -1,0 +1,69 @@
+# Forge Headless Mode - Base Configuration Template
+# Copy this file and customize it for your project
+
+# REQUIRED: Describe what you want the AI to do
+task: |
+  Please review all of the ADRs and assess the documentation state.
+  Ensure all ADRs are up to date, and ensure all PRDs are accurately reflected in the codebase.
+
+# Execution mode: "read-only" (analysis only) or "write" (make changes)
+mode: write
+
+# REQUIRED: Path to your project workspace
+workspace_dir: .
+
+# Enable detailed logging (useful for debugging)
+verbose: true
+
+# Safety constraints to prevent runaway execution
+constraints:
+  # File access patterns (glob syntax)
+  # Only allow modifications to files matching these patterns
+  allowed_patterns:
+    - "**/*.go"                    # All Go files
+    - "**/*.md"                    # All Markdown files
+    - "pkg/**/*"                   # Everything in pkg/ directory
+  
+  # Tool restrictions - only allow these tools to be used
+  allowed_tools:
+    - read_file                    # Read file contents
+    - write_file                   # Create or overwrite files
+    - apply_diff                   # Make surgical edits to files
+    - search_files                 # Search for patterns in files
+    - list_files                   # List directory contents
+    - execute_command              # Run shell commands
+  
+  # Resource limits
+  max_tokens: 20000000              # Maximum LLM tokens to consume
+  timeout: 5m                      # Maximum execution time (5 minutes)
+
+# Quality gates - commands to validate changes before committing
+# These run after the AI makes changes but before auto-commit
+quality_gates:
+  - name: "make build"
+    command: "make build"
+    required: true                 # Execution fails if this gate fails
+  
+  - name: "make test"
+    command: "make test"
+    required: true
+  
+  - name: "make lint"
+    command: "make lint"
+    required: false                # Optional gate - logs results but doesn't fail
+
+# Git integration - automatically commit changes if quality gates pass
+git:
+  auto_commit: true               # Set to true to enable automatic commits
+  commit_message: "docs: docs update by forge"
+  branch: "docs/update"                      
+  author_name: "Forge AI"
+  author_email: "forge@entrhq.net.au"
+
+# Artifact generation - execution logs and reports
+artifacts:
+  enabled: true                    # Generate execution artifacts
+  output_dir: ".forge/artifacts"   # Where to save artifacts
+  json: true                       # execution.json - Detailed JSON execution log
+  markdown: true                   # summary.md - Human-readable markdown summary
+  metrics: true                    # metrics.json - Execution metrics for analytics
