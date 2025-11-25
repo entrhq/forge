@@ -11,6 +11,9 @@ import (
 	"github.com/entrhq/forge/pkg/types"
 )
 
+// Import QualityGateAttempt type from quality_gate.go
+// (already defined in the same package)
+
 const (
 	statusSuccess        = "success"
 	statusFailed         = "failed"
@@ -189,8 +192,18 @@ func (e *Executor) Run(ctx context.Context) error {
 						e.qualityGateRetryCount++
 						log.Printf("[Headless] Quality gates failed (attempt %d/%d)", e.qualityGateRetryCount, e.config.QualityGateMaxRetries)
 
-						// Store quality gate results for later use in finalize
-						e.summary.QualityGateResults = results
+						// Store quality gate results and track attempt
+						if e.summary.QualityGateResults == nil {
+							e.summary.QualityGateResults = results
+						}
+						e.summary.QualityGateResults.Attempts = append(e.summary.QualityGateResults.Attempts, QualityGateAttempt{
+							AttemptNumber: e.qualityGateRetryCount,
+							Passed:        false,
+							Results:       results.Results,
+						})
+						// Keep the latest results at the top level for backwards compatibility
+						e.summary.QualityGateResults.AllPassed = results.AllPassed
+						e.summary.QualityGateResults.Results = results.Results
 
 						// Check if we've exceeded max retries
 						if e.qualityGateRetryCount >= e.config.QualityGateMaxRetries {
@@ -238,6 +251,21 @@ func (e *Executor) Run(ctx context.Context) error {
 						}
 					} else {
 						log.Printf("[Headless] Quality gates passed")
+
+						// Track successful attempt
+						e.qualityGateRetryCount++
+						if e.summary.QualityGateResults == nil {
+							e.summary.QualityGateResults = results
+						}
+						e.summary.QualityGateResults.Attempts = append(e.summary.QualityGateResults.Attempts, QualityGateAttempt{
+							AttemptNumber: e.qualityGateRetryCount,
+							Passed:        true,
+							Results:       results.Results,
+						})
+						// Update final results to show success
+						e.summary.QualityGateResults.AllPassed = true
+						e.summary.QualityGateResults.Results = results.Results
+
 						// Signal graceful shutdown on success
 						select {
 						case e.agent.GetChannels().Shutdown <- struct{}{}:

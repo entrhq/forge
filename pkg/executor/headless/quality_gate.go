@@ -147,6 +147,14 @@ func (r *QualityGateRunner) RunAll(ctx context.Context, workspaceDir string) *Qu
 type QualityGateResults struct {
 	AllPassed bool
 	Results   []QualityGateResult
+	Attempts  []QualityGateAttempt
+}
+
+// QualityGateAttempt represents a single execution of quality gates
+type QualityGateAttempt struct {
+	AttemptNumber int
+	Passed        bool
+	Results       []QualityGateResult
 }
 
 // QualityGateResult represents the result of a single quality gate
