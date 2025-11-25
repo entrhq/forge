@@ -374,6 +374,21 @@ func (e *Executor) validateWorkspace() {
 			log.Printf("[Headless] Current branch: %s", currentBranch)
 		}
 
+		// Create and checkout the specified branch if configured
+		if e.config.Git.Branch != "" && currentBranch != "" {
+			if currentBranch != e.config.Git.Branch {
+				log.Printf("[Headless] Creating and checking out branch: %s", e.config.Git.Branch)
+				if err := e.gitManager.CreateBranch(ctx, e.config.Git.Branch); err != nil {
+					log.Printf("[Headless] Warning: Failed to create branch '%s': %v", e.config.Git.Branch, err)
+					log.Printf("[Headless] Continuing with execution on current branch: %s", currentBranch)
+				} else {
+					log.Printf("[Headless] Successfully switched to branch: %s", e.config.Git.Branch)
+				}
+			} else {
+				log.Printf("[Headless] Already on target branch: %s", e.config.Git.Branch)
+			}
+		}
+
 		log.Printf("[Headless] Git auto-commit enabled")
 	}
 }
