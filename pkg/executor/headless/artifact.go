@@ -9,6 +9,11 @@ import (
 	"time"
 )
 
+const (
+	statusIconPass = "✅"
+	statusIconFail = "❌"
+)
+
 // ArtifactWriter handles writing execution artifacts
 type ArtifactWriter struct {
 	outputDir string
@@ -109,21 +114,14 @@ func (w *ArtifactWriter) WriteSummaryMarkdown(summary *ExecutionSummary) error {
 	// Quality Gates
 	if summary.QualityGateResults != nil && len(summary.QualityGateResults.Results) > 0 {
 		md.WriteString("## Quality Gates\n\n")
-		for _, result := range summary.QualityGateResults.Results {
-			status := "✅"
-			if !result.Passed {
-				status = "❌"
-			}
-			md.WriteString(fmt.Sprintf("%s **%s**", status, result.Name))
-			if result.Required {
-				md.WriteString(" (required)")
-			}
-			md.WriteString("\n")
-			if result.Error != "" {
-				md.WriteString(fmt.Sprintf("   Error: %s\n", result.Error))
-			}
+
+		// Show attempt history if available
+		if len(summary.QualityGateResults.Attempts) > 0 {
+			w.writeQualityGateAttempts(&md, summary.QualityGateResults.Attempts)
+		} else {
+			// Fallback to simple display if no attempt history
+			w.writeQualityGateResults(&md, summary.QualityGateResults.Results)
 		}
-		md.WriteString("\n")
 	}
 
 	// Metrics
@@ -187,4 +185,35 @@ type GitInfo struct {
 	Branch        string `json:"branch,omitempty"`
 	CommitHash    string `json:"commit_hash,omitempty"`
 	CommitMessage string `json:"commit_message,omitempty"`
+}
+
+// writeQualityGateAttempts writes quality gate attempts to markdown
+func (w *ArtifactWriter) writeQualityGateAttempts(md *strings.Builder, attempts []QualityGateAttempt) {
+	for _, attempt := range attempts {
+		attemptStatus := statusIconPass
+		if !attempt.Passed {
+			attemptStatus = statusIconFail
+		}
+		md.WriteString(fmt.Sprintf("### Attempt %d: %s\n\n", attempt.AttemptNumber, attemptStatus))
+		w.writeQualityGateResults(md, attempt.Results)
+	}
+}
+
+// writeQualityGateResults writes quality gate results to markdown
+func (w *ArtifactWriter) writeQualityGateResults(md *strings.Builder, results []QualityGateResult) {
+	for _, result := range results {
+		status := statusIconPass
+		if !result.Passed {
+			status = statusIconFail
+		}
+		md.WriteString(fmt.Sprintf("%s **%s**", status, result.Name))
+		if result.Required {
+			md.WriteString(" (required)")
+		}
+		md.WriteString("\n")
+		if result.Error != "" {
+			md.WriteString(fmt.Sprintf("   Error: %s\n", result.Error))
+		}
+	}
+	md.WriteString("\n")
 }
