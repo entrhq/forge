@@ -16,23 +16,25 @@ type BaseOverlay struct {
 	focused  bool
 
 	// Handlers for custom behavior
-	onClose      func(actions types.ActionHandler) tea.Cmd
-	onCustomKey  func(msg tea.KeyMsg, actions types.ActionHandler) (bool, tea.Cmd) // Returns (handled, cmd)
-	renderHeader func() string
-	renderFooter func() string
+	onClose               func(actions types.ActionHandler) tea.Cmd
+	onCustomKey           func(msg tea.KeyMsg, actions types.ActionHandler) (bool, tea.Cmd) // Returns (handled, cmd)
+	renderHeader          func() string
+	renderFooter          func() string
+	footerRendersViewport bool // If true, footer is responsible for rendering viewport
 }
 
 // BaseOverlayConfig configures a base overlay
 type BaseOverlayConfig struct {
-	Width          int
-	Height         int
-	ViewportWidth  int
-	ViewportHeight int
-	Content        string
-	OnClose        func(actions types.ActionHandler) tea.Cmd
-	OnCustomKey    func(msg tea.KeyMsg, actions types.ActionHandler) (bool, tea.Cmd)
-	RenderHeader   func() string
-	RenderFooter   func() string
+	Width                 int
+	Height                int
+	ViewportWidth         int
+	ViewportHeight        int
+	Content               string
+	OnClose               func(actions types.ActionHandler) tea.Cmd
+	OnCustomKey           func(msg tea.KeyMsg, actions types.ActionHandler) (bool, tea.Cmd)
+	RenderHeader          func() string
+	RenderFooter          func() string
+	FooterRendersViewport bool // If true, footer is responsible for rendering viewport
 }
 
 // NewBaseOverlay creates a new base overlay with the given configuration
@@ -44,14 +46,15 @@ func NewBaseOverlay(config BaseOverlayConfig) *BaseOverlay {
 	}
 
 	return &BaseOverlay{
-		viewport:     vp,
-		width:        config.Width,
-		height:       config.Height,
-		focused:      true,
-		onClose:      config.OnClose,
-		onCustomKey:  config.OnCustomKey,
-		renderHeader: config.RenderHeader,
-		renderFooter: config.RenderFooter,
+		viewport:              vp,
+		width:                 config.Width,
+		height:                config.Height,
+		focused:               true,
+		onClose:               config.OnClose,
+		onCustomKey:           config.OnCustomKey,
+		renderHeader:          config.RenderHeader,
+		renderFooter:          config.RenderFooter,
+		footerRendersViewport: config.FooterRendersViewport,
 	}
 }
 
@@ -137,10 +140,8 @@ func (b *BaseOverlay) View(contentWidth int) string {
 		sections = append(sections, b.renderHeader())
 	}
 
-	// Add viewport content ONLY if no footer renderer is provided
-	// If footer renderer exists, it's responsible for rendering the viewport
-	// (typically wrapped in a bordered box along with buttons/hints)
-	if b.renderFooter == nil {
+	// Add viewport content unless footer is rendering it
+	if !b.footerRendersViewport {
 		sections = append(sections, b.viewport.View())
 	}
 
