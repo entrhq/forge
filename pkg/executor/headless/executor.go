@@ -347,7 +347,7 @@ func (e *Executor) validateWorkspace() {
 		}
 
 		// Create and checkout the specified branch if configured
-		if e.config.Git.Branch != "" {
+		if e.config.Git.Branch != "" && currentBranch != "" {
 			if currentBranch != e.config.Git.Branch {
 				log.Printf("[Headless] Creating and checking out branch: %s", e.config.Git.Branch)
 				if err := e.gitManager.CreateBranch(ctx, e.config.Git.Branch); err != nil {
