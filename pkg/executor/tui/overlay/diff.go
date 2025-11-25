@@ -71,13 +71,14 @@ func NewDiffViewer(approvalID, toolName string, preview *tools.ToolPreview, widt
 	// Configure approval overlay
 	approvalConfig := ApprovalOverlayConfig{
 		BaseConfig: BaseOverlayConfig{
-			Width:          overlayWidth,
-			Height:         overlayHeight,
-			ViewportWidth:  overlayWidth - 4,
-			ViewportHeight: viewportHeight,
-			Content:        content,
-			RenderHeader:   viewer.renderHeader,
-			RenderFooter:   viewer.renderFooter,
+			Width:                 overlayWidth,
+			Height:                overlayHeight,
+			ViewportWidth:         overlayWidth - 4,
+			ViewportHeight:        viewportHeight,
+			Content:               content,
+			RenderHeader:          viewer.renderHeader,
+			RenderFooter:          viewer.renderFooter,
+			FooterRendersViewport: true, // Footer renders viewport with custom styling
 		},
 		OnApprove: viewer.handleApprove,
 		OnReject:  viewer.handleReject,

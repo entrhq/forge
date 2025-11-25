@@ -62,8 +62,9 @@ func NewCommandExecutionOverlay(command, workingDir, executionID string, cancelC
 			}
 			return nil
 		},
-		RenderHeader: overlay.renderHeader,
-		RenderFooter: overlay.renderFooter,
+		RenderHeader:          overlay.renderHeader,
+		RenderFooter:          overlay.renderFooter,
+		FooterRendersViewport: true, // Footer renders viewport directly
 	}
 
 	overlay.BaseOverlay = NewBaseOverlay(baseConfig)

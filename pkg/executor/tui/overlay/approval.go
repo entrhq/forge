@@ -49,13 +49,14 @@ func NewGenericApprovalOverlay(request approval.ApprovalRequest, width, height i
 	// Configure approval overlay
 	approvalConfig := ApprovalOverlayConfig{
 		BaseConfig: BaseOverlayConfig{
-			Width:          overlayWidth,
-			Height:         overlayHeight,
-			ViewportWidth:  overlayWidth - 4,
-			ViewportHeight: viewportHeight,
-			Content:        request.Content(),
-			RenderHeader:   overlay.renderHeader,
-			RenderFooter:   overlay.renderFooter,
+			Width:                 overlayWidth,
+			Height:                overlayHeight,
+			ViewportWidth:         overlayWidth - 4,
+			ViewportHeight:        viewportHeight,
+			Content:               request.Content(),
+			RenderHeader:          overlay.renderHeader,
+			RenderFooter:          overlay.renderFooter,
+			FooterRendersViewport: true, // Footer renders viewport with custom styling
 		},
 		OnApprove:    request.OnApprove,
 		OnReject:     request.OnReject,

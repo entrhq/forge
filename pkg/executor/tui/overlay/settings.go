@@ -606,10 +606,17 @@ func (s *SettingsOverlay) showAddPatternDialog() {
 				key:       "description",
 				fieldType: fieldTypeText,
 			},
+			{
+				label:     "Match Type",
+				key:       "type",
+				fieldType: fieldTypeRadio,
+				value:     "prefix",
+				options:   []string{"prefix", "exact"},
+			},
 		},
 		selectedField: 0,
 		onConfirm: func(values map[string]string) error {
-			s.addPattern(values["pattern"], values["description"])
+			s.addPattern(values["pattern"], values["description"], values["type"])
 			return nil
 		},
 		onCancel: func() {
@@ -624,6 +631,12 @@ func (s *SettingsOverlay) showEditPatternDialog() {
 	data, ok := item.value.(map[string]interface{})
 	if !ok {
 		return
+	}
+
+	// Get the type value, default to "prefix" if not present
+	typeValue := "prefix"
+	if t, ok := data["type"].(string); ok {
+		typeValue = t
 	}
 
 	s.activeDialog = &inputDialog{
@@ -647,10 +660,17 @@ func (s *SettingsOverlay) showEditPatternDialog() {
 				value:     fmt.Sprintf("%v", data["description"]),
 				fieldType: fieldTypeText,
 			},
+			{
+				label:     "Match Type",
+				key:       "type",
+				fieldType: fieldTypeRadio,
+				value:     typeValue,
+				options:   []string{"prefix", "exact"},
+			},
 		},
 		selectedField: 0,
 		onConfirm: func(values map[string]string) error {
-			s.updatePattern(s.selectedItem, values["pattern"], values["description"])
+			s.updatePattern(s.selectedItem, values["pattern"], values["description"], values["type"])
 			return nil
 		},
 		onCancel: func() {
@@ -696,7 +716,7 @@ func (s *SettingsOverlay) showUnsavedChangesDialog(actions types.ActionHandler) 
 	}
 }
 
-func (s *SettingsOverlay) addPattern(pattern, description string) {
+func (s *SettingsOverlay) addPattern(pattern, description, matchType string) {
 	// Implementation of adding pattern to the local state
 	// This updates s.sections directly
 	for i, section := range s.sections {
@@ -707,6 +727,7 @@ func (s *SettingsOverlay) addPattern(pattern, description string) {
 				value: map[string]interface{}{
 					"pattern":     pattern,
 					"description": description,
+					"type":        matchType,
 				},
 				itemType: itemTypeList,
 				modified: true,
@@ -718,13 +739,14 @@ func (s *SettingsOverlay) addPattern(pattern, description string) {
 	}
 }
 
-func (s *SettingsOverlay) updatePattern(index int, pattern, description string) {
+func (s *SettingsOverlay) updatePattern(index int, pattern, description, matchType string) {
 	for i, section := range s.sections {
 		if section.id == sectionCommandWhitelist {
 			if index < len(section.items) {
 				s.sections[i].items[index].value = map[string]interface{}{
 					"pattern":     pattern,
 					"description": description,
+					"type":        matchType,
 				}
 				s.sections[i].items[index].displayName = fmt.Sprintf("%s - %s", pattern, description)
 				s.sections[i].items[index].modified = true
@@ -817,6 +839,8 @@ func (s *SettingsOverlay) handleDialogConfirm() (types.Overlay, tea.Cmd) {
 		}
 	}
 
+	// Clear the dialog after successful confirmation
+	s.activeDialog = nil
 	return s, nil
 }
 
