@@ -9,9 +9,6 @@ on:
       - 'pkg/**'
       - 'internal/**'
       - '**.go'
-  push:
-    branches:
-      - feat/docs-headless-workflow
 
 jobs:
   update-docs:
