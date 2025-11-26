@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/entrhq/forge/pkg/agent"
+	"github.com/entrhq/forge/pkg/llm"
 	"github.com/entrhq/forge/pkg/types"
 )
 
@@ -28,6 +29,7 @@ type Executor struct {
 	qualityGates   *QualityGateRunner
 	artifactWriter *ArtifactWriter
 	gitManager     *GitManager
+	llmProvider    llm.Provider // LLM provider for PR generation
 
 	// Execution state
 	startTime             time.Time
@@ -64,6 +66,12 @@ func NewExecutor(ag agent.Agent, config *Config) (*Executor, error) {
 	// Create git manager
 	gitManager := NewGitManager(config.WorkspaceDir, config.Git)
 
+	// Extract LLM provider from agent (for PR generation)
+	var llmProvider llm.Provider
+	if defaultAgent, ok := ag.(*agent.DefaultAgent); ok {
+		llmProvider = defaultAgent.GetProvider()
+	}
+
 	return &Executor{
 		agent:                 ag,
 		config:                config,
@@ -71,6 +79,7 @@ func NewExecutor(ag agent.Agent, config *Config) (*Executor, error) {
 		qualityGates:          qualityGateRunner,
 		artifactWriter:        artifactWriter,
 		gitManager:            gitManager,
+		llmProvider:           llmProvider,
 		qualityGateRetryCount: 0,
 		summary: &ExecutionSummary{
 			Task:   config.Task,
@@ -464,7 +473,7 @@ func (e *Executor) finalize(ctx context.Context) error {
 	return nil
 }
 
-// commitChanges creates a git commit with the changes
+// commitChanges creates a git commit with the changes and optionally creates a PR
 func (e *Executor) commitChanges(ctx context.Context) error {
 	// Check if there are any changes to commit
 	changedFiles, err := e.gitManager.GetChangedFiles(ctx)
@@ -488,6 +497,24 @@ func (e *Executor) commitChanges(ctx context.Context) error {
 	}
 
 	log.Printf("[Headless] Created git commit with message: %s", message)
+
+	// Create PR if configured
+	if e.config.Git.CreatePR {
+		if err := e.createPullRequest(ctx); err != nil {
+			if e.config.Git.RequirePR {
+				return fmt.Errorf("failed to create pull request: %w", err)
+			}
+			log.Printf("[Headless] Warning: Failed to create PR, falling back to direct push: %v", err)
+			// Fall back to direct push if PR creation is not required
+			if e.config.Git.AutoPush {
+				if pushErr := e.gitManager.Push(ctx); pushErr != nil {
+					return fmt.Errorf("failed to push after PR creation failure: %w", pushErr)
+				}
+				log.Printf("[Headless] Changes pushed directly to remote")
+			}
+		}
+	}
+
 	return nil
 }
 

@@ -76,6 +76,14 @@ type GitConfig struct {
 	Branch              string `yaml:"branch" json:"branch"`
 	AuthorName          string `yaml:"author_name" json:"author_name"`
 	AuthorEmail         string `yaml:"author_email" json:"author_email"`
+
+	// PR creation configuration (ADR-0031)
+	CreatePR  bool   `yaml:"create_pr" json:"create_pr"`   // If true, create PR instead of direct push
+	PRTitle   string `yaml:"pr_title" json:"pr_title"`     // PR title (optional, auto-generated if empty)
+	PRBody    string `yaml:"pr_body" json:"pr_body"`       // PR description (optional, auto-generated if empty)
+	PRBase    string `yaml:"pr_base" json:"pr_base"`       // Target branch (default: auto-detected)
+	PRDraft   bool   `yaml:"pr_draft" json:"pr_draft"`     // Create as draft PR
+	RequirePR bool   `yaml:"require_pr" json:"require_pr"` // Fail if PR creation is not possible (no fallback)
 }
 
 // ArtifactConfig defines artifact generation configuration
@@ -118,6 +126,16 @@ func (c *Config) Validate() error {
 
 	if c.Constraints.MaxTokens < 0 {
 		return fmt.Errorf("max_tokens cannot be negative")
+	}
+
+	// Validate PR configuration
+	if c.Git.CreatePR {
+		if !c.Git.AutoCommit {
+			return fmt.Errorf("create_pr requires auto_commit to be enabled")
+		}
+		if c.Git.Branch == "" {
+			return fmt.Errorf("create_pr requires a branch to be specified")
+		}
 	}
 
 	return nil
