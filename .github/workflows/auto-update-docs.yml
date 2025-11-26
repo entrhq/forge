@@ -15,6 +15,9 @@ on:
 
 jobs:
   update-docs:
+    permissions:
+      contents: write
+      pull-requests: write
     uses: ./.github/workflows/docs-automation.yml
     with:
       mode: 'open_pr'
