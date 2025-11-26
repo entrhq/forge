@@ -62,8 +62,6 @@ jobs:
       
       - name: Setup Go
         uses: actions/setup-go@v5
-        with:
-          go-version: '1.21'
       
       - name: Install Forge
         run: |
@@ -74,16 +72,22 @@ jobs:
         run: |
           # Get PR details
           PR_TITLE="${{ github.event.pull_request.title }}"
-          PR_BODY="${{ github.event.pull_request.body }}"
           PR_NUMBER="${{ github.event.pull_request.number }}"
           
           # Get changed files
           CHANGED_FILES=$(gh pr view $PR_NUMBER --json files --jq '.files[].path' | tr '\n' ',')
           
-          # Export for next steps
+          # Get PR body and escape it properly for multiline
+          PR_BODY=$(gh pr view $PR_NUMBER --json body --jq '.body')
+          
+          # Export for next steps using multiline format
           echo "pr_title=$PR_TITLE" >> $GITHUB_OUTPUT
-          echo "pr_body=$PR_BODY" >> $GITHUB_OUTPUT
           echo "changed_files=$CHANGED_FILES" >> $GITHUB_OUTPUT
+          {
+            echo "pr_body<<EOF"
+            echo "$PR_BODY"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
         env:
           GH_TOKEN: ${{ github.token }}
       
