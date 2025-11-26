@@ -499,3 +499,8 @@ func (a *DefaultAgent) GetContextInfo() *ContextInfo {
 		TotalTokens:           0,
 	}
 }
+
+// GetProvider returns the LLM provider used by this agent
+func (a *DefaultAgent) GetProvider() llm.Provider {
+	return a.provider
+}

@@ -124,6 +124,12 @@ func (w *ArtifactWriter) WriteSummaryMarkdown(summary *ExecutionSummary) error {
 		}
 	}
 
+	// Pull Request
+	if summary.PRURL != "" {
+		md.WriteString("## Pull Request\n\n")
+		md.WriteString(fmt.Sprintf("✅ **Created:** %s\n\n", summary.PRURL))
+	}
+
 	// Metrics
 	md.WriteString("## Metrics\n\n")
 	md.WriteString(fmt.Sprintf("- **Files Modified:** %d\n", summary.Metrics.FilesModified))
@@ -168,6 +174,7 @@ type ExecutionSummary struct {
 	QualityGateResults *QualityGateResults `json:"quality_gate_results,omitempty"`
 	Metrics            ExecutionMetrics    `json:"metrics"`
 	GitInfo            *GitInfo            `json:"git_info,omitempty"`
+	PRURL              string              `json:"pr_url,omitempty"`
 	ToolCallCount      int                 `json:"tool_call_count"`
 }
 
