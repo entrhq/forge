@@ -94,25 +94,31 @@ jobs:
       - name: Generate Forge Configuration
         id: config
         run: |
-          # Build custom instructions
-          BASE_INSTRUCTIONS="You are a documentation assistant. Analyze the following pull request and update relevant documentation files to reflect the changes.
-
+          # Build custom instructions using cat with heredoc to avoid shell interpretation
+          BASE_INSTRUCTIONS=$(cat <<'INSTRUCTIONS_EOF'
+          You are a documentation assistant. Analyze the following pull request and update relevant documentation files to reflect the changes.
+          
           PR Title: ${{ steps.pr_context.outputs.pr_title }}
           PR Description: ${{ steps.pr_context.outputs.pr_body }}
           Changed Files: ${{ steps.pr_context.outputs.changed_files }}
-
+          
           Focus on:
           1. Updating existing documentation that references changed functionality
           2. Adding new documentation for new features
           3. Updating examples if code interfaces changed
           4. Maintaining consistency with existing documentation style
-          5. Only modifying markdown documentation files"
-
+          5. Only modifying markdown documentation files
+          INSTRUCTIONS_EOF
+          )
+          
           if [ -n "${{ inputs.custom_instructions }}" ]; then
-            INSTRUCTIONS="$BASE_INSTRUCTIONS
-
+            INSTRUCTIONS=$(cat <<CUSTOM_EOF
+          $BASE_INSTRUCTIONS
+          
           Additional Instructions:
-          ${{ inputs.custom_instructions }}"
+          ${{ inputs.custom_instructions }}
+          CUSTOM_EOF
+          )
           else
             INSTRUCTIONS="$BASE_INSTRUCTIONS"
           fi
