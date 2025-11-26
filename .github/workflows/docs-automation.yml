@@ -173,6 +173,7 @@ jobs:
             "git": {
               "auto_commit": true,
               "create_pr": true,
+              "auto_push": true,
               "branch": "${{ inputs.pr_branch_prefix }}-pr-${{ github.event.pull_request.number }}",
               "commit_message": "docs: automated documentation update for PR #${{ github.event.pull_request.number }}",
               "pr_title": "docs: Update documentation for PR #${{ github.event.pull_request.number }}",
@@ -206,6 +207,7 @@ jobs:
             "git": {
               "auto_commit": true,
               "create_pr": false,
+              "auto_push": true,
               "commit_message": "docs: automated documentation update for PR #${{ github.event.pull_request.number }}"
             }
           }

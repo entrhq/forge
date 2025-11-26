@@ -9,7 +9,7 @@ jobs:
     # Only run on PR comments that contain the trigger phrase
     if: |
       github.event.issue.pull_request &&
-      contains(github.event.comment.body, '@forge update-docs')
+      contains(github.event.comment.body, '/forge update-docs')
     permissions:
       contents: write
       pull-requests: write
