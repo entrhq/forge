@@ -1,0 +1,221 @@
+name: Automated Documentation Updates
+
+on:
+  workflow_call:
+    inputs:
+      mode:
+        description: 'Execution mode: direct_commit or open_pr'
+        required: false
+        type: string
+        default: 'direct_commit'
+      model:
+        description: 'LLM model to use'
+        required: false
+        type: string
+        default: 'gpt-4o-mini'
+      max_iterations:
+        description: 'Maximum agent iterations'
+        required: false
+        type: number
+        default: 10
+      custom_instructions:
+        description: 'Custom instructions for the agent'
+        required: false
+        type: string
+        default: ''
+      file_patterns:
+        description: 'Comma-separated file patterns to allow (e.g., "**/*.md,docs/**")'
+        required: false
+        type: string
+        default: '**/*.md,docs/**'
+      deny_patterns:
+        description: 'Comma-separated file patterns to deny (e.g., "vendor/**,node_modules/**")'
+        required: false
+        type: string
+        default: 'vendor/**,node_modules/**,.git/**'
+      pr_branch_prefix:
+        description: 'Prefix for documentation PR branches (only used in open_pr mode)'
+        required: false
+        type: string
+        default: 'docs/automated-update'
+    secrets:
+      OPENAI_API_KEY:
+        description: 'OpenAI API key for LLM access'
+        required: true
+      OPENAI_BASE_URL:
+        description: 'Base URL for OpenAI API (if using a custom endpoint)'
+        required: false
+      GITHUB_TOKEN:
+        description: 'GitHub token with repo write access'
+        required: false
+
+jobs:
+  update-docs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.ref }}
+      
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+      
+      - name: Install Forge
+        run: |
+          go install github.com/entrhq/forge/cmd/forge@latest
+      
+      - name: Extract PR Context
+        id: pr_context
+        run: |
+          # Get PR details
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          PR_BODY="${{ github.event.pull_request.body }}"
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          
+          # Get changed files
+          CHANGED_FILES=$(gh pr view $PR_NUMBER --json files --jq '.files[].path' | tr '\n' ',')
+          
+          # Export for next steps
+          echo "pr_title=$PR_TITLE" >> $GITHUB_OUTPUT
+          echo "pr_body=$PR_BODY" >> $GITHUB_OUTPUT
+          echo "changed_files=$CHANGED_FILES" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN || github.token }}
+      
+      - name: Generate Forge Configuration
+        id: config
+        run: |
+          # Build custom instructions
+          BASE_INSTRUCTIONS="You are a documentation assistant. Analyze the following pull request and update relevant documentation files to reflect the changes.
+
+          PR Title: ${{ steps.pr_context.outputs.pr_title }}
+          PR Description: ${{ steps.pr_context.outputs.pr_body }}
+          Changed Files: ${{ steps.pr_context.outputs.changed_files }}
+
+          Focus on:
+          1. Updating existing documentation that references changed functionality
+          2. Adding new documentation for new features
+          3. Updating examples if code interfaces changed
+          4. Maintaining consistency with existing documentation style
+          5. Only modifying markdown documentation files"
+
+          if [ -n "${{ inputs.custom_instructions }}" ]; then
+            INSTRUCTIONS="$BASE_INSTRUCTIONS
+
+          Additional Instructions:
+          ${{ inputs.custom_instructions }}"
+          else
+            INSTRUCTIONS="$BASE_INSTRUCTIONS"
+          fi
+
+          # Build file allow/deny lists
+          IFS=',' read -ra ALLOW_PATTERNS <<< "${{ inputs.file_patterns }}"
+          IFS=',' read -ra DENY_PATTERNS <<< "${{ inputs.deny_patterns }}"
+
+          ALLOW_JSON=$(printf '%s\n' "${ALLOW_PATTERNS[@]}" | jq -R . | jq -s .)
+          DENY_JSON=$(printf '%s\n' "${DENY_PATTERNS[@]}" | jq -R . | jq -s .)
+
+          # Generate config based on mode
+          if [ "${{ inputs.mode }}" = "open_pr" ]; then
+            CONFIG=$(cat <<EOF
+          {
+            "task": $(echo "$INSTRUCTIONS" | jq -R -s .),
+            "mode": "write",
+            "workspace_dir": ".",
+            "constraints": {
+              "max_files": 50,
+              "max_lines_changed": 2000,
+              "allowed_patterns": $ALLOW_JSON,
+              "denied_patterns": $DENY_JSON,
+              "max_tokens": 1000000,
+              "timeout": "10m"
+            },
+            "git": {
+              "auto_commit": true,
+              "create_pr": true,
+              "branch": "${{ inputs.pr_branch_prefix }}-pr-${{ github.event.pull_request.number }}",
+              "commit_message": "docs: automated documentation update for PR #${{ github.event.pull_request.number }}",
+              "pr_title": "docs: Update documentation for PR #${{ github.event.pull_request.number }}",
+              "pr_body": "Automated documentation updates based on changes in #${{ github.event.pull_request.number }}",
+              "pr_draft": false
+            }
+          }
+          EOF
+          )
+          else
+            CONFIG=$(cat <<EOF
+          {
+            "task": $(echo "$INSTRUCTIONS" | jq -R -s .),
+            "mode": "write",
+            "workspace_dir": ".",
+            "constraints": {
+              "max_files": 50,
+              "max_lines_changed": 2000,
+              "allowed_patterns": $ALLOW_JSON,
+              "denied_patterns": $DENY_JSON,
+              "max_tokens": 1000000,
+              "timeout": "10m"
+            },
+            "git": {
+              "auto_commit": true,
+              "create_pr": false,
+              "commit_message": "docs: automated documentation update for PR #${{ github.event.pull_request.number }}"
+            }
+          }
+          EOF
+          )
+          fi
+
+          echo "$CONFIG" > forge-config.json
+          echo "Generated configuration for mode: ${{ inputs.mode }}"
+      
+      - name: Run Forge
+        id: forge
+        run: |
+          forge --headless --headless-config forge-config.json --model "${{ inputs.model }}" 2>&1 | tee forge-output.log
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN || github.token }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
+      
+      - name: Post Summary Comment
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN || github.token }}
+          script: |
+            const fs = require('fs');
+            const output = fs.readFileSync('forge-output.log', 'utf8');
+            
+            const mode = '${{ inputs.mode }}';
+            const success = ${{ steps.forge.outcome == 'success' }};
+            
+            let body = `## 🤖 Automated Documentation Update\n\n`;
+            body += `**Mode:** ${mode}\n`;
+            body += `**Status:** ${success ? '✅ Success' : '❌ Failed'}\n\n`;
+            
+            if (mode === 'direct_commit') {
+              body += `### Changes Committed\n\n`;
+              body += `Documentation updates have been committed directly to this PR branch.\n\n`;
+            } else {
+              body += `### Documentation PR Created\n\n`;
+              body += `A separate pull request has been created with documentation updates.\n`;
+              body += `Please review and merge it after this PR is merged.\n\n`;
+            }
+            
+            body += `<details>\n<summary>Forge Output</summary>\n\n\`\`\`\n${output.slice(-4000)}\n\`\`\`\n</details>`;
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: body
+            });

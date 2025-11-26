@@ -319,6 +319,7 @@ jobs:
       - name: Run Forge Documentation Update
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           forge -headless -headless-config /tmp/forge-config.yml

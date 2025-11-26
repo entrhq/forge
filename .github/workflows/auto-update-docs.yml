@@ -1,0 +1,31 @@
+name: Auto-Update Documentation
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    # Only run when code changes, not for doc-only PRs
+    paths:
+      - 'cmd/**'
+      - 'pkg/**'
+      - 'internal/**'
+      - '**.go'
+  push:
+    branches:
+      - feat/docs-headless-workflow
+
+jobs:
+  update-docs:
+    uses: ./.github/workflows/docs-automation.yml
+    with:
+      mode: 'open_pr'
+      model: 'google/gemini-3-pro-preview'
+      max_iterations: 15
+      pr_branch_prefix: 'docs/auto-update'
+      file_patterns: '**/*.md,docs/**'
+      deny_patterns: 'vendor/**,.git/**'
+      custom_instructions: |
+        Be thorough but concise. Ensure all technical details are accurate.
+    secrets:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
+      GITHUB_TOKEN: ${{ github.token }}

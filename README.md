@@ -17,6 +17,8 @@
 - 🔄 **Event-Driven**: Real-time streaming of thinking, tool calls, and messages
 - 🔁 **Self-Healing Error Recovery**: Automatic error recovery with circuit breaker pattern
 - 🚀 **Execution Plane Abstraction**: Run agents in different environments (CLI, API, custom)
+- 🤖 **Headless Mode**: Automated CI/CD workflows with git integration and PR creation
+- 📚 **Automated Documentation**: AI-powered documentation updates on every PR
 - 📦 **Library-First Design**: Import as a Go module in your own applications
 - 🧪 **Well-Tested**: Comprehensive test coverage (196+ tests passing)
 - 📖 **Well-Documented**: Clear, comprehensive documentation
@@ -114,6 +116,8 @@ func main() {
 
 - **Automated Commits**: Review and commit changes directly from the TUI
 - **Pull Request Creation**: Generate PRs with AI-written descriptions
+- **Headless CI/CD**: Run Forge in GitHub Actions and other CI/CD pipelines
+- **Automated PR Documentation**: Auto-update docs when PRs are opened
 - **Change Tracking**: Monitor file modifications across agent sessions
 - **Diff Preview**: View changes before committing
 
@@ -128,6 +132,7 @@ func main() {
 ### How-To Guides
 - [Configure Provider](docs/how-to/configure-provider.md) - LLM provider setup
 - [Create Custom Tools](docs/how-to/create-custom-tool.md) - Extend agent capabilities
+- [Setup PR Documentation](docs/how-to/setup-pr-documentation.md) - Automated docs workflow
 - [Manage Memory](docs/how-to/manage-memory.md) - Context and history management
 - [Handle Errors](docs/how-to/handle-errors.md) - Error recovery patterns
 - [Test Tools](docs/how-to/test-tools.md) - Testing strategies
@@ -152,6 +157,9 @@ func main() {
 
 ### Architecture Decision Records
 See [ADRs](docs/adr/) for detailed design decisions including:
+- [Automated PR Documentation](docs/adr/0030-automated-pr-documentation.md)
+- [Headless Git PR Creation](docs/adr/0031-headless-git-pr-creation.md)
+- [Headless Git Integration](docs/adr/0029-headless-git-integration.md)
 - [XML Tool Call Format](docs/adr/0019-xml-cdata-tool-call-format.md)
 - [Auto-Approval System](docs/adr/0017-auto-approval-and-settings-system.md)
 - [Context Management](docs/adr/0014-composable-context-management.md)
@@ -343,6 +351,8 @@ For security issues, see our [Security Policy](SECURITY.md).
 - [x] Context management with multiple strategies
 - [x] Auto-approval and settings system
 - [x] Git integration (commits and PRs)
+- [x] Headless mode for CI/CD automation
+- [x] Automated PR documentation workflow
 - [x] File ignore system for security
 - [x] Slash command system
 - [x] Self-healing error recovery
