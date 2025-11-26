@@ -45,9 +45,6 @@ on:
       OPENAI_BASE_URL:
         description: 'Base URL for OpenAI API (if using a custom endpoint)'
         required: false
-      GITHUB_TOKEN:
-        description: 'GitHub token with repo write access'
-        required: false
 
 jobs:
   update-docs:
@@ -88,7 +85,7 @@ jobs:
           echo "pr_body=$PR_BODY" >> $GITHUB_OUTPUT
           echo "changed_files=$CHANGED_FILES" >> $GITHUB_OUTPUT
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN || github.token }}
+          GH_TOKEN: ${{ github.token }}
       
       - name: Generate Forge Configuration
         id: config
@@ -182,7 +179,7 @@ jobs:
         run: |
           forge --headless --headless-config forge-config.json --model "${{ inputs.model }}" 2>&1 | tee forge-output.log
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN || github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
       
@@ -190,7 +187,7 @@ jobs:
         if: always()
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN || github.token }}
+          github-token: ${{ github.token }}
           script: |
             const fs = require('fs');
             const output = fs.readFileSync('forge-output.log', 'utf8');
