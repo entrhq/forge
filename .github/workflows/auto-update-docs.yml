@@ -1,28 +1,26 @@
 name: Auto-Update Documentation
 
 on:
-  pull_request:
-    types: [opened, synchronize]
-    # Only run when code changes, not for doc-only PRs
-    paths:
-      - 'cmd/**'
-      - 'pkg/**'
-      - 'internal/**'
-      - '**.go'
+  issue_comment:
+    types: [created]
 
 jobs:
   update-docs:
+    # Only run on PR comments that contain the trigger phrase
+    if: |
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '@forge update-docs')
     permissions:
       contents: write
       pull-requests: write
     uses: ./.github/workflows/docs-automation.yml
     with:
       mode: 'open_pr'
-      model: 'google/gemini-3-pro-preview'
-      max_iterations: 15
+      model: 'google/gemini-2.5-flash'
       pr_branch_prefix: 'docs/auto-update'
       file_patterns: '**/*.md,docs/**'
       deny_patterns: 'vendor/**,.git/**'
+      max_tokens: 2000000
       custom_instructions: |
         Be thorough but concise. Ensure all technical details are accurate.
     secrets:
