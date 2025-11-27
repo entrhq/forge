@@ -3,9 +3,6 @@ name: Auto-Update Documentation
 on:
   issue_comment:
     types: [created]
-  push:
-    branches:
-      - fix/pr-automated-cleanup
 
 jobs:
   update-docs:
