@@ -263,30 +263,42 @@ jobs:
           script: |
             const fs = require('fs');
             
-            // Check if forge output exists
-            let output = '';
+            // Read structured data from JSON files
+            let metrics = {};
+            let execution = {};
+            
             try {
-              output = fs.readFileSync('forge-output.log', 'utf8');
+              const metricsData = fs.readFileSync('.forge/artifacts/metrics.json', 'utf8');
+              metrics = JSON.parse(metricsData);
             } catch (err) {
-              output = 'No output available (execution may have failed early)';
+              console.log('Could not read metrics.json:', err.message);
             }
             
-            // Try to read execution summary
-            let summary = '';
             try {
-              summary = fs.readFileSync('.forge/artifacts/summary.md', 'utf8');
+              const execData = fs.readFileSync('.forge/artifacts/execution.json', 'utf8');
+              execution = JSON.parse(execData);
             } catch (err) {
-              // Summary not available
+              console.log('Could not read execution.json:', err.message);
             }
             
             const mode = '${{ inputs.mode }}';
             const success = '${{ steps.forge.outcome }}' === 'success';
             const prNumber = context.issue.number || context.payload.pull_request.number;
             
+            // Build comment body with structured data
             let body = `## 🤖 Automated Documentation Update\n\n`;
             body += `**Mode:** ${mode}\n`;
             body += `**Status:** ${success ? '✅ Success' : '❌ Failed'}\n`;
             body += `**Triggered by:** @${context.payload.comment?.user?.login || context.actor}\n\n`;
+            
+            // Add metrics if available
+            if (metrics.files_modified || metrics.total_tokens) {
+              body += `### 📊 Metrics\n\n`;
+              if (metrics.files_modified) body += `- Files Modified: **${metrics.files_modified}**\n`;
+              if (metrics.total_tokens) body += `- Total Tokens: **${metrics.total_tokens.toLocaleString()}**\n`;
+              if (metrics.execution_time) body += `- Execution Time: **${metrics.execution_time}**\n`;
+              body += `\n`;
+            }
             
             if (mode === 'direct_commit') {
               body += `### Changes Committed\n\n`;
@@ -297,12 +309,20 @@ jobs:
               body += `Please review and merge it after this PR is merged.\n\n`;
             }
             
-            if (summary) {
-              body += `### Execution Summary\n\n${summary}\n\n`;
+            // Add quality gates if available
+            if (execution.quality_gates && Object.keys(execution.quality_gates).length > 0) {
+              body += `<details>\n<summary>Quality Gates</summary>\n\n`;
+              for (const [gate, result] of Object.entries(execution.quality_gates)) {
+                const status = result.passed ? '✅' : '❌';
+                body += `- ${status} **${gate}**: ${result.message || 'OK'}\n`;
+              }
+              body += `\n</details>\n\n`;
             }
             
-            body += `📊 **Artifacts**: Execution details, metrics, and summary have been uploaded as workflow artifacts.\n\n`;
-            body += `<details>\n<summary>Forge Output</summary>\n\n\`\`\`\n${output.slice(-4000)}\n\`\`\`\n</details>`;
+            body += `<details>\n<summary>📦 Artifacts</summary>\n\n`;
+            body += `Execution details have been uploaded as workflow artifacts:\n`;
+            body += `- [View Artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})\n`;
+            body += `</details>`;
             
             await github.rest.issues.createComment({
               owner: context.repo.owner,
