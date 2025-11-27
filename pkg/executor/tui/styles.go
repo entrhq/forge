@@ -12,7 +12,6 @@ var (
 	mintGreen   = lipgloss.Color("#A8E6CF") // Soft mint green - success/accept states
 	mutedGray   = lipgloss.Color("#6B7280") // Muted gray - secondary text
 	brightWhite = lipgloss.Color("#F9FAFB") // Bright white - primary text
-	darkBg      = lipgloss.Color("#111827") // Dark background - container backgrounds
 )
 
 // Common Styles
@@ -51,7 +50,6 @@ var (
 	// Container Styles
 	statusBarStyle = lipgloss.NewStyle().
 			Foreground(mutedGray).
-			Background(darkBg).
 			Padding(0, 1)
 
 	inputBoxStyle = lipgloss.NewStyle().

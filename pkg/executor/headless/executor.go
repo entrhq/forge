@@ -35,6 +35,7 @@ type Executor struct {
 	startTime             time.Time
 	summary               *ExecutionSummary
 	qualityGateRetryCount int
+	sourceBranch          string // The branch we started from before creating a new one
 }
 
 // NewExecutor creates a new headless executor with a pre-configured agent
@@ -64,7 +65,7 @@ func NewExecutor(ag agent.Agent, config *Config) (*Executor, error) {
 	artifactWriter := NewArtifactWriter(artifactOutputDir, config.Artifacts)
 
 	// Create git manager
-	gitManager := NewGitManager(config.WorkspaceDir, config.Git)
+	gitManager := NewGitManager(config.WorkspaceDir, config.Git, config.ConfigFilePath)
 
 	// Extract LLM provider from agent (for PR generation)
 	var llmProvider llm.Provider
@@ -406,10 +407,12 @@ func (e *Executor) validateWorkspace() {
 		// Create and checkout the specified branch if configured
 		if e.config.Git.Branch != "" && currentBranch != "" {
 			if currentBranch != e.config.Git.Branch {
+				e.sourceBranch = currentBranch
 				e.logger.Infof("± Creating and checking out branch: %s", e.config.Git.Branch)
 				if err := e.gitManager.CreateBranch(ctx, e.config.Git.Branch); err != nil {
 					e.logger.Warningf("! Failed to create branch '%s': %v", e.config.Git.Branch, err)
 					e.logger.Infof("→ Continuing with execution on current branch: %s", currentBranch)
+					e.sourceBranch = ""
 				} else {
 					e.logger.Successf("Successfully switched to branch: %s", e.config.Git.Branch)
 				}

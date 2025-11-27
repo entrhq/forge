@@ -31,6 +31,11 @@ type Config struct {
 
 	// Logging configuration
 	Logging LoggingConfig `yaml:"logging" json:"logging"`
+
+	// ConfigFilePath is the path to the config file used to start this run (if any)
+	// This file will be automatically excluded from commits to prevent temporary
+	// config files from being committed in PR workflows
+	ConfigFilePath string `yaml:"-" json:"-"`
 }
 
 // ExecutionMode defines the execution mode for headless runs

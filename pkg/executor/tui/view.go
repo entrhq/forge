@@ -59,7 +59,7 @@ func (m *model) buildTopStatus() string {
 	if err != nil {
 		cwd = "~"
 	}
-	return statusBarStyle.Render(fmt.Sprintf("  Working directory: %s", cwd))
+	return statusBarStyle.Render(fmt.Sprintf(" Working directory: %s", cwd))
 }
 
 // buildLoadingIndicator renders the loading spinner when agent is busy
