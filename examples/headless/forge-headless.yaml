@@ -69,8 +69,8 @@ git:
   auto_commit: false               # Set to true to enable automatic commits
   commit_message: "chore: automated changes via Forge"
   branch: ""                       # Leave empty to use current branch
-  author_name: "Forge AI"
-  author_email: "forge@example.com"
+  author_name: "anvxl"
+  author_email: "anvxl@entr.net.au"
 
 # Artifact generation - execution logs and reports
 artifacts:
