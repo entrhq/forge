@@ -185,8 +185,8 @@ func DefaultConfig() *Config {
 		Git: GitConfig{
 			AutoCommit:    false,
 			CommitMessage: "chore: automated changes via Forge",
-			AuthorName:    "anvxl[bot]",
-			AuthorEmail:   "2365524+anvxl[bot]@users.noreply.github.com",
+			AuthorName:    "anvxl",
+			AuthorEmail:   "anvxl@entr.net.au",
 		},
 		Artifacts: ArtifactConfig{
 			Enabled:   true,
