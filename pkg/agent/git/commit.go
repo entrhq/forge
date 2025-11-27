@@ -190,23 +190,23 @@ func CreateCommit(workingDir, message string) (string, error) {
 
 	userEmailCmd := exec.Command("git", "config", "user.email")
 	userEmailCmd.Dir = workingDir
-	userEmailOutput, err := userEmailCmd.Output()
-	if err != nil {
-		return "", fmt.Errorf("failed to get git user.email: %w", err)
+	userEmailOutput, userEmailErr := userEmailCmd.Output()
+	if userEmailErr != nil {
+		return "", fmt.Errorf("failed to get git user.email: %w", userEmailErr)
 	}
 	currentUserEmail := strings.TrimSpace(string(userEmailOutput))
 
 	// Set commit author to anvxl
 	configNameCmd := exec.Command("git", "config", "user.name", "anvxl")
 	configNameCmd.Dir = workingDir
-	if err := configNameCmd.Run(); err != nil {
-		return "", fmt.Errorf("failed to set git user.name: %w", err)
+	if configNameErr := configNameCmd.Run(); configNameErr != nil {
+		return "", fmt.Errorf("failed to set git user.name: %w", configNameErr)
 	}
 
 	configEmailCmd := exec.Command("git", "config", "user.email", "anvxl@entr.net.au")
 	configEmailCmd.Dir = workingDir
-	if err := configEmailCmd.Run(); err != nil {
-		return "", fmt.Errorf("failed to set git user.email: %w", err)
+	if configEmailErr := configEmailCmd.Run(); configEmailErr != nil {
+		return "", fmt.Errorf("failed to set git user.email: %w", configEmailErr)
 	}
 
 	// Add co-author trailer to commit message
@@ -219,25 +219,24 @@ func CreateCommit(workingDir, message string) (string, error) {
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	if err := cmd.Run(); err != nil {
-		// Restore original git config on error
-		exec.Command("git", "config", "user.name", currentUserName).Run()
-		exec.Command("git", "config", "user.email", currentUserEmail).Run()
-		return "", fmt.Errorf("git commit failed: %w, stderr: %s", err, stderr.String())
-	}
+	commitErr := cmd.Run()
 
-	// Restore original git config after commit
+	// Always restore original git config
 	restoreNameCmd := exec.Command("git", "config", "user.name", currentUserName)
 	restoreNameCmd.Dir = workingDir
-	restoreNameCmd.Run()
+	restoreNameCmd.Run() //nolint:errcheck // Best effort restore
 
 	restoreEmailCmd := exec.Command("git", "config", "user.email", currentUserEmail)
 	restoreEmailCmd.Dir = workingDir
-	restoreEmailCmd.Run()
+	restoreEmailCmd.Run() //nolint:errcheck // Best effort restore
 
-	hash, err := getLatestCommitHash(workingDir)
-	if err != nil {
-		return "", fmt.Errorf("failed to get commit hash: %w", err)
+	if commitErr != nil {
+		return "", fmt.Errorf("git commit failed: %w, stderr: %s", commitErr, stderr.String())
+	}
+
+	hash, hashErr := getLatestCommitHash(workingDir)
+	if hashErr != nil {
+		return "", fmt.Errorf("failed to get commit hash: %w", hashErr)
 	}
 
 	return hash, nil
