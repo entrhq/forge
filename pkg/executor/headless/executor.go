@@ -523,7 +523,7 @@ func (e *Executor) commitChanges(ctx context.Context) error {
 	// Generate commit message
 	message := e.gitManager.GenerateCommitMessage(ctx, e.config.Task)
 
-	// Create commit
+	// Create commit (this will exclude the config file if set)
 	if err := e.gitManager.Commit(ctx, message); err != nil {
 		return fmt.Errorf("failed to create commit: %w", err)
 	}
