@@ -65,7 +65,7 @@ func NewExecutor(ag agent.Agent, config *Config) (*Executor, error) {
 	artifactWriter := NewArtifactWriter(artifactOutputDir, config.Artifacts)
 
 	// Create git manager
-	gitManager := NewGitManager(config.WorkspaceDir, config.Git)
+	gitManager := NewGitManager(config.WorkspaceDir, config.Git, config.ConfigFilePath)
 
 	// Extract LLM provider from agent (for PR generation)
 	var llmProvider llm.Provider

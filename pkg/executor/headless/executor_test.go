@@ -65,7 +65,7 @@ func TestGitManager_BranchCreationWorkflow(t *testing.T) {
 		Branch:     "feature/test-branch",
 	}
 
-	gm := NewGitManager(testDir, config)
+	gm := NewGitManager(testDir, config, "")
 
 	// Get initial branch
 	initialBranch, err := gm.GetCurrentBranch(ctx)
@@ -106,7 +106,7 @@ func TestGitManager_BranchAlreadyExists(t *testing.T) {
 		Branch:     "feature/existing-branch",
 	}
 
-	gm := NewGitManager(testDir, config)
+	gm := NewGitManager(testDir, config, "")
 
 	// Create the branch
 	err := gm.CreateBranch(ctx, config.Branch)
