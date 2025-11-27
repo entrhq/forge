@@ -32,14 +32,17 @@ type Executor struct {
 	program      *tea.Program
 	provider     llm.Provider
 	workspaceDir string
+	header       string // Custom ASCII art header (optional)
 }
 
 // NewExecutor creates a new TUI executor for the given agent.
-func NewExecutor(agent agent.Agent, provider llm.Provider, workspaceDir string) *Executor {
+// The headerText will be automatically converted to ASCII art for display.
+func NewExecutor(agent agent.Agent, provider llm.Provider, workspaceDir string, headerText string) *Executor {
 	return &Executor{
 		agent:        agent,
 		provider:     provider,
 		workspaceDir: workspaceDir,
+		header:       headerText,
 	}
 }
 
@@ -66,6 +69,7 @@ func (e *Executor) Run(ctx context.Context) error {
 	m.agent = e.agent
 	m.channels = e.agent.GetChannels()
 	m.workspaceDir = e.workspaceDir
+	m.header = e.header
 	debugLog.Printf("Model initialized, workspace: %s", e.workspaceDir)
 
 	// Initialize slash handler for git operations

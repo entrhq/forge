@@ -33,6 +33,9 @@ type model struct {
 	commitGen    *git.CommitMessageGenerator
 	prGen        *git.PRGenerator
 
+	// Customization
+	header string // Custom ASCII art header (empty means use default)
+
 	// Content buffers
 	content        *strings.Builder
 	thinkingBuffer *strings.Builder
