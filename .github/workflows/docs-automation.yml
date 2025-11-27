@@ -45,10 +45,10 @@ on:
       OPENAI_BASE_URL:
         description: 'Base URL for OpenAI API (if using a custom endpoint)'
         required: false
-      GITHUB_APP_ID:
+      GH_APP_ID:
         description: 'GitHub App ID for generating tokens with PR permissions'
         required: true
-      GITHUB_APP_PRIVATE_KEY:
+      GH_APP_PRIVATE_KEY:
         description: 'GitHub App private key for token generation'
         required: true
 
@@ -64,8 +64,8 @@ jobs:
         id: app-token
         uses: actions/create-github-app-token@v1
         with:
-          app-id: ${{ secrets.GITHUB_APP_ID }}
-          private-key: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
+          app-id: ${{ secrets.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
       
       - name: Get PR details
         id: pr
