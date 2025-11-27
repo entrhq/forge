@@ -3,7 +3,6 @@ package headless
 import (
 	"context"
 	"fmt"
-	"log"
 	"os/exec"
 	"strings"
 	"time"
@@ -216,7 +215,6 @@ func (r *QualityGateResults) FormatFeedbackMessage(retryCount, maxRetries int) s
 
 	msg.WriteString("\nAfter fixing these issues, use task_completion again to revalidate your changes.")
 
-	log.Printf("Quality gate failed, sending message to agent:\n%s", msg.String())
 	return msg.String()
 }
 

@@ -12,8 +12,10 @@ mode: write
 # REQUIRED: Path to your project workspace
 workspace_dir: .
 
-# Enable detailed logging (useful for debugging)
-verbose: true
+# Logging configuration
+logging:
+  # Verbosity levels: quiet, normal, verbose, debug
+  verbosity: verbose
 
 # Safety constraints to prevent runaway execution
 constraints:

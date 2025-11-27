@@ -10,8 +10,10 @@ mode: write
 # REQUIRED: Path to your project workspace
 workspace_dir: .
 
-# Enable detailed logging (useful for debugging)
-verbose: false
+# Logging configuration
+logging:
+  # Verbosity levels: quiet, normal, verbose, debug
+  verbosity: normal
 
 # Safety constraints to prevent runaway execution
 constraints:
@@ -44,7 +46,7 @@ constraints:
     - execute_command              # Run shell commands
   
   # Resource limits
-  max_tokens: 50000                # Maximum LLM tokens to consume
+  max_tokens: 1000000                # Maximum LLM tokens to consume
   timeout: 5m                      # Maximum execution time (5 minutes)
 
 # Quality gates - commands to validate changes before committing
