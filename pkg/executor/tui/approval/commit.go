@@ -11,6 +11,8 @@ import (
 	"github.com/entrhq/forge/pkg/executor/tui/types"
 )
 
+const commitPreviewTitle = "Commit Preview"
+
 // CommitRequest is a concrete implementation of ApprovalRequest for git commits.
 // It encapsulates all data needed to preview and execute a commit operation.
 type CommitRequest struct {
@@ -34,7 +36,7 @@ func NewCommitRequest(files []string, message, diff, args string, slashHandler *
 
 // Title returns the approval dialog title
 func (c *CommitRequest) Title() string {
-	return "Commit Preview"
+	return commitPreviewTitle
 }
 
 // Content returns the formatted content for the commit preview

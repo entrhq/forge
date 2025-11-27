@@ -465,26 +465,26 @@ func TestExecute_PRCommand(t *testing.T) {
 
 func initGitRepo(t *testing.T, dir string) {
 	t.Helper()
-	
+
 	// Initialize git repo
 	err := runGitCommand(dir, "init")
 	require.NoError(t, err, "failed to init git repo")
-	
+
 	// Configure git user
 	err = runGitCommand(dir, "config", "user.email", "test@example.com")
 	require.NoError(t, err, "failed to configure git user email")
-	
+
 	err = runGitCommand(dir, "config", "user.name", "Test User")
 	require.NoError(t, err, "failed to configure git user name")
-	
+
 	// Create initial commit
 	readmePath := filepath.Join(dir, "README.md")
 	err = os.WriteFile(readmePath, []byte("# Test Repo"), 0644)
 	require.NoError(t, err, "failed to create README")
-	
+
 	err = runGitCommand(dir, "add", "README.md")
 	require.NoError(t, err, "failed to add README")
-	
+
 	err = runGitCommand(dir, "commit", "-m", "Initial commit")
 	require.NoError(t, err, "failed to create initial commit")
 }
