@@ -5,6 +5,11 @@ import (
 	"maps"
 )
 
+const (
+	// SectionIDAutoApproval is the identifier for the auto-approval section
+	SectionIDAutoApproval = "auto_approval"
+)
+
 // AutoApprovalSection manages auto-approval settings for tools.
 type AutoApprovalSection struct {
 	// tools maps tool names to their auto-approval status
@@ -21,7 +26,7 @@ func NewAutoApprovalSection() *AutoApprovalSection {
 
 // ID returns the section identifier.
 func (s *AutoApprovalSection) ID() string {
-	return "auto_approval"
+	return SectionIDAutoApproval
 }
 
 // Title returns the section title.
