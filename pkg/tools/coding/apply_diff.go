@@ -121,13 +121,13 @@ func (t *ApplyDiffTool) Execute(ctx context.Context, argsXML []byte) (string, ma
 
 		// Check if search text exists
 		if !strings.Contains(fileContent, edit.Search) {
-			return "", nil, fmt.Errorf("edit %d: search text not found in file:\n%s", i+1, edit.Search)
+			return "", nil, fmt.Errorf("edit %d: search text not found in file. The file content may have changed or the search pattern doesn't match exactly.\n\nRecovery steps:\n1. Use read_file to view the current file content (consider reading more context lines to understand the structure)\n2. Verify the exact text including whitespace, indentation, and line breaks\n3. Try a smaller, more focused edit targeting a unique code pattern\n4. Ensure your search text matches the actual file content character-for-character\n\nSearch text that failed:\n%s", i+1, edit.Search)
 		}
 
 		// Count occurrences to warn about multiple matches
 		count := strings.Count(fileContent, edit.Search)
 		if count > 1 {
-			return "", nil, fmt.Errorf("edit %d: search text appears %d times in file, must be unique", i+1, count)
+			return "", nil, fmt.Errorf("edit %d: search text appears %d times in file, must be unique. When multiple matches exist, the diff cannot determine which occurrence to modify.\n\nRecovery steps:\n1. Use read_file with appropriate line ranges to examine each occurrence\n2. Include more surrounding context in your search text to make it unique\n3. Make the search pattern more specific by including nearby code (function signature, variable declarations, etc.)\n4. Consider splitting into multiple smaller, targeted edits with unique search patterns\n5. Avoid overly generic patterns that match multiple locations\n\nExample: Instead of searching for 'return err', include the surrounding function context to make it unique.", i+1, count)
 		}
 
 		// Track line changes for this edit
@@ -257,12 +257,12 @@ func (t *ApplyDiffTool) GeneratePreview(ctx context.Context, argsXML []byte) (*t
 		}
 
 		if !strings.Contains(modifiedContent, edit.Search) {
-			return nil, fmt.Errorf("edit %d: search text not found in file", i+1)
+			return nil, fmt.Errorf("edit %d: search text not found in file. The file content may have changed or the search pattern doesn't match exactly.\n\nRecovery steps:\n1. Use read_file to view the current file content (consider reading more context lines to understand the structure)\n2. Verify the exact text including whitespace, indentation, and line breaks\n3. Try a smaller, more focused edit targeting a unique code pattern\n4. Ensure your search text matches the actual file content character-for-character\n\nSearch text that failed:\n%s", i+1, edit.Search)
 		}
 
 		count := strings.Count(modifiedContent, edit.Search)
 		if count > 1 {
-			return nil, fmt.Errorf("edit %d: search text appears %d times in file, must be unique", i+1, count)
+			return nil, fmt.Errorf("edit %d: search text appears %d times in file, must be unique. When multiple matches exist, the diff cannot determine which occurrence to modify.\n\nRecovery steps:\n1. Use read_file with appropriate line ranges to examine each occurrence\n2. Include more surrounding context in your search text to make it unique\n3. Make the search pattern more specific by including nearby code (function signature, variable declarations, etc.)\n4. Consider splitting into multiple smaller, targeted edits with unique search patterns\n5. Avoid overly generic patterns that match multiple locations\n\nExample: Instead of searching for 'return err', include the surrounding function context to make it unique.", i+1, count)
 		}
 
 		modifiedContent = strings.Replace(modifiedContent, edit.Search, edit.Replace, 1)
