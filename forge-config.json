@@ -1,0 +1,36 @@
+{
+  "task": "You are a documentation assistant. Analyze the following pull request and update relevant documentation files to reflect the changes.\n\nPR Title: style(executor): update branding and UI spacing\nPR Description: ## Summary\n\nMinor UI refinements to the executor interface, including simplified branding and improved visual spacing in the TUI.\n\n## Changes\n\n- Updated CLI welcome message from \"Forge CLI Agent\" to \"Forge Agent\" for cleaner branding\n- Removed background color from status bar style to reduce visual clutter\n- Adjusted status bar padding from 2 spaces to 1 space for better alignment\n\n## Testing\n\n- Run the CLI executor and verify the welcome message displays \"Forge Agent\"\n- Launch the TUI and confirm the status bar renders correctly without background color\n- Check that the working directory status displays with proper spacing\nChanged Files: .github/workflows/auto-update-docs.yml,LOGGING_MIGRATION.md,headless-logging-plan.md,pkg/executor/cli/executor.go,pkg/executor/tui/styles.go,pkg/executor/tui/view.go,\n\nFocus on:\n1. Updating existing documentation that references changed functionality\n2. Adding new documentation for new features\n3. Updating examples if code interfaces changed\n4. Maintaining consistency with existing documentation style\n5. Only modifying markdown documentation files\n\nAdditional Instructions:\nBe thorough but concise. Ensure all technical details are accurate.\n",
+  "mode": "write",
+  "workspace_dir": ".",
+  "constraints": {
+    "max_files": 50,
+    "max_lines_changed": 2000,
+    "allowed_patterns": [
+  "**/*.md",
+  "docs/**"
+],
+    "denied_patterns": [
+  "vendor/**",
+  ".git/**"
+],
+    "max_tokens": 1000000,
+    "timeout": "10m"
+  },
+  "artifacts": {
+    "enabled": true,
+    "output_dir": ".forge/artifacts",
+    "json": true,
+    "markdown": true,
+    "metrics": true
+  },
+  "git": {
+    "auto_commit": true,
+    "create_pr": true,
+    "auto_push": true,
+    "branch": "docs/auto-update-pr-32",
+    "commit_message": "docs: automated documentation update for PR #32",
+    "pr_title": "docs: Update documentation for PR #32",
+    "pr_body": "Automated documentation updates based on changes in #32",
+    "pr_draft": false
+  }
+}
