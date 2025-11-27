@@ -24,13 +24,14 @@ func (e *Executor) createPullRequest(ctx context.Context) error {
 	// Detect or use configured base branch
 	base := e.config.Git.PRBase
 	if base == "" {
-		detectedBase, detectErr := git.DetectBaseBranch(e.config.WorkspaceDir)
-		if detectErr != nil {
-			e.logger.Warningf("! Could not detect base branch, using '%s': %v", defaultBaseBranch, detectErr)
-			base = defaultBaseBranch
+		// Use sourceBranch if available (we switched from it)
+		if e.sourceBranch != "" {
+			base = e.sourceBranch
+			e.logger.Debugf("Using source branch as base: %s", base)
 		} else {
-			base = detectedBase
-			e.logger.Debugf("Detected base branch: %s", base)
+			// No source branch and no configured base, use default
+			e.logger.Debugf("No source branch tracked, using default base: %s", defaultBaseBranch)
+			base = defaultBaseBranch
 		}
 	}
 
