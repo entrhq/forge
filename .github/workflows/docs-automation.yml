@@ -221,8 +221,8 @@ jobs:
       
       - name: Configure Git
         run: |
-          git config --global user.name "anvxl[bot]"
-          git config --global user.email "2365524+anvxl[bot]@users.noreply.github.com"
+          git config --global user.name "anvxl"
+          git config --global user.email "2365524+anvxl@users.noreply.github.com"
       
       - name: Run Forge
         id: forge
