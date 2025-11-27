@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"maps"
+	"sync"
 )
 
 const (
@@ -14,6 +15,7 @@ const (
 type AutoApprovalSection struct {
 	// tools maps tool names to their auto-approval status
 	tools map[string]bool
+	mu    sync.RWMutex
 }
 
 // NewAutoApprovalSection creates a new auto-approval section with default settings.
@@ -41,6 +43,8 @@ func (s *AutoApprovalSection) Description() string {
 
 // Data returns the current configuration data.
 func (s *AutoApprovalSection) Data() map[string]any {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	data := make(map[string]any, len(s.tools))
 	for tool, enabled := range s.tools {
 		data[tool] = enabled
@@ -54,6 +58,8 @@ func (s *AutoApprovalSection) SetData(data map[string]any) error {
 		return nil
 	}
 
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	for tool, value := range data {
 		if enabled, ok := value.(bool); ok {
 			s.tools[tool] = enabled
@@ -73,6 +79,8 @@ func (s *AutoApprovalSection) Validate() error {
 
 // Reset resets the section to default configuration (all disabled).
 func (s *AutoApprovalSection) Reset() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	for tool := range s.tools {
 		s.tools[tool] = false
 	}
@@ -81,6 +89,8 @@ func (s *AutoApprovalSection) Reset() {
 // EnsureToolExists ensures a tool exists in the map with a default value if not present.
 // This allows tools to be registered dynamically.
 func (s *AutoApprovalSection) EnsureToolExists(toolName string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if _, exists := s.tools[toolName]; !exists {
 		// Default to false (require approval) for new tools
 		s.tools[toolName] = false
@@ -90,7 +100,10 @@ func (s *AutoApprovalSection) EnsureToolExists(toolName string) {
 // IsToolAutoApproved returns true if the specified tool is auto-approved.
 // Returns false for unknown tools (default is to require approval).
 func (s *AutoApprovalSection) IsToolAutoApproved(toolName string) bool {
+	s.mu.RLock()
 	enabled, exists := s.tools[toolName]
+	s.mu.RUnlock()
+
 	if !exists {
 		// Unknown tool - ensure it exists with default value (false)
 		s.EnsureToolExists(toolName)
@@ -101,11 +114,15 @@ func (s *AutoApprovalSection) IsToolAutoApproved(toolName string) bool {
 
 // SetToolAutoApproval sets the auto-approval status for a tool.
 func (s *AutoApprovalSection) SetToolAutoApproval(toolName string, enabled bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.tools[toolName] = enabled
 }
 
 // GetTools returns a map of all tool names to their auto-approval status.
 func (s *AutoApprovalSection) GetTools() map[string]bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	// Return a copy to prevent external modification
 	copy := make(map[string]bool, len(s.tools))
 	maps.Copy(copy, s.tools)
