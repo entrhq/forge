@@ -411,7 +411,7 @@ func (e *Executor) validateWorkspace() {
 					e.logger.Warningf("! Failed to create branch '%s': %v", e.config.Git.Branch, err)
 					e.logger.Infof("→ Continuing with execution on current branch: %s", currentBranch)
 				} else {
-					e.logger.Successf("✓ Successfully switched to branch: %s", e.config.Git.Branch)
+					e.logger.Successf("Successfully switched to branch: %s", e.config.Git.Branch)
 				}
 			} else {
 				e.logger.Infof("± Already on target branch: %s", e.config.Git.Branch)
