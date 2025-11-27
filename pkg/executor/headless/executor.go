@@ -269,7 +269,7 @@ func (e *Executor) Run(ctx context.Context) error {
 								// Don't shutdown - let the agent retry
 								turnEndReceived = false // Reset to allow another turn
 							default:
-								e.logger.Errorf("✗ Failed to send quality gate feedback, input channel blocked")
+								e.logger.Errorf("Failed to send quality gate feedback, input channel blocked")
 								e.summary.Status = statusFailed
 								e.summary.Error = "Failed to send quality gate feedback to agent"
 								select {
