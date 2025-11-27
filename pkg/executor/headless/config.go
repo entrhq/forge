@@ -29,8 +29,8 @@ type Config struct {
 	// Workspace directory
 	WorkspaceDir string `yaml:"workspace_dir" json:"workspace_dir"`
 
-	// Verbose enables detailed event logging
-	Verbose bool `yaml:"verbose" json:"verbose"`
+	// Logging configuration
+	Logging LoggingConfig `yaml:"logging" json:"logging"`
 }
 
 // ExecutionMode defines the execution mode for headless runs
@@ -86,6 +86,12 @@ type GitConfig struct {
 	RequirePR bool   `yaml:"require_pr" json:"require_pr"` // Fail if PR creation is not possible (no fallback)
 }
 
+// LoggingConfig defines logging configuration
+type LoggingConfig struct {
+	// Verbosity controls logging level: quiet, normal, verbose, debug
+	Verbosity string `yaml:"verbosity" json:"verbosity"`
+}
+
 // ArtifactConfig defines artifact generation configuration
 type ArtifactConfig struct {
 	Enabled   bool   `yaml:"enabled" json:"enabled"`
@@ -136,6 +142,22 @@ func (c *Config) Validate() error {
 		if c.Git.Branch == "" {
 			return fmt.Errorf("create_pr requires a branch to be specified")
 		}
+	}
+
+	// Set default verbosity if not specified
+	if c.Logging.Verbosity == "" {
+		c.Logging.Verbosity = "normal"
+	}
+
+	// Validate log level
+	validLevels := map[string]bool{
+		"quiet":   true,
+		"normal":  true,
+		"verbose": true,
+		"debug":   true,
+	}
+	if !validLevels[c.Logging.Verbosity] {
+		return fmt.Errorf("invalid logging verbosity: %s (must be 'quiet', 'normal', 'verbose', or 'debug')", c.Logging.Verbosity)
 	}
 
 	return nil

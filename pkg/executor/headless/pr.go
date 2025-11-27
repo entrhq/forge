@@ -3,7 +3,6 @@ package headless
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"github.com/entrhq/forge/pkg/agent/git"
 	"github.com/entrhq/forge/pkg/llm"
@@ -27,11 +26,11 @@ func (e *Executor) createPullRequest(ctx context.Context) error {
 	if base == "" {
 		detectedBase, detectErr := git.DetectBaseBranch(e.config.WorkspaceDir)
 		if detectErr != nil {
-			log.Printf("[Headless] Could not detect base branch, using '%s': %v", defaultBaseBranch, detectErr)
+			e.logger.Warningf("! Could not detect base branch, using '%s': %v", defaultBaseBranch, detectErr)
 			base = defaultBaseBranch
 		} else {
 			base = detectedBase
-			log.Printf("[Headless] Detected base branch: %s", base)
+			e.logger.Debugf("Detected base branch: %s", base)
 		}
 	}
 
@@ -42,7 +41,7 @@ func (e *Executor) createPullRequest(ctx context.Context) error {
 	if title == "" || body == "" {
 		prContent, genErr := e.generatePRContent(ctx, base, head)
 		if genErr != nil {
-			log.Printf("[Headless] Warning: Failed to generate PR content, using defaults: %v", genErr)
+			e.logger.Warningf("! Failed to generate PR content, using defaults: %v", genErr)
 			if title == "" {
 				title = fmt.Sprintf("chore: automated changes in %s", head)
 			}
@@ -59,8 +58,14 @@ func (e *Executor) createPullRequest(ctx context.Context) error {
 		}
 	}
 
-	log.Printf("[Headless] Creating PR: %s -> %s", head, base)
-	log.Printf("[Headless] PR Title: %s", title)
+	e.logger.Debugf("Creating PR: %s -> %s", head, base)
+	e.logger.Debugf("PR Title: %s", title)
+
+	// Push branch before creating PR
+	e.logger.Infof("↑ Pushing to origin/%s...", head)
+	if pushErr := e.gitManager.Push(ctx); pushErr != nil {
+		return fmt.Errorf("failed to push branch: %w", pushErr)
+	}
 
 	// Create PR using existing git.CreatePR function
 	prURL, err := git.CreatePR(e.config.WorkspaceDir, title, body, base, head)
@@ -68,7 +73,7 @@ func (e *Executor) createPullRequest(ctx context.Context) error {
 		return fmt.Errorf("failed to create pull request: %w", err)
 	}
 
-	log.Printf("[Headless] ✅ Pull request created: %s", prURL)
+	e.logger.Successf("⇄ Created pull request: %s", prURL)
 
 	// Store PR URL in summary for artifact generation
 	e.summary.PRURL = prURL
