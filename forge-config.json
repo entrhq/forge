@@ -1,0 +1,36 @@
+{
+  "task": "You are a documentation assistant. Analyze the following pull request and update relevant documentation files to reflect the changes.\n\nPR Title: feat(headless): implement structured logging system with verbosity levels\nPR Description: This pull request introduces a structured, color-coded logging system for headless mode execution, replacing the previous use of `log.Printf` with a configurable `Logger` that supports multiple verbosity levels. It updates the configuration files and codebase to support the new logging architecture, ensuring backward compatibility and improving the clarity and usefulness of execution logs.\r\n\r\n**Logging System Implementation:**\r\n\r\n* Added a new `Logger` struct with four verbosity levels (`quiet`, `normal`, `verbose`, `debug`), color-coded output, and methods for structured logging. The logger replaces all previous `log.Printf` calls in `executor.go` and integrates with the execution flow for user-facing and debug logs. [[1]](diffhunk://#diff-9e8e85fc5985d424fef3bd77bb5149f0bed1ff9d6c74e5231891b38f2bdbf030R1-R36) [[2]](diffhunk://#diff-dd359df2429a9eabaae8d58f319bdcd85d01573313a8195c42bc7422c0453f47R1-R265) [[3]](diffhunk://#diff-f6396a8e4053a4dcdc4e35342b1892fc5b1cbdec72cdb02de2d2352b957b8846L6) [[4]](diffhunk://#diff-f6396a8e4053a4dcdc4e35342b1892fc5b1cbdec72cdb02de2d2352b957b8846R32) [[5]](diffhunk://#diff-f6396a8e4053a4dcdc4e35342b1892fc5b1cbdec72cdb02de2d2352b957b8846R75-R79) [[6]](diffhunk://#diff-f6396a8e4053a4dcdc4e35342b1892fc5b1cbdec72cdb02de2d2352b957b8846R88) [[7]](diffhunk://#diff-f6396a8e4053a4dcdc4e35342b1892fc5b1cbdec72cdb02de2d2352b957b8846L98-R104) [[8]](diffhunk://#diff-f6396a8e4053a4dcdc4e35342b1892fc5b1cbdec72cdb02de2d2352b957b8846L118-R145) [[9]](diffhunk://#diff-f6396a8e4053a4dcdc4e35342b1892fc5b1cbdec72cdb02de2d2352b957b8846L133-R166) [[10]](diffhunk://#diff-f6396a8e4053a4dcdc4e35342b1892fc5b1cbdec72cdb02de2d2352b957b8846L160-R182) [[11]](diffhunk://#diff-f6396a8e4053a4dcdc4e35342b1892fc5b1cbdec72cdb02de2d2352b957b8846L175-R207) [[12]](diffhunk://#diff-f6396a8e4053a4dcdc4e35342b1892fc5b1cbdec72cdb02de2d2352b957b8846L194-R224)\r\n\r\n**Configuration Changes:**\r\n\r\n* Updated the configuration schema to use a `LoggingConfig` struct with a `verbosity` field, replacing the old `verbose` boolean. Added validation and defaulting logic for the log level in `Config.Validate()`. [[1]](diffhunk://#diff-1bf0254e79bf46f0a6af9c6a42dd1d21b323e8b28e9b3a2768d1e89bdfb87687L32-R33) [[2]](diffhunk://#diff-1bf0254e79bf46f0a6af9c6a42dd1d21b323e8b28e9b3a2768d1e89bdfb87687R89-R94) [[3]](diffhunk://#diff-1bf0254e79bf46f0a6af9c6a42dd1d21b323e8b28e9b3a2768d1e89bdfb87687R147-R162)\r\n* Updated example YAML files to reflect the new `logging` configuration block and verbosity options.\r\n\r\n**Documentation and Planning:**\r\n\r\n* Added detailed migration and implementation plan documents outlining the logging system architecture, configuration, output examples for each verbosity level, and a checklist for migration tasks. [[1]](diffhunk://#diff-9e8e85fc5985d424fef3bd77bb5149f0bed1ff9d6c74e5231891b38f2bdbf030R1-R36) [[2]](diffhunk://#diff-dd359df2429a9eabaae8d58f319bdcd85d01573313a8195c42bc7422c0453f47R1-R265)\r\n\r\n**Constraint and Resource Updates:**\r\n\r\n* Increased the default maximum LLM token limit in example configuration for resource constraints.\r\n\r\nThese changes collectively modernize and standardize logging for headless execution, making logs easier to scan, more informative, and configurable for different environments and use cases.\nChanged Files: LOGGING_MIGRATION.md,examples/headless/forge-headless.yaml,headless-logging-plan.md,pkg/executor/headless/config.go,pkg/executor/headless/executor.go,pkg/executor/headless/file_tracker.go,pkg/executor/headless/logger.go,pkg/executor/headless/pr.go,pkg/executor/headless/quality_gate.go,test-docs.yaml,\n\nFocus on:\n1. Updating existing documentation that references changed functionality\n2. Adding new documentation for new features\n3. Updating examples if code interfaces changed\n4. Maintaining consistency with existing documentation style\n5. Only modifying markdown documentation files\n\nAdditional Instructions:\nBe thorough but concise. Ensure all technical details are accurate.\n",
+  "mode": "write",
+  "workspace_dir": ".",
+  "constraints": {
+    "max_files": 50,
+    "max_lines_changed": 2000,
+    "allowed_patterns": [
+  "**/*.md",
+  "docs/**"
+],
+    "denied_patterns": [
+  "vendor/**",
+  ".git/**"
+],
+    "max_tokens": 1000000,
+    "timeout": "10m"
+  },
+  "artifacts": {
+    "enabled": true,
+    "output_dir": ".forge/artifacts",
+    "json": true,
+    "markdown": true,
+    "metrics": true
+  },
+  "git": {
+    "auto_commit": true,
+    "create_pr": true,
+    "auto_push": true,
+    "branch": "docs/auto-update-pr-",
+    "commit_message": "docs: automated documentation update for PR #",
+    "pr_title": "docs: Update documentation for PR #",
+    "pr_body": "Automated documentation updates based on changes in #",
+    "pr_draft": false
+  }
+}

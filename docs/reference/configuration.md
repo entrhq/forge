@@ -9,6 +9,8 @@ Complete reference for configuring Forge agents.
 - [Memory Configuration](#memory-configuration)
 - [Tool Configuration](#tool-configuration)
 - [Executor Configuration](#executor-configuration)
+- [Headless Executor Configuration](#headless-executor-configuration)
+- [Headless Executor Configuration](#headless-executor-configuration)
 - [Environment Variables](#environment-variables)
 - [Configuration Examples](#configuration-examples)
 
@@ -461,6 +463,118 @@ func (t *MyTool) Parameters() map[string]interface{} {
 ---
 
 ## Executor Configuration
+
+### CLI Executor
+
+```go
+executor := cli.NewExecutor(
+    cli.WithColorOutput(true),
+    cli.WithPromptPrefix("> "),
+    cli.WithThinkingColor(color.Cyan),
+)
+```
+
+[Existing content about CLI Executor options will follow naturally]
+
+## Headless Executor Configuration
+
+For headless mode execution, the executor's logging behavior is configured via the `LoggingConfig` struct, supporting various verbosity levels and color-coded output.
+
+### Logging Configuration
+
+The logging system uses a `LoggingConfig` struct with a `verbosity` field, replacing the previous `verbose` boolean setting. This allows for fine-grained control over the logging output.
+
+#### Verbosity Levels
+
+The `verbosity` field accepts one of four levels:
+
+*   **`quiet`**: Only critical errors and final results are logged.
+*   **`normal`**: (Default) Provides standard operational messages and key events, offering a balance between detail and conciseness.
+*   **`verbose`**: Includes more detailed information, useful for general debugging and understanding execution flow.
+*   **`debug`**: Outputs all available diagnostic information, including extensive internal workings and detailed step-by-step execution. This level is recommended for in-depth troubleshooting.
+
+```yaml
+# Example Headless Configuration with Logging
+logging:
+  verbosity: normal # Options: quiet, normal, verbose, debug
+```
+
+#### Color-Coded Output
+
+Logs in headless mode are color-coded to enhance readability and quickly identify the type of message (e.g., errors in red, debug information in gray, etc.). This feature is active by default in supported terminals.
+
+```go
+// Example of configuring headless executor with specific logging
+cfg := &headless.Config{
+    Logging: headless.LoggingConfig{
+        Verbosity: "debug", // Set to "debug" for maximum detail
+    },
+    // ... other headless configurations
+}
+executor := headless.NewExecutor(cfg)
+```
+
+---
+
+[Remaining sections of the document will follow here]
+
+## Environment Variables
+
+### CLI Executor
+
+```go
+executor := cli.NewExecutor(
+    cli.WithColorOutput(true),
+    cli.WithPromptPrefix("> "),
+    cli.WithThinkingColor(color.Cyan),
+)
+```
+
+[Existing content about CLI Executor options will follow naturally]
+
+## Headless Executor Configuration
+
+For headless mode execution, the executor's logging behavior is configured via the `LoggingConfig` struct, supporting various verbosity levels and color-coded output.
+
+### Logging Configuration
+
+The logging system uses a `LoggingConfig` struct with a `verbosity` field, replacing the previous `verbose` boolean setting. This allows for fine-grained control over the logging output.
+
+#### Verbosity Levels
+
+The `verbosity` field accepts one of four levels:
+
+*   **`quiet`**: Only critical errors and final results are logged.
+*   **`normal`**: (Default) Provides standard operational messages and key events, offering a balance between detail and conciseness.
+*   **`verbose`**: Includes more detailed information, useful for general debugging and understanding execution flow.
+*   **`debug`**: Outputs all available diagnostic information, including extensive internal workings and detailed step-by-step execution. This level is recommended for in-depth troubleshooting.
+
+```yaml
+# Example Headless Configuration with Logging
+logging:
+  verbosity: normal # Options: quiet, normal, verbose, debug
+```
+
+#### Color-Coded Output
+
+Logs in headless mode are color-coded to enhance readability and quickly identify the type of message (e.g., errors in red, debug information in gray, etc.). This feature is active by default in supported terminals.
+
+```go
+// Example of configuring headless executor with specific logging
+cfg := &headless.Config{
+    Logging: headless.LoggingConfig{
+        Verbosity: "debug", // Set to "debug" for maximum detail
+    },
+    // ... other headless configurations
+}
+executor := headless.NewExecutor(cfg)
+```
+
+---
+
+[Remaining sections of the document will follow here]
+
+## Environment Variables
 
 ### CLI Executor
 
