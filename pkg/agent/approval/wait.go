@@ -21,7 +21,12 @@ func (m *Manager) waitForResponse(ctx context.Context, approvalID string, toolCa
 		m.emitEvent(types.NewToolApprovalTimeoutEvent(approvalID, toolCall.ToolName))
 		return false, true
 
-	case response := <-responseChannel:
+	case response, ok := <-responseChannel:
+		if !ok {
+			// Channel closed, treat as rejection
+			m.emitEvent(types.NewToolApprovalRejectedEvent(approvalID, toolCall.ToolName))
+			return false, false
+		}
 		if response.IsGranted() {
 			m.emitEvent(types.NewToolApprovalGrantedEvent(approvalID, toolCall.ToolName))
 			return true, false
