@@ -542,6 +542,38 @@ fmt.Printf("Messages: %d, Tokens: ~%d\n", mem.Size(), mem.EstimateTokens())
 
 ## Executor Package (`pkg/executor`)
 
+### TUI Executor
+
+#### `tui.NewExecutor`
+
+Creates a new TUI (Terminal User Interface) executor.
+
+```go
+func NewExecutor(opts ...Option) (*Executor, error)
+```
+
+**Options:**
+
+- `WithHeaderText(headerText string)`: Sets a custom string to be rendered as an ASCII art header on the welcome screen.
+- `WithInitialPrompt(prompt string)`: Sets the initial prompt to be sent to the agent on startup.
+
+**Example:**
+
+```go
+// TUI executor with a custom header
+tuiExecutor, err := tui.NewExecutor(
+    tui.WithHeaderText("My App"),
+)
+if err != nil {
+    log.Fatalf("failed to create TUI executor: %v", err)
+}
+
+// Run the agent with the TUI
+if err := agent.Run(context.Background(), tuiExecutor); err != nil {
+    log.Fatalf("agent run failed: %v", err)
+}
+```
+
 ### CLI Executor
 
 #### `CLIExecutor`

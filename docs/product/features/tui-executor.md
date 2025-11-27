@@ -882,6 +882,21 @@ Toast appears:
 
 ---
 
+#### P1-6: Customizable ASCII Art Header
+**Description:** Allow applications to specify custom text for the ASCII art header on the welcome screen.
+
+**User Stories:**
+- As a developer integrating Forge's TUI, I want to display my own application's name in the header to provide a branded experience.
+- As a user, I want to see a familiar name on startup so I know I'm running the correct application.
+
+**Acceptance Criteria:**
+- `tui.NewExecutor()` accepts an optional `headerText` string.
+- If `headerText` is provided, the welcome screen generates ASCII art from that text.
+- If `headerText` is empty, a default header is used (or no header is shown).
+- The ASCII art generation supports standard alphanumeric characters.
+
+---
+
 ### Priority 2 (Nice to Have - Future Enhancements)
 
 #### P2-1: Themes (Light/Dark/Custom)
@@ -931,16 +946,18 @@ Terminal: forge
 
 [TUI launches with welcome screen]
 
-┌─ Welcome to Forge ───────────────────────────────────────┐
+┌─ Welcome to My App ────────────────────────────────────┐
 │                                                           │
-│      ███████╗ ██████╗ ██████╗  ██████╗ ███████╗         │
-│      ██╔════╝██╔═══██╗██╔══██╗██╔════╝ ██╔════╝         │
-│      █████╗  ██║   ██║██████╔╝██║  ███╗█████╗           │
-│      ██╔══╝  ██║   ██║██╔══██╗██║   ██║██╔══╝           │
-│      ██║     ╚██████╔╝██║  ██║╚██████╔╝███████╗         │
-│      ╚═╝      ╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚══════╝         │
+│   ███╗   ███╗██╗   ██╗    █████╗  ██████╗ ██████╗          │
+│   ████╗ ████║╚██╗ ██╔╝   ██╔══██╗██╔═══██╗██╔═══██╗         │
+│   ██╔████╔██║ ╚████╔╝    ███████║██║   ██║██║   ██║         │
+│   ██║╚██╔╝██║  ╚██╔╝     ██╔══██║██║   ██║██║   ██║         │
+│   ██║ ╚═╝ ██║   ██║      ██║  ██║╚██████╔╝╚██████╔╝         │
+│   ╚═╝     ╚═╝   ╚═╝      ╚═╝  ╚═╝ ╚═════╝  ╚═════╝          │
 │                                                           │
 │  Your AI Coding Assistant                                │
+│                                                           │
+│  (Header is customizable via `headerText` option)          │
 │                                                           │
 │  📁 Workspace: ~/projects/myapp                          │
 │                                                           │

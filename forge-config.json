@@ -1,0 +1,36 @@
+{
+  "task": "You are a documentation assistant. Analyze the following pull request and update relevant documentation files to reflect the changes.\n\nPR Title: feat: add customizable ASCII art header support to TUI\nPR Description: ## Summary\n\nAdds support for customizable ASCII art headers in the TUI executor. Previously, the TUI displayed a hardcoded \"FORGE\" ASCII art header. Now, applications can specify custom header text that will be automatically converted to ASCII art using a block-style font.\n\n## Changes\n\n- Added new `pkg/ui/ascii.go` with `GenerateASCIIArt()` function supporting A-Z, 0-9, and common symbols\n- Added comprehensive test coverage in `pkg/ui/ascii_test.go` (111 lines)\n- Updated `tui.NewExecutor()` to accept optional `headerText` parameter\n- Modified `model.go` to store custom header text\n- Updated `view.go` to dynamically generate ASCII art from header text instead of using hardcoded art\n- Updated `cmd/forge/main.go` to pass \"forge\" as header text\n- Updated `examples/agent-chat/main.go` to pass \"FORGE\" as header text\n\n## Testing\n\n- Run the forge TUI: `go run cmd/forge/main.go` - verify \"FORGE\" ASCII art displays correctly\n- Run the agent-chat example: `go run examples/agent-chat/main.go` - verify \"FORGE\" ASCII art displays\n- Run tests: `go test ./pkg/ui/...` - verify ASCII art generation for various characters\n- Test with custom header text by modifying the `headerText` parameter in `NewExecutor()`\nChanged Files: cmd/forge/main.go,examples/agent-chat/main.go,pkg/executor/tui/executor.go,pkg/executor/tui/model.go,pkg/executor/tui/view.go,pkg/ui/ascii.go,pkg/ui/ascii_test.go,\n\nFocus on:\n1. Updating existing documentation that references changed functionality\n2. Adding new documentation for new features\n3. Updating examples if code interfaces changed\n4. Maintaining consistency with existing documentation style\n5. Only modifying markdown documentation files\n\nAdditional Instructions:\nBe thorough but concise. Ensure all technical details are accurate.\n",
+  "mode": "write",
+  "workspace_dir": ".",
+  "constraints": {
+    "max_files": 50,
+    "max_lines_changed": 2000,
+    "allowed_patterns": [
+  "**/*.md",
+  "docs/**"
+],
+    "denied_patterns": [
+  "vendor/**",
+  ".git/**"
+],
+    "max_tokens": 1000000,
+    "timeout": "10m"
+  },
+  "artifacts": {
+    "enabled": true,
+    "output_dir": ".forge/artifacts",
+    "json": true,
+    "markdown": true,
+    "metrics": true
+  },
+  "git": {
+    "auto_commit": true,
+    "create_pr": true,
+    "auto_push": true,
+    "branch": "docs/auto-update-pr-34",
+    "commit_message": "docs: automated documentation update for PR #34",
+    "pr_title": "docs: Update documentation for PR #34",
+    "pr_body": "Automated documentation updates based on changes in #34",
+    "pr_draft": false
+  }
+}

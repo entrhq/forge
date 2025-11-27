@@ -42,10 +42,11 @@ go run cmd/forge/main.go tui
 ### Initial Screen
 
 When the TUI starts, you'll see:
-- **Header**: Shows workspace path and context information
-- **Chat Area**: Displays conversation history with the agent
-- **Input Box**: Where you type messages (bottom of screen)
-- **Status Bar**: Shows agent state and token usage
+- **Welcome Header**: Displays an ASCII art logo. This is customizable when you initialize the TUI executor in your own applications.
+- **Header**: Shows workspace path and context information.
+- **Chat Area**: Displays conversation history with the agent.
+- **Input Box**: Where you type messages (bottom of screen).
+- **Status Bar**: Shows agent state and token usage.
 
 ---
 
@@ -411,6 +412,7 @@ Access settings with the `/settings` command.
 - **Syntax Highlighting**: Enable/disable
 - **Show Line Numbers**: In code displays
 - **Diff Style**: Unified vs side-by-side
+- **Custom Header Text**: For custom builds, you can set the ASCII header text programmatically.
 
 ### Saving Settings
 

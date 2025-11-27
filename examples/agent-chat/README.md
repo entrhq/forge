@@ -9,16 +9,22 @@ This example demonstrates the complete capabilities of the Forge agent framework
 
 ## Features Demonstrated
 
-### 1. Agent Loop
+### 1. Interactive TUI
+This example uses the Forge TUI Executor to provide a rich, interactive terminal interface. It features:
+- A welcome screen with a customizable ASCII art header.
+- A chat-style view for agent conversation.
+- A status bar and input handling.
+
+### 2. Agent Loop
 The agent continuously reasons and uses tools until it decides the task is complete by calling a loop-breaking tool (`task_completion`, `ask_question`, or `converse`).
 
-### 2. Custom Tool Registration
+### 3. Custom Tool Registration
 The example includes a custom `CalculatorTool` that performs basic arithmetic. This shows how to create and register your own tools.
 
-### 3. Chain-of-Thought
+### 4. Chain-of-Thought
 All responses include thinking blocks shown in brackets, e.g., `[Analyzing the problem...]`, which reveal the agent's reasoning process.
 
-### 4. Built-in Tools
+### 5. Built-in Tools
 Three loop-breaking tools are always available:
 - `task_completion` - Signal that a task is complete with a final result
 - `ask_question` - Request additional information from the user
@@ -27,9 +33,9 @@ Three loop-breaking tools are always available:
 ## Running the Example
 
 ```bash
-cd examples/agent-chat
+# Ensure you are in the root of the forge repository
 export OPENAI_API_KEY="your-api-key"
-go run main.go
+go run examples/agent-chat/main.go
 ```
 
 ## Example Interactions
