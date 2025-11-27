@@ -73,18 +73,32 @@ func (g *GitManager) CreateBranch(ctx context.Context, branchName string) error 
 
 // Commit creates a git commit with the configured author
 func (g *GitManager) Commit(ctx context.Context, message string) error {
-	// Stage all changes
-	_, err := g.execGit(ctx, "add", "-A")
-	if err != nil {
-		return fmt.Errorf("failed to stage changes: %w", err)
+	// Stage all changes, excluding the config file
+	if g.configFilePath != "" {
+		// Use pathspec magic to exclude the config file from staging
+		// This is more reliable than staging everything and then unstaging
+		_, err := g.execGit(ctx, "add", "-A", "--", ".", fmt.Sprintf(":(exclude)%s", g.configFilePath))
+		if err != nil {
+			return fmt.Errorf("failed to stage changes: %w", err)
+		}
+	} else {
+		// No config file to exclude, stage everything
+		_, err := g.execGit(ctx, "add", "-A")
+		if err != nil {
+			return fmt.Errorf("failed to stage changes: %w", err)
+		}
 	}
 
-	// Unstage the config file if it was used to start this run
-	// This prevents temporary config files from being committed in PR workflows
-	if g.configFilePath != "" {
-		// Use reset to unstage the file without removing it from the working directory
-		// Ignore errors - the file might not have been staged or might not exist
-		_ = g.resetConfigFile(ctx) //nolint:errcheck
+	// Check if there are any staged changes to commit
+	// This prevents empty commits when the only change was the config file
+	hasChanges, err := g.hasChangesToCommit(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to verify staged changes: %w", err)
+	}
+
+	if !hasChanges {
+		// No changes to commit, skip the commit
+		return nil
 	}
 
 	// Create commit with configured author
@@ -112,6 +126,17 @@ func (g *GitManager) Commit(ctx context.Context, message string) error {
 	}
 
 	return nil
+}
+
+// hasChangesToCommit checks if there are any staged changes to commit
+// This prevents empty commits when the only change was the config file
+func (g *GitManager) hasChangesToCommit(ctx context.Context) (bool, error) {
+	output, err := g.execGit(ctx, "diff", "--cached", "--name-only")
+	if err != nil {
+		return false, fmt.Errorf("failed to check staged changes: %w", err)
+	}
+
+	return strings.TrimSpace(output) != "", nil
 }
 
 // GetChangedFiles returns a list of files that have been modified or are untracked
@@ -217,12 +242,4 @@ func (g *GitManager) GenerateCommitMessage(ctx context.Context, taskDescription 
 func GenerateBranchName(prefix string) string {
 	timestamp := time.Now().Format("20060102-150405")
 	return fmt.Sprintf("%s-%s", prefix, timestamp)
-}
-
-// resetConfigFile attempts to unstage the config file from git
-// Returns nil on success or if the file wasn't staged
-func (g *GitManager) resetConfigFile(ctx context.Context) error {
-	_, err := g.execGit(ctx, "reset", "HEAD", g.configFilePath)
-	// Ignore errors - file might not have been staged or might not exist
-	return err
 }
