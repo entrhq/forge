@@ -24,6 +24,21 @@ Three loop-breaking tools are always available:
 - `ask_question` - Request additional information from the user
 - `converse` - Continue the conversation naturally
 
+## User Interface
+
+This example uses the Forge Terminal User Interface (TUI) to provide a rich, interactive chat experience.
+
+### Customizing the Header
+
+The TUI displays a large ASCII art header on the welcome screen. You can customize this header by modifying the `headerText` parameter in `main.go`.
+
+```go
+// In main.go, line 121
+executor := tui.NewExecutor(ag, provider, workspaceDir, "FORGE") 
+```
+
+Change `"FORGE"` to any other string to see your custom header. For example: `"MY-APP"`.
+
 ## Running the Example
 
 ```bash
