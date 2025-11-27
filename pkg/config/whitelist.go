@@ -5,6 +5,15 @@ import (
 	"strings"
 )
 
+const (
+	// MatchTypePrefix indicates a prefix-based pattern match
+	MatchTypePrefix = "prefix"
+	// MatchTypeExact indicates an exact pattern match
+	MatchTypeExact = "exact"
+	// SectionIDCommandWhitelist is the identifier for the command whitelist section
+	SectionIDCommandWhitelist = "command_whitelist"
+)
+
 // WhitelistPattern represents a command pattern that can be auto-approved.
 type WhitelistPattern struct {
 	Pattern     string `json:"pattern"`
@@ -24,17 +33,17 @@ func NewCommandWhitelistSection() *CommandWhitelistSection {
 			{
 				Pattern:     "git status",
 				Description: "Git status and variations",
-				Type:        "prefix",
+				Type:        MatchTypePrefix,
 			},
 			{
 				Pattern:     "ls",
 				Description: "List directory",
-				Type:        "prefix",
+				Type:        MatchTypePrefix,
 			},
 			{
 				Pattern:     "pwd",
 				Description: "Get current directory",
-				Type:        "exact",
+				Type:        MatchTypeExact,
 			},
 		},
 	}
@@ -42,7 +51,7 @@ func NewCommandWhitelistSection() *CommandWhitelistSection {
 
 // ID returns the section identifier.
 func (s *CommandWhitelistSection) ID() string {
-	return "command_whitelist"
+	return SectionIDCommandWhitelist
 }
 
 // Title returns the section title.
@@ -110,10 +119,10 @@ func (s *CommandWhitelistSection) SetData(data map[string]interface{}) error {
 		}
 
 		// Get type field, default to "prefix" if not specified
-		patternType := "prefix"
+		patternType := MatchTypePrefix
 		if typeVal, hasType := patternMap["type"]; hasType {
 			if typeStr, ok := typeVal.(string); ok {
-				if typeStr == "exact" || typeStr == "prefix" {
+				if typeStr == MatchTypeExact || typeStr == MatchTypePrefix {
 					patternType = typeStr
 				}
 			}
