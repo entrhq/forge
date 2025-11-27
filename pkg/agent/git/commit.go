@@ -209,8 +209,13 @@ func CreateCommit(workingDir, message string) (string, error) {
 		return "", fmt.Errorf("failed to set git user.email: %w", configEmailErr)
 	}
 
-	// Add co-author trailer to commit message
-	messageWithCoAuthor := message + "\n\nCo-authored-by: " + currentUserName + " <" + currentUserEmail + ">"
+	// Add co-author trailer to commit message only if current user is different from commit author
+	var messageWithCoAuthor string
+	if currentUserName != "anvxl" || currentUserEmail != "anvxl@entr.net.au" {
+		messageWithCoAuthor = message + "\n\nCo-authored-by: " + currentUserName + " <" + currentUserEmail + ">"
+	} else {
+		messageWithCoAuthor = message
+	}
 
 	cmd := exec.Command("git", "commit", "-m", messageWithCoAuthor)
 	cmd.Dir = workingDir
