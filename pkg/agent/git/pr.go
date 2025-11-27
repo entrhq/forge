@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -32,19 +34,33 @@ func (g *PRGenerator) Generate(
 	headBranch string,
 	customTitle string,
 ) (*PRContent, error) {
+	logFile, _ := os.OpenFile("/tmp/forge-pr-debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if logFile != nil {
+		defer logFile.Close()
+	}
+	logger := log.New(logFile, "[PR] ", log.LstdFlags)
+	
+	logger.Printf("=== PR Generation Started ===")
+	logger.Printf("Base: %s, Head: %s, Custom title: %s", baseBranch, headBranch, customTitle)
+	
 	prompt := g.buildPRPrompt(commits, diffSummary, baseBranch, headBranch, customTitle)
+	logger.Printf("Prompt: %s", prompt)
 
 	response, err := g.llmClient.Generate(ctx, prompt)
 	if err != nil {
+		logger.Printf("ERROR: %v", err)
 		return nil, fmt.Errorf("failed to generate PR content: %w", err)
 	}
 
-	content := parsePRContent(response)
+	logger.Printf("Raw response: %s", response)
+
+	content := parsePRContent(response, logger)
 
 	if customTitle != "" {
 		content.Title = customTitle
 	}
 
+	logger.Printf("Final - Title: %q, Desc: %q", content.Title, content.Description)
 	return content, nil
 }
 
@@ -84,18 +100,30 @@ func (g *PRGenerator) buildPRPrompt(
 	return sb.String()
 }
 
-func parsePRContent(response string) *PRContent {
-	// Try to find JSON in the response (handle markdown code blocks)
+func parsePRContent(response string, logger *log.Logger) *PRContent {
+	logger.Printf("=== Parsing PR content ===")
+	logger.Printf("Input: %s", response)
+	
 	jsonStr := response
 
+	// Remove thinking tags if present
+	if startIdx := strings.Index(jsonStr, "<thinking>"); startIdx != -1 {
+		if endIdx := strings.Index(jsonStr, "</thinking>"); endIdx != -1 {
+			logger.Printf("Removing thinking tags from %d to %d", startIdx, endIdx)
+			jsonStr = jsonStr[:startIdx] + jsonStr[endIdx+len("</thinking>"):]
+		}
+	}
+
 	// Remove markdown code fences if present
-	if idx := strings.Index(response, "```json"); idx != -1 {
-		jsonStr = response[idx+7:] // Skip "```json"
+	if idx := strings.Index(jsonStr, "```json"); idx != -1 {
+		logger.Printf("Found ```json block")
+		jsonStr = jsonStr[idx+7:]
 		if endIdx := strings.Index(jsonStr, "```"); endIdx != -1 {
 			jsonStr = jsonStr[:endIdx]
 		}
-	} else if idx := strings.Index(response, "```"); idx != -1 {
-		jsonStr = response[idx+3:]
+	} else if idx := strings.Index(jsonStr, "```"); idx != -1 {
+		logger.Printf("Found ``` block")
+		jsonStr = jsonStr[idx+3:]
 		if endIdx := strings.Index(jsonStr, "```"); endIdx != -1 {
 			jsonStr = jsonStr[:endIdx]
 		}
@@ -109,14 +137,18 @@ func parsePRContent(response string) *PRContent {
 		jsonStr = jsonStr[start : end+1]
 	}
 
+	logger.Printf("Extracted JSON: %s", jsonStr)
+
 	// Try to unmarshal JSON
 	var content PRContent
 	if err := json.Unmarshal([]byte(strings.TrimSpace(jsonStr)), &content); err == nil {
+		logger.Printf("Parsed successfully - Title: %q", content.Title)
 		return &content
+	} else {
+		logger.Printf("Parse error: %v", err)
 	}
 
-	// Fallback: if JSON parsing fails, return empty content
-	// The overlay will show "Pull Request Preview" and just the commits/changes
+	logger.Printf("Using fallback content")
 	return &PRContent{
 		Title:       "",
 		Description: "",
