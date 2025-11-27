@@ -52,7 +52,7 @@ Create a clean, structured, and beautiful logging system for headless mode that 
 File: `pkg/executor/headless/logger.go`
 - Define `Logger` struct with configurable verbosity
 - Implement methods for each logging category
-- Use `fatih/color` for colored output
+- Use ANSI escape codes for colored output
 - Support io.Writer for testing
 
 ### Step 2: Update Executor
