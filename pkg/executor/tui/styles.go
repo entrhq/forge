@@ -51,7 +51,6 @@ var (
 	// Container Styles
 	statusBarStyle = lipgloss.NewStyle().
 			Foreground(mutedGray).
-			Background(darkBg).
 			Padding(0, 1)
 
 	inputBoxStyle = lipgloss.NewStyle().

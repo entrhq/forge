@@ -109,7 +109,7 @@ func (e *Executor) Run(ctx context.Context) error {
 	go e.handleEvents(channels.Event, eventsDone, turnEnd)
 
 	// Print welcome message
-	fmt.Fprintln(e.writer, "Forge CLI Agent")
+	fmt.Fprintln(e.writer, "Forge Agent")
 	fmt.Fprintln(e.writer, "Type your message and press Enter. Type 'exit' or 'quit' to end the conversation.")
 	fmt.Fprintln(e.writer)
 
