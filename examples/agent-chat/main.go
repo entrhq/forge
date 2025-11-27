@@ -117,7 +117,8 @@ func main() {
 	}
 
 	// Create TUI executor with provider and workspace for git operations
-	executor := tui.NewExecutor(ag, provider, workspaceDir)
+	// Pass "FORGE" as the header text (will be auto-converted to ASCII art)
+	executor := tui.NewExecutor(ag, provider, workspaceDir, "FORGE")
 
 	// Run the conversation
 	ctx := context.Background()

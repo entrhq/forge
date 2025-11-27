@@ -39,13 +39,17 @@ Or if running from source:
 go run cmd/forge/main.go tui
 ```
 
-### Initial Screen
+### Welcome Screen
 
-When the TUI starts, you'll see:
-- **Header**: Shows workspace path and context information
-- **Chat Area**: Displays conversation history with the agent
-- **Input Box**: Where you type messages (bottom of screen)
-- **Status Bar**: Shows agent state and token usage
+Upon first launch, a welcome screen is displayed with ASCII art branding. This screen confirms that the application has started successfully. Press any key to proceed to the main interface.
+
+### Main Interface
+
+After the welcome screen, the main interface appears. It is composed of several key components:
+- **Header**: Shows workspace path and context information.
+- **Chat Area**: Displays the conversation history with the agent.
+- **Input Box**: Where you type messages (at the bottom of the screen).
+- **Status Bar**: Shows the current agent state, token usage, and contextual hints.
 
 ---
 

@@ -857,6 +857,21 @@ Selecting a result shows details:
 
 ---
 
+#### P1-6: Customizable ASCII Art Header
+**Description:** Application-specific ASCII art header on the welcome screen.
+
+**User Stories:**
+- As a developer building on Forge, I want to display my application's name on the welcome screen for branding.
+- As a user, I want to see a visually appealing, branded entry point when I launch a Forge-powered application.
+
+**Acceptance Criteria:**
+- The `NewExecutor` function accepts an optional `headerText` string.
+- If `headerText` is provided, the welcome screen displays it as large ASCII art.
+- The ASCII art generation supports A-Z, 0-9, and common symbols.
+- If no text is provided, the header is omitted.
+
+---
+
 #### P1-5: Workspace Directory Indicator
 **Description:** Show current workspace at top of interface
 
@@ -933,12 +948,7 @@ Terminal: forge
 
 ┌─ Welcome to Forge ───────────────────────────────────────┐
 │                                                           │
-│      ███████╗ ██████╗ ██████╗  ██████╗ ███████╗         │
-│      ██╔════╝██╔═══██╗██╔══██╗██╔════╝ ██╔════╝         │
-│      █████╗  ██║   ██║██████╔╝██║  ███╗█████╗           │
-│      ██╔══╝  ██║   ██║██╔══██╗██║   ██║██╔══╝           │
-│      ██║     ╚██████╔╝██║  ██║╚██████╔╝███████╗         │
-│      ╚═╝      ╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚══════╝         │
+│  [Customizable ASCII art is displayed here, e.g., "FORGE"]  │
 │                                                           │
 │  Your AI Coding Assistant                                │
 │                                                           │

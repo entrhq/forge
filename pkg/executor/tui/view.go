@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/entrhq/forge/pkg/ui"
 )
 
 // View renders the entire TUI interface.
@@ -34,15 +35,12 @@ func (m *model) View() string {
 	return m.applyOverlays(baseView)
 }
 
-// buildHeader renders the Forge ASCII art header
+// buildHeader renders the ASCII art header
+// Generates ASCII art from the header text provided to the executor
 func (m *model) buildHeader() string {
-	return headerStyle.Render(`
-	███████╗ ██████╗ ██████╗  ██████╗ ███████╗
-	██╔════╝██╔═══██╗██╔══██╗██╔════╝ ██╔════╝
-	█████╗  ██║   ██║██████╔╝██║  ███╗█████╗
-	██╔══╝  ██║   ██║██╔══██╗██║   ██║██╔══╝
-	██║     ╚██████╔╝██║  ██║╚██████╔╝███████╗
-	╚═╝      ╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚══════╝`)
+	// Generate ASCII art from the header text
+	asciiArt := ui.GenerateASCIIArt(m.header)
+	return headerStyle.Render(asciiArt)
 }
 
 // buildTips renders context-sensitive usage tips
