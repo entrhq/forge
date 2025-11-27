@@ -6,7 +6,7 @@ Migrating from standard log.Printf to structured Logger with color-coded output 
 ## Configuration Changes
 ✅ Added `LogLevel` field to Config struct
 ✅ Added log level validation in Config.Validate()
-✅ Maintained backward compatibility with `Verbose` flag
+✅ Replaced `Verbose` bool field with `Logging.Verbosity` string field
 ✅ Default log level set to "normal"
 
 ## Logger Implementation
