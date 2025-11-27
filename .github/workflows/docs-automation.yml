@@ -87,10 +87,10 @@ jobs:
       - name: Extract PR Context
         id: pr_context
         run: |
-          # Get PR details from the issue comment event
+          # Get PR details - works for both issue_comment and pull_request events
           PR_DATA='${{ steps.pr.outputs.result }}'
           PR_TITLE=$(echo "$PR_DATA" | jq -r '.title')
-          PR_NUMBER=${{ github.event.issue.number }}
+          PR_NUMBER=$(echo "$PR_DATA" | jq -r '.number')
           
           # Get changed files
           CHANGED_FILES=$(gh pr view $PR_NUMBER --json files --jq '.files[].path' | tr '\n' ',')
@@ -99,6 +99,7 @@ jobs:
           PR_BODY=$(echo "$PR_DATA" | jq -r '.body')
           
           # Export for next steps using multiline format
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
           echo "pr_title=$PR_TITLE" >> $GITHUB_OUTPUT
           echo "changed_files=$CHANGED_FILES" >> $GITHUB_OUTPUT
           {
@@ -174,10 +175,10 @@ jobs:
               "auto_commit": true,
               "create_pr": true,
               "auto_push": true,
-              "branch": "${{ inputs.pr_branch_prefix }}-pr-${{ github.event.pull_request.number }}",
-              "commit_message": "docs: automated documentation update for PR #${{ github.event.pull_request.number }}",
-              "pr_title": "docs: Update documentation for PR #${{ github.event.pull_request.number }}",
-              "pr_body": "Automated documentation updates based on changes in #${{ github.event.pull_request.number }}",
+              "branch": "${{ inputs.pr_branch_prefix }}-pr-${{ steps.pr_context.outputs.pr_number }}",
+              "commit_message": "docs: automated documentation update for PR #${{ steps.pr_context.outputs.pr_number }}",
+              "pr_title": "docs: Update documentation for PR #${{ steps.pr_context.outputs.pr_number }}",
+              "pr_body": "Automated documentation updates based on changes in #${{ steps.pr_context.outputs.pr_number }}",
               "pr_draft": false
             }
           }
@@ -208,7 +209,7 @@ jobs:
               "auto_commit": true,
               "create_pr": false,
               "auto_push": true,
-              "commit_message": "docs: automated documentation update for PR #${{ github.event.pull_request.number }}"
+              "commit_message": "docs: automated documentation update for PR #${{ steps.pr_context.outputs.pr_number }}"
             }
           }
           EOF
@@ -236,7 +237,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: forge-artifacts-pr-${{ github.event.issue.number || github.event.pull_request.number }}
+          name: forge-artifacts-pr-${{ steps.pr_context.outputs.pr_number }}
           path: .forge/artifacts/
           retention-days: 30
           if-no-files-found: warn
