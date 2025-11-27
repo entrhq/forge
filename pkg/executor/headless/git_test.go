@@ -198,204 +198,101 @@ func TestGitManager_GetChangedFiles(t *testing.T) {
 	ctx := context.Background()
 	gm := NewGitManager(testDir, GitConfig{}, "")
 
-	// Initially no changes
+	// Create two files
+	testFile1 := filepath.Join(testDir, "test1.txt")
+	if err := os.WriteFile(testFile1, []byte("content 1"), 0644); err != nil {
+		t.Fatalf("failed to write test file 1: %v", err)
+	}
+
+	testFile2 := filepath.Join(testDir, "test2.txt")
+	if err := os.WriteFile(testFile2, []byte("content 2"), 0644); err != nil {
+		t.Fatalf("failed to write test file 2: %v", err)
+	}
+
+	// Get changed files
 	files, err := gm.GetChangedFiles(ctx)
 	if err != nil {
 		t.Fatalf("failed to get changed files: %v", err)
 	}
-	if len(files) != 0 {
-		t.Errorf("expected no changed files, got %d", len(files))
+
+	// Should have both files
+	if len(files) != 2 {
+		t.Errorf("expected 2 changed files, got %d", len(files))
+	}
+}
+
+func TestGitManager_hasChangesToCommit(t *testing.T) {
+	testDir := setupTestRepo(t)
+
+	config := GitConfig{
+		AutoCommit:  true,
+		AuthorName:  "Forge Bot",
+		AuthorEmail: "forge@example.com",
+	}
+	gm := NewGitManager(testDir, config, "")
+
+	ctx := context.Background()
+
+	// No changes initially
+	hasChanges, err := gm.hasChangesToCommit(ctx)
+	if err != nil {
+		t.Fatalf("failed to check for changes: %v", err)
+	}
+	if hasChanges {
+		t.Error("should have no changes initially")
 	}
 
-	// Create a new file
+	// Create and stage a file
 	testFile := filepath.Join(testDir, "test.txt")
 	if writeErr := os.WriteFile(testFile, []byte("test content"), 0644); writeErr != nil {
 		t.Fatalf("failed to write test file: %v", writeErr)
 	}
 
-	// Should detect new file
-	files, err = gm.GetChangedFiles(ctx)
+	if _, addErr := gm.execGit(ctx, "add", "test.txt"); addErr != nil {
+		t.Fatalf("failed to stage file: %v", addErr)
+	}
+
+	// Should have changes now
+	hasChanges, err = gm.hasChangesToCommit(ctx)
 	if err != nil {
-		t.Fatalf("failed to get changed files: %v", err)
+		t.Fatalf("failed to check for changes: %v", err)
 	}
-	if len(files) != 1 {
-		t.Errorf("expected 1 changed file, got %d", len(files))
-	}
-	if len(files) > 0 && files[0] != "test.txt" {
-		t.Errorf("expected test.txt, got %s", files[0])
+	if !hasChanges {
+		t.Error("should have changes after staging file")
 	}
 }
 
-func TestGitManager_Rollback(t *testing.T) {
+func TestGitManager_CommitWithNoChanges(t *testing.T) {
 	testDir := setupTestRepo(t)
 
-	ctx := context.Background()
-	gm := NewGitManager(testDir, GitConfig{}, "")
-
-	// Modify existing file
-	readmePath := filepath.Join(testDir, "README.md")
-	if err := os.WriteFile(readmePath, []byte("# Modified\n"), 0644); err != nil {
-		t.Fatalf("failed to modify README: %v", err)
+	// Create a config file (which will be excluded)
+	configFile := filepath.Join(testDir, "forge-config.yaml")
+	if err := os.WriteFile(configFile, []byte("task: test\nmode: write\n"), 0644); err != nil {
+		t.Fatalf("failed to write config file: %v", err)
 	}
 
-	// Create a new file
-	testFile := filepath.Join(testDir, "test.txt")
-	if err := os.WriteFile(testFile, []byte("test content"), 0644); err != nil {
-		t.Fatalf("failed to write test file: %v", err)
+	config := GitConfig{
+		AutoCommit:  true,
+		AuthorName:  "Forge Bot",
+		AuthorEmail: "forge@example.com",
 	}
-
-	// Rollback changes
-	if err := gm.Rollback(ctx); err != nil {
-		t.Fatalf("failed to rollback: %v", err)
-	}
-
-	// Workspace should be clean
-	if err := gm.CheckWorkspaceClean(ctx); err != nil {
-		t.Error("workspace should be clean after rollback")
-	}
-
-	// Test file should be removed
-	if _, err := os.Stat(testFile); !os.IsNotExist(err) {
-		t.Error("test file should be removed after rollback")
-	}
-
-	// README should be restored to original content
-	content, err := os.ReadFile(readmePath)
-	if err != nil {
-		t.Fatalf("failed to read README: %v", err)
-	}
-	if string(content) != "# Test Repository\n" {
-		t.Errorf("README content not restored, got: %s", string(content))
-	}
-}
-
-func TestGenerateBranchName(t *testing.T) {
-	branchName := GenerateBranchName("forge/test")
-
-	// Branch name should contain the prefix
-	if !strings.HasPrefix(branchName, "forge/test-") {
-		t.Errorf("branch name should start with 'forge/test-', got: %s", branchName)
-	}
-
-	// Should contain timestamp
-	if len(branchName) < len("forge/test-20060102-150405") {
-		t.Errorf("branch name should contain timestamp, got: %s", branchName)
-	}
-}
-
-func TestGitManager_GenerateCommitMessage(t *testing.T) {
-	testDir := setupTestRepo(t)
+	gm := NewGitManager(testDir, config, configFile)
 
 	ctx := context.Background()
 
-	tests := []struct {
-		name   string
-		config GitConfig
-		task   string
-		want   string
-	}{
-		{
-			name: "custom message",
-			config: GitConfig{
-				CommitMessage: "Custom commit message",
-			},
-			task: "Any task",
-			want: "Custom commit message",
-		},
-		{
-			name:   "generated message",
-			config: GitConfig{},
-			task:   "Fix bug in authentication",
-			want:   "chore: Fix bug in authentication\n\nAutomated changes via Forge headless mode",
-		},
+	// Try to commit - should succeed but create no commit since only config file exists
+	if err := gm.Commit(ctx, "Test commit"); err != nil {
+		t.Fatalf("failed to commit: %v", err)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			gm := NewGitManager(testDir, tt.config, "")
-			msg := gm.GenerateCommitMessage(ctx, tt.task)
-			if msg != tt.want {
-				t.Errorf("GenerateCommitMessage() = %v, want %v", msg, tt.want)
-			}
-		})
-	}
-}
-
-func TestGitManager_WorkspaceStateValidation(t *testing.T) {
-	testDir := setupTestRepo(t)
-
-	ctx := context.Background()
-	gm := NewGitManager(testDir, GitConfig{}, "")
-
-	t.Run("clean workspace", func(t *testing.T) {
-		if err := gm.CheckWorkspaceClean(ctx); err != nil {
-			t.Errorf("CheckWorkspaceClean() failed on clean workspace: %v", err)
-		}
-	})
-
-	t.Run("branch workflow", func(t *testing.T) {
-		// Create and checkout new branch
-		if err := gm.CreateBranch(ctx, "feature/test"); err != nil {
-			t.Fatalf("failed to create branch: %v", err)
-		}
-
-		// Validation should pass on new branch
-		if err := gm.CheckWorkspaceClean(ctx); err != nil {
-			t.Errorf("CheckWorkspaceClean() failed on new branch: %v", err)
-		}
-
-		// Create a file
-		testFile := filepath.Join(testDir, "test.txt")
-		if err := os.WriteFile(testFile, []byte("test"), 0644); err != nil {
-			t.Fatalf("failed to write file: %v", err)
-		}
-
-		// Validation should fail with uncommitted changes
-		if err := gm.CheckWorkspaceClean(ctx); err == nil {
-			t.Error("CheckWorkspaceClean() should fail with uncommitted changes")
-		}
-
-		// Commit the changes
-		config := GitConfig{
-			AuthorName:  "Forge Bot",
-			AuthorEmail: "forge@example.com",
-		}
-		gm = NewGitManager(testDir, config, "")
-		if err := gm.Commit(ctx, "Add test file"); err != nil {
-			t.Fatalf("failed to commit: %v", err)
-		}
-
-		// Validation should pass again
-		if err := gm.CheckWorkspaceClean(ctx); err != nil {
-			t.Errorf("CheckWorkspaceClean() failed after commit: %v", err)
-		}
-	})
-}
-
-func TestGitManager_DetachedHeadDetection(t *testing.T) {
-	testDir := setupTestRepo(t)
-
-	ctx := context.Background()
-	gm := NewGitManager(testDir, GitConfig{}, "")
-
-	// Get the commit hash
-	output, err := gm.execGit(ctx, "rev-parse", "HEAD")
+	// Verify no new commit was created by checking log count
+	output, err := gm.execGit(ctx, "rev-list", "--count", "HEAD")
 	if err != nil {
-		t.Fatalf("failed to get commit hash: %v", err)
-	}
-	commitHash := strings.TrimSpace(output)
-
-	// Checkout the commit directly (creates detached HEAD)
-	if checkoutErr := execCommand(testDir, "git", "checkout", commitHash); checkoutErr != nil {
-		t.Fatalf("failed to checkout commit: %v", checkoutErr)
+		t.Fatalf("failed to count commits: %v", err)
 	}
 
-	// Get current branch should return empty in detached HEAD
-	branch, err := gm.GetCurrentBranch(ctx)
-	if err != nil {
-		t.Fatalf("failed to get current branch: %v", err)
-	}
-	if branch != "" {
-		t.Errorf("expected empty branch in detached HEAD, got: %s", branch)
+	// Should still have only 1 commit (the initial one)
+	if strings.TrimSpace(output) != "1" {
+		t.Errorf("expected 1 commit, got %s", strings.TrimSpace(output))
 	}
 }

@@ -17,6 +17,8 @@ type GitManager struct {
 
 // NewGitManager creates a new git manager
 func NewGitManager(workspaceDir string, config GitConfig, configFilePath string) *GitManager {
+	// Use the config file path as-is
+	// If it's not in the workspace or can't be excluded, that's fine
 	return &GitManager{
 		workspaceDir:   workspaceDir,
 		config:         config,
@@ -75,11 +77,16 @@ func (g *GitManager) CreateBranch(ctx context.Context, branchName string) error 
 func (g *GitManager) Commit(ctx context.Context, message string) error {
 	// Stage all changes, excluding the config file
 	if g.configFilePath != "" {
-		// Use pathspec magic to exclude the config file from staging
-		// This is more reliable than staging everything and then unstaging
-		_, err := g.execGit(ctx, "add", "-A", "--", ".", fmt.Sprintf(":(exclude)%s", g.configFilePath))
+		// Try to use pathspec magic to exclude the config file from staging
+		// Note: Don't use -A with pathspecs as it ignores them
+		_, err := g.execGit(ctx, "add", ".", fmt.Sprintf(":(exclude)%s", g.configFilePath))
 		if err != nil {
-			return fmt.Errorf("failed to stage changes: %w", err)
+			// If pathspec exclusion fails (e.g., config file is outside workspace),
+			// fall back to staging everything
+			_, fallbackErr := g.execGit(ctx, "add", "-A")
+			if fallbackErr != nil {
+				return fmt.Errorf("failed to stage changes: %w", fallbackErr)
+			}
 		}
 	} else {
 		// No config file to exclude, stage everything

@@ -150,7 +150,8 @@ func loadHeadlessConfigFromFile(path string) (*headless.Config, error) {
 		return nil, fmt.Errorf("failed to parse config file: %w", unmarshalErr)
 	}
 
-	// Store the config file path so it can be excluded from commits
+	// Store the config file path as-is (relative or absolute)
+	// If it's in the workspace, it will be excluded from commits
 	config.ConfigFilePath = path
 
 	return config, nil
