@@ -72,7 +72,7 @@ By giving the agent the ability to "remember" and organize information within a 
 **Agent-Initiated**: Agent automatically creates notes during task execution when discovering important insights
 - Cross-component dependencies and patterns trigger pattern notes
 - Architectural decisions with trade-offs get decision tags
-- Multi-step workflows and progress tracking become todo notes
+- Multi-step workflows and progress tracking documented with progress notes
 - Root cause analysis and fix rationale documented in bug notes
 
 **Implicit Access**: Notes are invisible to users unless explicitly displayed through UI (future)
@@ -94,9 +94,9 @@ By giving the agent the ability to "remember" and organize information within a 
      ↓
 [Retrieves Previous Decision & Rationale] → Applies consistent approach with same trade-offs
      ↓
-[Completes Implementation] → scratch_note(id="note_123", scratched=true)
+[Addresses Insight/Decision] → scratch_note(id="note_123", scratched=true)
      ↓
-[Checks Remaining Work] → list_notes(tags=["todo"], include_scratched=false)
+[Checks Active Notes] → list_notes(tags=["decision"], include_scratched=false)
 ```
 
 ### Success States
@@ -104,7 +104,7 @@ By giving the agent the ability to "remember" and organize information within a 
 - **Efficient Exploration**: Agent creates 5-10 focused notes capturing insights and decisions during large codebase exploration without overwhelming context
 - **Preserved Context**: Agent maintains understanding of cross-component relationships and trade-offs even after context compression
 - **Consistent Decisions**: All changes follow architectural pattern and rationale documented early in session
-- **Tracked Progress**: Agent knows exactly which subtasks are complete vs remaining through multi-step implementations
+- **Tracked Progress**: Agent knows which insights have been addressed (scratched) vs still active through multi-step implementations
 
 ### Error/Edge States
 
@@ -112,7 +112,7 @@ By giving the agent the ability to "remember" and organize information within a 
 - **Invalid Tag Count**: Validation error if <1 or >5 tags provided
 - **Note Not Found**: Graceful handling when updating/deleting non-existent note ID
 - **Empty Search Results**: Return empty array with helpful context about search parameters
-- **Context Overflow**: If notes grow too large, agent proactively prunes scratched/obsolete notes
+- **Context Overflow**: If notes grow too large, agent can delete obsolete notes or filter out scratched ones to reduce context load
 
 ## User Interface & Interaction Design
 
@@ -132,14 +132,14 @@ By giving the agent the ability to "remember" and organize information within a 
 ### Information Architecture
 
 Notes organize around three dimensions:
-1. **Type**: What kind of insight (decision, todo, pattern, bug, dependency, workaround)
+1. **Type**: What kind of insight (decision, pattern, bug, dependency, workaround, progress)
 2. **Domain**: What system/component (auth, api, database, ui, config, test, build)
 3. **Status**: Lifecycle stage (active, investigating, resolved, future)
 
 ### Progressive Disclosure
 
 - **Core Operation**: Add/search notes - always available
-- **Advanced Filtering**: Tag combinations and completion filters - used as needed
+- **Advanced Filtering**: Tag combinations and scratched status filters - used as needed
 - **Management**: Update/delete - only when notes become obsolete
 - **Analytics**: Tag usage stats - for agent optimization of tagging strategy
 
@@ -183,7 +183,7 @@ Notes organize around three dimensions:
 - Learn effective note content (insights and decisions vs searchable facts)
 - Develop consistent tagging taxonomy aligned with note purpose
 - Balance note creation vs context overhead (quality over quantity)
-- Recognize when to scratch completed notes vs delete obsolete ones
+- Recognize when to scratch finished notes (keep for reference) vs delete obsolete ones (remove entirely)
 - Understand when to search files vs search notes
 
 ## Risk & Mitigation
@@ -211,7 +211,7 @@ Notes organize around three dimensions:
 - **Mitigation**: Usage guidelines with clear good/bad examples; decision framework for when to create notes; emphasis on relationships over facts
 
 **Risk**: Notes overhead negates performance benefits
-- **Mitigation**: Strict character limits; usage philosophy of quality over quantity; encourage scratching completed work; measure net efficiency gains
+- **Mitigation**: Strict character limits; usage philosophy of quality over quantity; encourage scratching finished work; measure net efficiency gains
 
 ## Dependencies & Integration Points
 
@@ -310,7 +310,7 @@ Notes organize around three dimensions:
 
 ### Version History
 
-- **v1.0**: Core note CRUD operations, search, tagging, completion tracking (session-scoped)
+- **v1.0**: Core note CRUD operations, search, tagging, scratch tracking (session-scoped)
 - **v1.1**: Tag usage analytics, smart default limits, enhanced search relevance
 - **v2.0**: Optional UI visibility, note export, workspace-local persistence
 
@@ -361,14 +361,14 @@ Unlikely - core capability that becomes more valuable over time. If superseded, 
   "tags": ["string"] (1-5 items),
   "created_at": "ISO 8601 timestamp",
   "updated_at": "ISO 8601 timestamp", 
-  "completed": boolean
+  "scratched": boolean
 }
 ```
 
 **Tool Schemas**: See scratch document for complete XML specifications
 
 **Tag Taxonomy Examples**:
-- **Type**: decision, todo, bug, pattern, dependency, workaround
+- **Type**: decision, pattern, bug, dependency, workaround, progress
 - **Domain**: auth, api, database, ui, config, test, build
 - **Priority**: critical, blocking, tech-debt
 - **Status**: investigating, resolved, future
