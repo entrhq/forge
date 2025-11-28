@@ -1,4 +1,12 @@
-# Agent Scratchpad & Notes System
+# Product Requirements: Agent Scratchpad & Notes System
+
+**Feature:** Agent Working Memory System  
+**Version:** 1.0  
+**Status:** In Development  
+**Owner:** Core Team  
+**Last Updated:** November 2025
+
+---
 
 ## Product Vision
 
@@ -124,9 +132,9 @@ By giving the agent the ability to "remember" and organize information within a 
 ### Information Architecture
 
 Notes organize around three dimensions:
-1. **Type**: What kind of information (location, decision, todo, pattern, bug)
-2. **Domain**: What system/component (auth, api, database, ui, config)
-3. **Status**: Lifecycle stage (active, completed, blocked)
+1. **Type**: What kind of insight (decision, todo, pattern, bug, dependency, workaround)
+2. **Domain**: What system/component (auth, api, database, ui, config, test, build)
+3. **Status**: Lifecycle stage (active, investigating, resolved, future)
 
 ### Progressive Disclosure
 
