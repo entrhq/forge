@@ -301,9 +301,15 @@ Key factors:
 
 ### Command Syntax
 
-- `/notes` - Show all active notes (default limit: 10)
-- `/notes tag:auth` - Show notes tagged with "auth"
+**MVP Implementation:**
+- `/notes` - Show up to 100 active notes in an interactive overlay
+
+**Future Enhancements (Not Yet Implemented):**
+- `/notes tag:auth` - Filter notes by tag
 - `/notes --all` - Include scratched notes
+- Support for argument parsing and filtering
+
+The initial implementation provides read-only viewing of all active notes. Tag filtering and other command arguments are planned for future iterations.
 
 ### Migration Path
 

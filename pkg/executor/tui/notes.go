@@ -13,7 +13,7 @@ func (m *model) requestNotes() tea.Cmd {
 	return func() tea.Msg {
 		// Create notes request input
 		notesInput := types.NewNotesRequestInput(types.NotesRequestParams{
-			Limit: 100, // Request all notes
+			Limit: 100, // Request up to 100 notes
 		})
 
 		// Send to agent

@@ -72,12 +72,11 @@ func newNoteListDelegate() noteListDelegate {
 
 // NotesOverlay displays scratchpad notes in a modal dialog
 type NotesOverlay struct {
-	list     list.Model
-	notes    []pkgtypes.NoteData
-	width    int
-	height   int
-	active   bool
-	quitting bool
+	list   list.Model
+	notes  []pkgtypes.NoteData
+	width  int
+	height int
+	active bool
 }
 
 // NewNotesOverlay creates a new notes overlay
@@ -146,7 +145,6 @@ func (o *NotesOverlay) Update(msg tea.Msg, state types.StateProvider, actions ty
 		case keyEnter:
 			// Show full note content
 			if item, ok := o.list.SelectedItem().(noteListItem); ok {
-				o.quitting = true
 				return o, func() tea.Msg {
 					return types.ViewNoteMsg{Note: item.tuiNoteData}
 				}

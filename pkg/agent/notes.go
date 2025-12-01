@@ -44,5 +44,5 @@ func (a *DefaultAgent) handleNotesRequest(input *types.Input) {
 	}
 
 	// Emit notes data event
-	a.emitEvent(types.NewNotesDataEvent(notesData, ""))
+	a.emitEvent(types.NewNotesDataEvent(notesData, params.Tag))
 }

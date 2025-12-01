@@ -458,40 +458,13 @@ func (m *model) handleNotesData(event *pkgtypes.AgentEvent) {
 	m.agentBusy = false
 	m.currentLoadingMessage = ""
 
-	// If this was a notes request (from /notes command), show overlay
-	if m.pendingNotesRequest {
-		m.pendingNotesRequest = false
-
-		// Create and activate notes overlay
-		notesOverlay := overlay.NewNotesOverlay(event.NotesData.Notes, m.width, m.height)
-		m.overlay.activate(types.OverlayModeNotes, notesOverlay)
+	// Notes data should only come from explicit /notes command request
+	if !m.pendingNotesRequest {
 		return
 	}
+	m.pendingNotesRequest = false
 
-	// Otherwise, display notes in viewport (for backward compatibility)
-	var notesContent strings.Builder
-	notesContent.WriteString(lipgloss.NewStyle().Bold(true).Foreground(types.SalmonPink).Render("📝 Scratchpad Notes") + "\n\n")
-
-	if len(event.NotesData.Notes) == 0 {
-		notesContent.WriteString(lipgloss.NewStyle().Foreground(types.MutedGray).Render("  No notes found") + "\n")
-	} else {
-		for i, note := range event.NotesData.Notes {
-			// Note header with tags
-			tags := strings.Join(note.Tags, ", ")
-			header := fmt.Sprintf("Note %d [%s]", i+1, tags)
-			notesContent.WriteString(lipgloss.NewStyle().Bold(true).Render(header) + "\n")
-
-			// Note content
-			notesContent.WriteString("  " + note.Content + "\n")
-
-			// Metadata
-			meta := fmt.Sprintf("  ID: %s | Created: %s", note.ID, note.CreatedAt)
-			if note.Scratched {
-				meta += " | [SCRATCHED]"
-			}
-			notesContent.WriteString(lipgloss.NewStyle().Foreground(types.MutedGray).Render(meta) + "\n\n")
-		}
-	}
-
-	m.content.WriteString(notesContent.String())
+	// Create and activate notes overlay
+	notesOverlay := overlay.NewNotesOverlay(event.NotesData.Notes, m.width, m.height)
+	m.overlay.activate(types.OverlayModeNotes, notesOverlay)
 }
