@@ -1,4 +1,4 @@
-# 0006. Agent Scratchpad & Notes System
+# 0032. Agent Scratchpad & Notes System
 
 **Status:** Proposed
 **Date:** 2025-12-01
