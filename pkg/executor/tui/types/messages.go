@@ -60,3 +60,18 @@ type ToastMsg struct {
 type ViewResultMsg struct {
 	ResultID string
 }
+
+// ViewNoteMsg is sent when a note is selected from the notes list
+type ViewNoteMsg struct {
+	Note *NoteData
+}
+
+// NoteData represents a single note for display (mirrored from pkg/types)
+type NoteData struct {
+	ID        string
+	Content   string
+	Tags      []string
+	CreatedAt string
+	UpdatedAt string
+	Scratched bool
+}

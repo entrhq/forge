@@ -12,10 +12,16 @@ func (m *model) SetOverlay(mode types.OverlayMode, overlay types.Overlay) {
 }
 
 // ClearOverlay closes the current overlay
+// If there's an overlay stack, it pops back to the previous overlay
+// Otherwise it fully deactivates the overlay
 func (m *model) ClearOverlay() {
-	m.overlay.deactivate()
-	// Refocus textarea if needed? The View logic handles focus.
-	m.textarea.Focus()
+	// Try to pop to previous overlay first
+	hadPrevious := m.overlay.popOverlay()
+
+	// Only refocus textarea if we fully closed all overlays
+	if !hadPrevious {
+		m.textarea.Focus()
+	}
 }
 
 // ShowToast displays a toast notification

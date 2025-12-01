@@ -57,9 +57,7 @@ func NewCommandExecutionOverlay(command, workingDir, executionID string, cancelC
 			if overlay.isRunning {
 				return nil
 			}
-			if actions != nil {
-				actions.ClearOverlay()
-			}
+			// Return nil to signal close - caller will handle ClearOverlay()
 			return nil
 		},
 		RenderHeader:          overlay.renderHeader,
@@ -76,7 +74,7 @@ func (c *CommandExecutionOverlay) Update(msg tea.Msg, state types.StateProvider,
 	// Handle command execution events first
 	if event, ok := msg.(*pkgtypes.AgentEvent); ok {
 		if event.IsCommandExecutionEvent() {
-			return c.handleCommandEvent(event, actions)
+			return c.handleCommandEvent(event)
 		}
 	}
 
@@ -92,10 +90,7 @@ func (c *CommandExecutionOverlay) Update(msg tea.Msg, state types.StateProvider,
 				c.status = "Canceling..."
 				return c, nil
 			}
-			// If not running, close the overlay
-			if actions != nil {
-				actions.ClearOverlay()
-			}
+			// If not running, close the overlay by returning nil
 			return nil, nil
 		}
 	}
@@ -112,7 +107,7 @@ func (c *CommandExecutionOverlay) Update(msg tea.Msg, state types.StateProvider,
 }
 
 // handleCommandEvent processes command execution events
-func (c *CommandExecutionOverlay) handleCommandEvent(event *pkgtypes.AgentEvent, actions types.ActionHandler) (types.Overlay, tea.Cmd) {
+func (c *CommandExecutionOverlay) handleCommandEvent(event *pkgtypes.AgentEvent) (types.Overlay, tea.Cmd) {
 	if event.CommandExecution == nil {
 		return c, nil
 	}
@@ -149,10 +144,7 @@ func (c *CommandExecutionOverlay) handleCommandEvent(event *pkgtypes.AgentEvent,
 	case pkgtypes.EventTypeCommandExecutionCanceled:
 		c.isRunning = false
 		c.status = "Canceled by user"
-		// Auto-close overlay on cancellation
-		if actions != nil {
-			actions.ClearOverlay()
-		}
+		// Auto-close overlay on cancellation by returning nil
 		return nil, nil
 	}
 

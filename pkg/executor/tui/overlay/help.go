@@ -32,9 +32,7 @@ func NewHelpOverlay(title, content string) *HelpOverlay {
 		ViewportHeight: viewportHeight,
 		Content:        content,
 		OnClose: func(actions types.ActionHandler) tea.Cmd {
-			if actions != nil {
-				actions.ClearOverlay()
-			}
+			// Return nil to signal close - caller will handle ClearOverlay()
 			return nil
 		},
 		OnCustomKey: func(msg tea.KeyMsg, actions types.ActionHandler) (bool, tea.Cmd) {

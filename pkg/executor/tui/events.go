@@ -8,107 +8,111 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/entrhq/forge/pkg/agent/tools"
 	"github.com/entrhq/forge/pkg/executor/tui/overlay"
-	tuitypes "github.com/entrhq/forge/pkg/executor/tui/types"
-	"github.com/entrhq/forge/pkg/types"
+	"github.com/entrhq/forge/pkg/executor/tui/types"
+	pkgtypes "github.com/entrhq/forge/pkg/types"
 )
 
 // handleAgentEvent processes events from the agent event stream.
 // This is the main event handler that updates the UI based on agent activity.
 //
 //nolint:gocyclo
-func (m *model) handleAgentEvent(event *types.AgentEvent) {
+func (m *model) handleAgentEvent(event *pkgtypes.AgentEvent) {
 	debugLog.Printf("handleAgentEvent called with event type: %s", event.Type)
 
 	switch event.Type {
-	case types.EventTypeThinkingStart:
+	case pkgtypes.EventTypeThinkingStart:
 		debugLog.Printf("Processing EventTypeThinkingStart")
 		m.handleThinkingStart()
 
-	case types.EventTypeThinkingContent:
+	case pkgtypes.EventTypeThinkingContent:
 		debugLog.Printf("Processing EventTypeThinkingContent: %s", event.Content)
 		m.handleThinkingContent(event)
 		return // Exit early to preserve streaming viewport update
 
-	case types.EventTypeThinkingEnd:
+	case pkgtypes.EventTypeThinkingEnd:
 		debugLog.Printf("Processing EventTypeThinkingEnd")
 		m.handleThinkingEnd()
 
-	case types.EventTypeToolCallStart:
+	case pkgtypes.EventTypeToolCallStart:
 		debugLog.Printf("Processing EventTypeToolCallStart")
 		m.handleToolCallStart(event)
 
-	case types.EventTypeToolCall:
+	case pkgtypes.EventTypeToolCall:
 		debugLog.Printf("Processing EventTypeToolCall")
 		m.handleToolCall(event)
 
-	case types.EventTypeToolResult:
+	case pkgtypes.EventTypeToolResult:
 		debugLog.Printf("Processing EventTypeToolResult")
 		m.handleToolResult(event)
 
-	case types.EventTypeMessageStart:
+	case pkgtypes.EventTypeMessageStart:
 		debugLog.Printf("Processing EventTypeMessageStart")
 		m.handleMessageStart()
 
-	case types.EventTypeMessageContent:
+	case pkgtypes.EventTypeMessageContent:
 		debugLog.Printf("Processing EventTypeMessageContent: %s", event.Content)
 		if m.handleMessageContent(event.Content) {
 			return // Exit early to preserve streaming viewport update
 		}
 
-	case types.EventTypeMessageEnd:
+	case pkgtypes.EventTypeMessageEnd:
 		debugLog.Printf("Processing EventTypeMessageEnd")
 		m.handleMessageEnd()
 
-	case types.EventTypeError:
+	case pkgtypes.EventTypeError:
 		debugLog.Printf("Processing EventTypeError: %v", event.Error)
 		m.handleError(event)
 
-	case types.EventTypeTurnEnd:
+	case pkgtypes.EventTypeTurnEnd:
 		debugLog.Printf("Processing EventTypeTurnEnd")
 		m.handleTurnEnd()
 
-	case types.EventTypeUpdateBusy:
+	case pkgtypes.EventTypeUpdateBusy:
 		debugLog.Printf("Processing EventTypeUpdateBusy")
 		m.handleUpdateBusy(event)
 
-	case types.EventTypeToolApprovalRequest:
+	case pkgtypes.EventTypeToolApprovalRequest:
 		debugLog.Printf("Processing EventTypeToolApprovalRequest")
 		m.handleToolApprovalRequest(event)
 
-	case types.EventTypeToolApprovalGranted:
+	case pkgtypes.EventTypeToolApprovalGranted:
 		debugLog.Printf("Processing EventTypeToolApprovalGranted")
 		m.handleToolApprovalGranted()
 
-	case types.EventTypeToolApprovalRejected:
+	case pkgtypes.EventTypeToolApprovalRejected:
 		debugLog.Printf("Processing EventTypeToolApprovalRejected")
 		m.handleToolApprovalRejected()
 
-	case types.EventTypeToolApprovalTimeout:
+	case pkgtypes.EventTypeToolApprovalTimeout:
 		m.handleToolApprovalTimeout()
 
-	case types.EventTypeApiCallStart:
+	case pkgtypes.EventTypeApiCallStart:
 		m.handleApiCallStart(event)
 
-	case types.EventTypeTokenUsage:
+	case pkgtypes.EventTypeTokenUsage:
 		m.handleTokenUsage(event)
 
-	case types.EventTypeCommandExecutionStart:
+	case pkgtypes.EventTypeCommandExecutionStart:
 		m.handleCommandExecutionStart(event)
 
-	case types.EventTypeCommandOutput:
+	case pkgtypes.EventTypeCommandOutput:
 		m.handleCommandExecutionOutput(event)
 
-	case types.EventTypeCommandExecutionComplete:
+	case pkgtypes.EventTypeCommandExecutionComplete:
 		m.handleCommandExecutionComplete(event)
 
-	case types.EventTypeContextSummarizationStart:
+	case pkgtypes.EventTypeContextSummarizationStart:
 		m.handleContextSummarizationStart(event)
 
-	case types.EventTypeContextSummarizationProgress:
+	case pkgtypes.EventTypeContextSummarizationProgress:
 		m.handleContextSummarizationProgress(event)
 
-	case types.EventTypeContextSummarizationComplete:
+	case pkgtypes.EventTypeContextSummarizationComplete:
 		m.handleContextSummarizationComplete(event)
+
+	case pkgtypes.EventTypeNotesData:
+		debugLog.Printf("Processing EventTypeNotesData")
+		m.handleNotesData(event)
 	}
 
 	// Update viewport with current content
@@ -123,7 +127,7 @@ func (m *model) handleThinkingStart() {
 	m.thinkingBuffer.Reset()
 }
 
-func (m *model) handleThinkingContent(event *types.AgentEvent) {
+func (m *model) handleThinkingContent(event *pkgtypes.AgentEvent) {
 	if event.Content == "" {
 		return
 	}
@@ -149,7 +153,7 @@ func (m *model) handleThinkingEnd() {
 
 // Tool event handlers
 
-func (m *model) handleToolCallStart(event *types.AgentEvent) {
+func (m *model) handleToolCallStart(event *pkgtypes.AgentEvent) {
 	// Check if we have early tool name detection in metadata
 	if toolName, ok := event.Metadata["tool_name"].(string); ok && toolName != "" && !m.toolNameDisplayed {
 		// Display the tool name immediately when detected early
@@ -163,7 +167,7 @@ func (m *model) handleToolCallStart(event *types.AgentEvent) {
 	// If no tool name yet, we'll wait for EventTypeToolCall
 }
 
-func (m *model) handleToolCall(event *types.AgentEvent) {
+func (m *model) handleToolCall(event *pkgtypes.AgentEvent) {
 	// Only display if we haven't already shown it from early detection
 	if !m.toolNameDisplayed {
 		formatted := formatEntry("🔧 ", event.ToolName, toolStyle, m.width, false)
@@ -177,7 +181,7 @@ func (m *model) handleToolCall(event *types.AgentEvent) {
 	m.toolNameDisplayed = false // Reset for next tool call
 }
 
-func (m *model) handleToolResult(event *types.AgentEvent) {
+func (m *model) handleToolResult(event *pkgtypes.AgentEvent) {
 	resultStr := fmt.Sprintf("%v", event.ToolOutput)
 
 	// Classify the tool result to determine display strategy
@@ -250,7 +254,7 @@ func (m *model) handleMessageEnd() {
 
 // Error and state handlers
 
-func (m *model) handleError(event *types.AgentEvent) {
+func (m *model) handleError(event *pkgtypes.AgentEvent) {
 	m.content.WriteString(errorStyle.Render(fmt.Sprintf("  ❌ Error: %v", event.Error)))
 	m.content.WriteString("\n\n")
 }
@@ -261,7 +265,7 @@ func (m *model) handleTurnEnd() {
 	m.recalculateLayout()
 }
 
-func (m *model) handleUpdateBusy(event *types.AgentEvent) {
+func (m *model) handleUpdateBusy(event *pkgtypes.AgentEvent) {
 	// Update busy state based on event
 	wasBusy := m.agentBusy
 	m.agentBusy = event.IsBusy
@@ -277,7 +281,7 @@ func (m *model) handleUpdateBusy(event *types.AgentEvent) {
 
 // Tool approval handlers
 
-func (m *model) handleToolApprovalRequest(event *types.AgentEvent) {
+func (m *model) handleToolApprovalRequest(event *pkgtypes.AgentEvent) {
 	// Show "Requesting approval" message before overlay
 	formatted := formatEntry("  ⏳ ", "Requesting tool approval...", toolStyle, m.width, false)
 	m.content.WriteString(formatted)
@@ -290,7 +294,7 @@ func (m *model) handleToolApprovalRequest(event *types.AgentEvent) {
 		preview, ok := event.Preview.(*tools.ToolPreview)
 		if ok {
 			// Create response callback that will be called by the overlay
-			responseFunc := func(response *types.ApprovalResponse) {
+			responseFunc := func(response *pkgtypes.ApprovalResponse) {
 				// Send approval response to agent
 				m.channels.Approval <- response
 
@@ -309,7 +313,7 @@ func (m *model) handleToolApprovalRequest(event *types.AgentEvent) {
 				m.height,
 				responseFunc,
 			)
-			m.overlay.activate(tuitypes.OverlayModeDiffViewer, diffViewer)
+			m.overlay.activate(types.OverlayModeDiffViewer, diffViewer)
 		}
 	}
 }
@@ -337,7 +341,7 @@ func (m *model) handleToolApprovalTimeout() {
 
 // API and token handlers
 
-func (m *model) handleApiCallStart(event *types.AgentEvent) {
+func (m *model) handleApiCallStart(event *pkgtypes.AgentEvent) {
 	// Update context token information
 	if event.ApiCallInfo != nil {
 		m.currentContextTokens = event.ApiCallInfo.ContextTokens
@@ -345,7 +349,7 @@ func (m *model) handleApiCallStart(event *types.AgentEvent) {
 	}
 }
 
-func (m *model) handleTokenUsage(event *types.AgentEvent) {
+func (m *model) handleTokenUsage(event *pkgtypes.AgentEvent) {
 	// Update token usage counts
 	if event.TokenUsage != nil {
 		m.totalPromptTokens += event.TokenUsage.PromptTokens
@@ -356,7 +360,7 @@ func (m *model) handleTokenUsage(event *types.AgentEvent) {
 
 // Command execution handlers
 
-func (m *model) handleCommandExecutionStart(event *types.AgentEvent) {
+func (m *model) handleCommandExecutionStart(event *pkgtypes.AgentEvent) {
 	// Show command execution started message
 	if event.CommandExecution != nil {
 		formatted := formatEntry("  🚀 ", fmt.Sprintf("Executing: %s", event.CommandExecution.Command), toolStyle, m.width, false)
@@ -372,11 +376,11 @@ func (m *model) handleCommandExecutionStart(event *types.AgentEvent) {
 			event.CommandExecution.ExecutionID,
 			m.channels.Cancel,
 		)
-		m.overlay.activate(tuitypes.OverlayModeCommandOutput, overlay)
+		m.overlay.activate(types.OverlayModeCommandOutput, overlay)
 	}
 }
 
-func (m *model) handleCommandExecutionOutput(event *types.AgentEvent) {
+func (m *model) handleCommandExecutionOutput(event *pkgtypes.AgentEvent) {
 	// Stream command output as it arrives
 	// Write output directly without styling to preserve formatting/indentation
 	if event.CommandExecution != nil && event.CommandExecution.Output != "" {
@@ -384,7 +388,7 @@ func (m *model) handleCommandExecutionOutput(event *types.AgentEvent) {
 	}
 }
 
-func (m *model) handleCommandExecutionComplete(event *types.AgentEvent) {
+func (m *model) handleCommandExecutionComplete(event *pkgtypes.AgentEvent) {
 	// Show command completion status
 	if event.CommandExecution != nil {
 		if event.CommandExecution.ExitCode == 0 {
@@ -400,7 +404,7 @@ func (m *model) handleCommandExecutionComplete(event *types.AgentEvent) {
 
 // Context summarization handlers
 
-func (m *model) handleContextSummarizationStart(event *types.AgentEvent) {
+func (m *model) handleContextSummarizationStart(event *pkgtypes.AgentEvent) {
 	m.summarization.active = true
 	m.summarization.startTime = time.Now()
 	if event.ContextSummarization != nil {
@@ -411,7 +415,7 @@ func (m *model) handleContextSummarizationStart(event *types.AgentEvent) {
 	}
 }
 
-func (m *model) handleContextSummarizationProgress(event *types.AgentEvent) {
+func (m *model) handleContextSummarizationProgress(event *pkgtypes.AgentEvent) {
 	if event.ContextSummarization != nil {
 		m.summarization.itemsProcessed = event.ContextSummarization.ItemsProcessed
 		// Calculate progress percentage from items processed
@@ -421,7 +425,7 @@ func (m *model) handleContextSummarizationProgress(event *types.AgentEvent) {
 	}
 }
 
-func (m *model) handleContextSummarizationComplete(event *types.AgentEvent) {
+func (m *model) handleContextSummarizationComplete(event *pkgtypes.AgentEvent) {
 	if event.ContextSummarization != nil {
 		oldTokens := m.summarization.currentTokens
 		newTokens := event.ContextSummarization.NewTokenCount
@@ -442,4 +446,25 @@ func (m *model) handleContextSummarizationComplete(event *types.AgentEvent) {
 		// Update current context tokens
 		m.currentContextTokens = newTokens
 	}
+}
+
+// Notes data handler
+func (m *model) handleNotesData(event *pkgtypes.AgentEvent) {
+	if event.NotesData == nil {
+		return
+	}
+
+	// End loading state
+	m.agentBusy = false
+	m.currentLoadingMessage = ""
+
+	// Notes data should only come from explicit /notes command request
+	if !m.pendingNotesRequest {
+		return
+	}
+	m.pendingNotesRequest = false
+
+	// Create and activate notes overlay
+	notesOverlay := overlay.NewNotesOverlay(event.NotesData.Notes, m.width, m.height)
+	m.overlay.activate(types.OverlayModeNotes, notesOverlay)
 }

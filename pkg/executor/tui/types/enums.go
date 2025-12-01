@@ -22,4 +22,6 @@ const (
 	OverlayModeContext
 	// OverlayModeToolResult shows full tool result overlay
 	OverlayModeToolResult
+	// OverlayModeNotes shows the scratchpad notes overlay
+	OverlayModeNotes
 )

@@ -65,9 +65,7 @@ func NewContextOverlay(info *ContextInfo, width, height int) *ContextOverlay {
 		ViewportHeight: 20,
 		Content:        content,
 		OnClose: func(actions types.ActionHandler) tea.Cmd {
-			if actions != nil {
-				actions.ClearOverlay()
-			}
+			// Return nil to signal close - caller will handle ClearOverlay()
 			return nil
 		},
 		RenderHeader: overlay.renderHeader,

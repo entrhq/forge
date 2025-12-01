@@ -53,6 +53,7 @@ type model struct {
 	bashMode              bool // Track if in bash mode
 	currentLoadingMessage string
 	toolNameDisplayed     bool // Track if we've already displayed the tool name
+	pendingNotesRequest   bool // Track if we're waiting for notes data
 
 	// Window dimensions
 	width  int

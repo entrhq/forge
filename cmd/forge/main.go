@@ -223,11 +223,12 @@ func runTUI(ctx context.Context, config *Config) error {
 	// Create notes manager for scratchpad
 	notesManager := notes.NewManager()
 
-	// Create agent with custom system prompt and context manager
+	// Create agent with custom system prompt, context manager, and shared notes manager
 	ag := agent.NewDefaultAgent(
 		provider,
 		agent.WithCustomInstructions(systemPrompt),
 		agent.WithContextManager(contextManager),
+		agent.WithNotesManager(notesManager),
 	)
 
 	// Register coding tools

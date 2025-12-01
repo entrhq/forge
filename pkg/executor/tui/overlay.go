@@ -11,6 +11,13 @@ import (
 type overlayState struct {
 	mode    types.OverlayMode
 	overlay types.Overlay
+	stack   []overlayStackEntry // Stack of previous overlays for navigation
+}
+
+// overlayStackEntry represents a saved overlay state
+type overlayStackEntry struct {
+	mode    types.OverlayMode
+	overlay types.Overlay
 }
 
 // newOverlayState creates a new overlay state
@@ -20,10 +27,52 @@ func newOverlayState() *overlayState {
 	}
 }
 
-// activate activates an overlay
+// activate activates an overlay without affecting the stack
 func (o *overlayState) activate(mode types.OverlayMode, overlay types.Overlay) {
 	o.mode = mode
 	o.overlay = overlay
+}
+
+// activateAndClearStack activates an overlay and clears the navigation stack
+// Use this for top-level commands that should replace any existing overlay hierarchy
+func (o *overlayState) activateAndClearStack(mode types.OverlayMode, overlay types.Overlay) {
+	o.stack = nil
+	o.mode = mode
+	o.overlay = overlay
+}
+
+// pushOverlay saves current overlay and activates a new one
+func (o *overlayState) pushOverlay(mode types.OverlayMode, overlay types.Overlay) {
+	// Save current overlay to stack if one is active
+	if o.mode != types.OverlayModeNone && o.overlay != nil {
+		o.stack = append(o.stack, overlayStackEntry{
+			mode:    o.mode,
+			overlay: o.overlay,
+		})
+	}
+	// Activate new overlay
+	o.mode = mode
+	o.overlay = overlay
+}
+
+// popOverlay returns to the previous overlay in the stack
+// Returns true if there was a previous overlay, false if stack was empty
+func (o *overlayState) popOverlay() bool {
+	if len(o.stack) == 0 {
+		// No previous overlay, fully deactivate
+		o.deactivate()
+		return false
+	}
+
+	// Pop the last overlay from the stack
+	lastIdx := len(o.stack) - 1
+	prev := o.stack[lastIdx]
+	o.stack = o.stack[:lastIdx]
+
+	// Restore it
+	o.mode = prev.mode
+	o.overlay = prev.overlay
+	return true
 }
 
 // deactivate closes the current overlay

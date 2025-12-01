@@ -450,7 +450,7 @@ func TestManagerConcurrency(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		go func(n int) {
 			// Add a small sleep to ensure unique nanosecond timestamps
-			time.Sleep(time.Nanosecond * time.Duration(n*100))
+			time.Sleep(time.Microsecond * time.Duration(n*10))
 			_, err := m.Add("Concurrent note", []string{"test"})
 			if err != nil {
 				t.Errorf("concurrent add failed: %v", err)

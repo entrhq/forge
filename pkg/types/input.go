@@ -4,9 +4,10 @@ package types
 type InputType string
 
 const (
-	InputTypeCancel    InputType = "cancel"     // InputTypeCancel indicates a cancellation request.
-	InputTypeUserInput InputType = "user_input" // InputTypeUserInput indicates a simple text input from the user.
-	InputTypeFormInput InputType = "form_input" // InputTypeFormInput indicates structured form data with multiple key-value pairs.
+	InputTypeCancel       InputType = "cancel"        // InputTypeCancel indicates a cancellation request.
+	InputTypeUserInput    InputType = "user_input"    // InputTypeUserInput indicates a simple text input from the user.
+	InputTypeFormInput    InputType = "form_input"    // InputTypeFormInput indicates structured form data with multiple key-value pairs.
+	InputTypeNotesRequest InputType = "notes_request" // InputTypeNotesRequest indicates a request for notes data.
 )
 
 // Input represents various types of input that can be sent to an agent.
@@ -74,4 +75,29 @@ func (i *Input) IsUserInput() bool {
 // IsFormInput returns true if this is a form input.
 func (i *Input) IsFormInput() bool {
 	return i.Type == InputTypeFormInput
+}
+
+// IsNotesRequest returns true if this is a notes request input.
+func (i *Input) IsNotesRequest() bool {
+	return i.Type == InputTypeNotesRequest
+}
+
+// NotesRequestParams contains parameters for requesting notes data.
+type NotesRequestParams struct {
+	Tag              string // Optional tag filter
+	IncludeScratched bool   // Include scratched notes
+	Limit            int    // Max notes to return (default 10)
+}
+
+// NewNotesRequestInput creates a new notes request input.
+func NewNotesRequestInput(params NotesRequestParams) *Input {
+	// Set default limit if not specified
+	if params.Limit == 0 {
+		params.Limit = 10
+	}
+
+	return &Input{
+		Type:     InputTypeNotesRequest,
+		Metadata: map[string]interface{}{"params": params},
+	}
 }

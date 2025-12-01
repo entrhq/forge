@@ -37,6 +37,7 @@ const (
 	EventTypeContextSummarizationProgress AgentEventType = "context_summarization_progress" // EventTypeContextSummarizationProgress indicates progress during context summarization.
 	EventTypeContextSummarizationComplete AgentEventType = "context_summarization_complete" // EventTypeContextSummarizationComplete indicates context summarization finished successfully.
 	EventTypeContextSummarizationError    AgentEventType = "context_summarization_error"    // EventTypeContextSummarizationError indicates an error occurred during context summarization.
+	EventTypeNotesData                    AgentEventType = "notes_data"                     // EventTypeNotesData indicates notes data response from agent.
 )
 
 // AgentEvent represents an event emitted by the agent during execution.
@@ -83,6 +84,9 @@ type AgentEvent struct {
 
 	// ApiCallInfo contains API call information (for API call events).
 	ApiCallInfo *ApiCallInfo
+
+	// NotesData contains notes data (for notes data events).
+	NotesData *NotesData
 }
 
 // TokenUsage contains token usage statistics from an LLM API call.
@@ -574,4 +578,31 @@ func (e *AgentEvent) IsContextSummarizationEvent() bool {
 		e.Type == EventTypeContextSummarizationProgress ||
 		e.Type == EventTypeContextSummarizationComplete ||
 		e.Type == EventTypeContextSummarizationError
+}
+
+// NoteData represents a single note for display.
+type NoteData struct {
+	ID        string
+	Content   string
+	Tags      []string
+	CreatedAt string
+	UpdatedAt string
+	Scratched bool
+}
+
+// NotesData contains the notes response data.
+type NotesData struct {
+	Notes []NoteData
+	Tag   string // Echo the requested tag filter
+}
+
+// NewNotesDataEvent creates a new notes data event.
+func NewNotesDataEvent(notes []NoteData, tag string) *AgentEvent {
+	return &AgentEvent{
+		Type: EventTypeNotesData,
+		NotesData: &NotesData{
+			Notes: notes,
+			Tag:   tag,
+		},
+	}
 }
