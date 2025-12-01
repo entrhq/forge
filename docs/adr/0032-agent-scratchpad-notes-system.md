@@ -142,10 +142,10 @@ pkg/agent/memory/
 pkg/tools/scratchpad/      # 7 scratchpad tools
 ├── add_note.go           # Create new note with content & tags
 ├── search_notes.go       # Full-text search with tag filtering
-├── list_notes.go         # List all notes (optionally by tag)
-├── update_note.go        # Modify existing note
+├── list_notes.go         # List all notes (optionally by tag/scratch status)
+├── update_note.go        # Modify existing note content/tags
 ├── delete_note.go        # Remove note by ID
-├── scratch_note.go       # Quick note without tags
+├── scratch_note.go       # Mark note as scratched/addressed
 └── list_tags.go          # List all tags in use
 ```
 
@@ -208,14 +208,21 @@ You have access to a persistent scratchpad for managing ephemeral notes during t
 - Organizing complex information
 
 **Best practices:**
-- Use descriptive tags for easy filtering
-- Keep notes focused and actionable
+- Use descriptive tags for easy filtering (1-5 tags required per note)
+- Keep notes concise (max 800 characters)
 - Update notes as information evolves
+- Mark notes as scratched when addressed (preserves context)
 - Search before creating duplicates
-- Clean up notes when tasks complete
+- Use list_notes to review active vs scratched notes
 
 **Available operations:**
-add_note, search_notes, list_notes, update_note, delete_note, scratch_note, list_tags
+- add_note: Create note with content and 1-5 tags
+- search_notes: Find notes by content/tags
+- list_notes: View all notes (filter by tag/scratched status)
+- update_note: Modify content or tags
+- delete_note: Remove note permanently
+- scratch_note: Mark note as addressed/obsolete
+- list_tags: See all tags in use
 </scratchpad_system>
 ```
 
@@ -225,8 +232,9 @@ add_note, search_notes, list_notes, update_note, delete_note, scratch_note, list
 // Note represents a single scratchpad entry
 type Note struct {
     ID        string    // "note_" + timestamp_ms
-    Content   string    // Max 4000 chars (configurable)
-    Tags      []string  // Max 10 tags (configurable)
+    Content   string    // Max 800 chars
+    Tags      []string  // 1-5 tags (required)
+    Scratched bool      // Marks note as addressed/obsolete
     CreatedAt time.Time
     UpdatedAt time.Time
 }
@@ -241,7 +249,8 @@ type Manager struct {
 **Design rationale:**
 - **No mutex**: Tools execute sequentially in the agent loop; concurrent access is impossible
 - **Simple ID scheme**: `note_` prefix + Unix milliseconds provides uniqueness and sortability
-- **Fixed limits**: 4000 chars prevents abuse, 10 tags balances flexibility vs. complexity
+- **Fixed limits**: 800 chars forces concise insights, 1-5 tags required for organization
+- **Scratch tracking**: Boolean flag to mark notes as addressed without deleting (preserves context)
 - **In-memory only**: Session-scoped, no persistence (cleared on restart)
 
 #### 6. Search Implementation
@@ -294,11 +303,11 @@ return "", nil, fmt.Errorf(
     MaxContentLength, len(content),
 )
 
-// Example: Too many tags
+// Example: Tag count validation
 return "", nil, fmt.Errorf(
-    "note has too many tags (max %d, got %d). "+
-    "Please reduce the number of tags to focus on the most relevant categories",
-    MaxTags, len(tags),
+    "note requires 1-5 tags (got %d). "+
+    "Please provide at least 1 tag and no more than 5 tags for organization",
+    len(tags),
 )
 ```
 
@@ -360,8 +369,8 @@ Future enhancement: Add optional persistence layer for note export/import.
 ```
 
 **Parameters:**
-- `content` (required): String, max 4000 chars
-- `tags` (optional): Array of strings, max 10 tags
+- `content` (required): String, max 800 chars
+- `tags` (required): Array of strings, 1-5 tags
 
 **Returns:** Note ID, success message, metadata
 
@@ -398,8 +407,10 @@ Future enhancement: Add optional persistence layer for note export/import.
 
 **Parameters:**
 - `tag` (optional): Single tag filter
+- `include_scratched` (optional): Include scratched notes (default: false)
+- `limit` (optional): Maximum notes to return (default: 10)
 
-**Returns:** All notes (optionally filtered), sorted by recency, metadata
+**Returns:** Notes (optionally filtered), sorted by recency, metadata
 
 #### 4. update_note
 ```xml
@@ -418,10 +429,12 @@ Future enhancement: Add optional persistence layer for note export/import.
 
 **Parameters:**
 - `id` (required): Note ID
-- `content` (optional): New content (replaces existing)
-- `tags` (optional): New tags (replaces existing)
+- `content` (optional): New content (replaces existing if provided)
+- `tags` (optional): New tags (replaces existing if provided, must be 1-5)
 
 **Returns:** Success message, updated note, metadata
+
+**Note:** At least one of content or tags must be provided
 
 #### 5. delete_note
 ```xml
@@ -445,17 +458,17 @@ Future enhancement: Add optional persistence layer for note export/import.
   <server_name>local</server_name>
   <tool_name>scratch_note</tool_name>
   <arguments>
-    <content>Quick note without tags</content>
+    <id>note_1234567890</id>
   </arguments>
 </tool>
 ```
 
 **Parameters:**
-- `content` (required): String, max 4000 chars
+- `id` (required): Note ID to mark as scratched
 
-**Returns:** Note ID, success message, metadata
+**Returns:** Success message, metadata
 
-**Rationale:** Convenience tool for rapid note-taking without tag overhead.
+**Rationale:** Marks a note as addressed/obsolete without deleting it, preserving context while indicating it's no longer active.
 
 #### 7. list_tags
 ```xml
