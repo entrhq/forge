@@ -91,11 +91,12 @@ func (t *UpdateNoteTool) Execute(ctx context.Context, argsXML []byte) (string, m
 
 	// Build result message
 	var message string
-	if input.Content != "" && len(input.Tags) > 0 {
+	switch {
+	case input.Content != "" && len(input.Tags) > 0:
 		message = fmt.Sprintf("Note %s updated successfully (content and tags modified)", note.ID)
-	} else if input.Content != "" {
+	case input.Content != "":
 		message = fmt.Sprintf("Note %s updated successfully (content modified)", note.ID)
-	} else {
+	default:
 		message = fmt.Sprintf("Note %s updated successfully (tags modified)", note.ID)
 	}
 

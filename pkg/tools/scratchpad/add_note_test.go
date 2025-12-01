@@ -46,10 +46,10 @@ func TestAddNoteTool_Schema(t *testing.T) {
 		t.Fatal("Schema missing properties")
 	}
 
-	if _, ok := props["content"]; !ok {
+	if _, hasContent := props["content"]; !hasContent {
 		t.Error("Schema missing 'content' property")
 	}
-	if _, ok := props["tags"]; !ok {
+	if _, hasTags := props["tags"]; !hasTags {
 		t.Error("Schema missing 'tags' property")
 	}
 

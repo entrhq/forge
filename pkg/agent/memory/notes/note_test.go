@@ -181,7 +181,7 @@ func TestNoteUpdate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a fresh note for each test
 			testNote, _ := NewNote("Test content", []string{"test"})
-			
+
 			err := testNote.Update(tt.content, tt.tags)
 
 			if tt.expectError {

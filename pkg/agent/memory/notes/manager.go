@@ -93,9 +93,9 @@ func (m *Manager) Scratch(id string) (*Note, error) {
 
 // ListOptions configures the List operation
 type ListOptions struct {
-	Tag             string // Filter by single tag (optional)
+	Tag              string // Filter by single tag (optional)
 	IncludeScratched bool   // Include scratched notes (default: false)
-	Limit           int    // Maximum notes to return (default: 10)
+	Limit            int    // Maximum notes to return (default: 10)
 }
 
 // List retrieves notes with optional filtering and limiting
