@@ -196,6 +196,7 @@ Total time: <1 minute, high confidence
 - **Interaction:** Keyboard shortcut (e.g., 'f' for filter) cycles through states
 - **Visual Feedback:** Clear indicator of current filter state
 - **Success Criteria:** User can filter to active-only in 1 keystroke
+- **Rationale:** Showing all notes by default provides complete transparency; users can filter to active-only if needed
 
 **4. Navigation Consistency**
 - **Requirement:** Follow existing overlay navigation patterns
@@ -222,12 +223,13 @@ Total time: <1 minute, high confidence
   - Readable fonts and spacing
 - **Success Criteria:** Notes are easily scannable, information hierarchy clear
 
-### Should Have (P1)
-
-**7. Search/Jump to Note**
+**7. Search/Filter Notes**
 - **Requirement:** Quick search within notes (press '/' in list view)
 - **Behavior:** Filter notes by content or tag as user types
 - **Success Criteria:** Find specific note in 3-5 keystrokes
+- **Rationale:** Essential for usability with 20+ notes; low implementation complexity, high user value
+
+### Should Have (P1)
 
 **8. Note Count Summary**
 - **Requirement:** Header shows total count and breakdown
@@ -393,10 +395,11 @@ Agent updates note, proceeds correctly
 - **Performance Target:** Smooth scrolling even with 500+ notes
 - **Recovery:** Filter or search to reduce visible set
 
-**5. Note Update Race Condition**
-- **State:** Agent updates note while user viewing it
-- **Behavior:** Note refreshes with visual indicator ("Note updated")
-- **Recovery:** User re-reads updated content or continues
+**5. Note Update During Viewing**
+- **State:** Agent updates note while user viewing notes overlay
+- **Behavior:** No auto-refresh; updates only visible after closing and reopening overlay
+- **Rationale:** Keeps implementation simple; avoids UI flicker or distraction during viewing
+- **Recovery:** Close and reopen overlay to see latest notes
 
 ---
 
@@ -809,11 +812,11 @@ Agent updates note, proceeds correctly
 - **Workaround:** Notes persist automatically; users see them on session resume
 - **Future:** v1.1 could add session history viewer
 
-**Limitation 2: No Content Search in MVP**
-- **Scope:** Cannot search within note content (P1 feature)
-- **Rationale:** List view shows snippets; detail view is searchable via browser Ctrl+F
-- **Workaround:** Scan list view, use tags, filter scratched
-- **Future:** P1 in-overlay search with text matching
+**Limitation 2: No Real-Time Updates**
+- **Scope:** Notes don't auto-refresh while viewing overlay
+- **Rationale:** Keeps implementation simple; avoids UI flicker during rapid note creation
+- **Workaround:** Close and reopen overlay to see latest notes
+- **Future:** v1.1 could add live update mode with toggle if demand exists
 
 **Limitation 3: No Export/Share**
 - **Scope:** Cannot export notes to file or share with others
@@ -821,11 +824,11 @@ Agent updates note, proceeds correctly
 - **Workaround:** Copy note content manually (P2 feature)
 - **Future:** P2 export to markdown, P3 team note sharing
 
-**Limitation 4: Static Display During Agent Execution**
-- **Scope:** Notes don't auto-refresh while agent is running
-- **Rationale:** Avoids UI flicker/distraction during rapid note creation
-- **Workaround:** Close and reopen overlay to refresh
-- **Future:** v1.1 could add live update mode with toggle
+**Limitation 4: No Inline Editing or Deletion**
+- **Scope:** Read-only viewing; cannot edit or delete notes from overlay
+- **Rationale:** Maintains clear ownership (agent's working memory); users influence via conversation
+- **Workaround:** Ask agent to update or scratch notes via chat
+- **Future:** v1.2 could add user annotations separate from agent notes
 
 ### Future Considerations
 
@@ -1057,6 +1060,7 @@ Agent updates note, proceeds correctly
 
 ---
 
-**Document Version:** 1.0  
+**Document Version:** 1.1  
 **Last Updated:** January 2, 2025  
+**Change Summary:** Promoted search to P0 feature, clarified default filter state (show all), simplified note update behavior (no real-time refresh in MVP)  
 **Next Review:** After MVP implementation and first user feedback cycle
