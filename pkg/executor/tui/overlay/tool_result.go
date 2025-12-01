@@ -39,9 +39,7 @@ func NewToolResultOverlay(toolName, result string, width, height int) *ToolResul
 		ViewportHeight: overlayHeight - 6,
 		Content:        result,
 		OnClose: func(actions types.ActionHandler) tea.Cmd {
-			if actions != nil {
-				actions.ClearOverlay()
-			}
+			// Return nil to signal close - caller will handle ClearOverlay()
 			return nil
 		},
 		OnCustomKey: func(msg tea.KeyMsg, actions types.ActionHandler) (bool, tea.Cmd) {
@@ -67,6 +65,14 @@ func (o *ToolResultOverlay) Update(msg tea.Msg, state types.StateProvider, actio
 	o.BaseOverlay = updatedBase
 
 	if handled {
+		// Check if this is a close signal (Esc key pressed)
+		// BaseOverlay.close() returns nil cmd, which signals the overlay wants to close
+		if keyMsg, ok := msg.(tea.KeyMsg); ok {
+			if keyMsg.String() == "esc" || keyMsg.String() == "ctrl+c" {
+				// Return nil to signal close - caller will handle ClearOverlay()
+				return nil, cmd
+			}
+		}
 		return o, cmd
 	}
 

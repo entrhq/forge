@@ -11,6 +11,7 @@ import (
 	"github.com/entrhq/forge/pkg/agent/approval"
 	agentcontext "github.com/entrhq/forge/pkg/agent/context"
 	"github.com/entrhq/forge/pkg/agent/memory"
+	"github.com/entrhq/forge/pkg/agent/memory/notes"
 	"github.com/entrhq/forge/pkg/agent/prompts"
 	"github.com/entrhq/forge/pkg/agent/tools"
 	"github.com/entrhq/forge/pkg/llm"
@@ -72,6 +73,9 @@ type DefaultAgent struct {
 
 	// Context management
 	contextManager *agentcontext.Manager
+
+	// Notes management
+	notesManager *notes.Manager
 }
 
 // AgentOption is a function that configures an agent
@@ -89,6 +93,14 @@ func WithCustomInstructions(instructions string) AgentOption {
 func WithMaxTurns(max int) AgentOption {
 	return func(a *DefaultAgent) {
 		a.maxTurns = max
+	}
+}
+
+// WithNotesManager sets a custom notes manager for the agent
+// If not provided, a new manager will be created
+func WithNotesManager(manager *notes.Manager) AgentOption {
+	return func(a *DefaultAgent) {
+		a.notesManager = manager
 	}
 }
 
@@ -156,6 +168,11 @@ func NewDefaultAgent(provider llm.Provider, opts ...AgentOption) *DefaultAgent {
 	// Apply options
 	for _, opt := range opts {
 		opt(a)
+	}
+
+	// Initialize notes manager if not provided via option
+	if a.notesManager == nil {
+		a.notesManager = notes.NewManager()
 	}
 
 	// Create channels with configured buffer size
@@ -311,6 +328,12 @@ func (a *DefaultAgent) processInput(ctx context.Context, input *types.Input) {
 	if input.IsFormInput() {
 		a.emitEvent(types.NewErrorEvent(fmt.Errorf("form input not yet supported")))
 		a.emitEvent(types.NewTurnEndEvent())
+		return
+	}
+
+	// Handle notes request
+	if input.IsNotesRequest() {
+		a.handleNotesRequest(input)
 		return
 	}
 }

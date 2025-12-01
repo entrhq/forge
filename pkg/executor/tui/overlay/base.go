@@ -124,10 +124,8 @@ func (b *BaseOverlay) close(actions types.ActionHandler) tea.Cmd {
 		return b.onClose(actions)
 	}
 
-	// Default close behavior
-	if actions != nil {
-		actions.ClearOverlay()
-	}
+	// Default close behavior - return nil to signal close
+	// The caller (handleKeyPress) will call ClearOverlay()
 	return nil
 }
 

@@ -112,6 +112,15 @@ func init() {
 		MinArgs:     0,
 		MaxArgs:     0,
 	})
+
+	registerCommand(&SlashCommand{
+		Name:        "notes",
+		Description: "View scratchpad notes",
+		Type:        CommandTypeTUI,
+		Handler:     handleNotesCommand,
+		MinArgs:     0,
+		MaxArgs:     0,
+	})
 }
 
 // registerCommand adds a command to the registry
@@ -469,9 +478,10 @@ func getCurrentBranch(workingDir string) (string, error) {
 
 // handleSettingsCommand shows the settings configuration
 func handleSettingsCommand(m *model, args []string) interface{} {
-	// Create and activate settings overlay
+	// Create and activate settings overlay, clearing any existing overlay stack
+	// This ensures settings replaces the current overlay hierarchy rather than stacking on top
 	settingsOverlay := overlay.NewSettingsOverlay(m.width, m.height)
-	m.overlay.activate(tuitypes.OverlayModeSettings, settingsOverlay)
+	m.overlay.activateAndClearStack(tuitypes.OverlayModeSettings, settingsOverlay)
 
 	return nil
 }
@@ -526,4 +536,10 @@ func handleBashCommand(m *model, args []string) interface{} {
 	m.updatePrompt()
 	m.showToast("Bash Mode", "Entered bash mode. Commands will be executed directly. Type 'exit' or press Ctrl+C to return.", "🔧", false)
 	return nil
+}
+
+// handleNotesCommand requests notes data from the agent and shows notes viewer
+func handleNotesCommand(m *model, args []string) interface{} {
+	// Send notes request to agent
+	return m.requestNotes()
 }

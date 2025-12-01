@@ -53,6 +53,7 @@ type model struct {
 	bashMode              bool // Track if in bash mode
 	currentLoadingMessage string
 	toolNameDisplayed     bool // Track if we've already displayed the tool name
+	pendingNotesRequest   bool // Track if we're waiting for notes data
 
 	// Window dimensions
 	width  int
@@ -91,6 +92,11 @@ type approvalRequestMsg struct {
 
 // slashCommandCompleteMsg signals that a slash command has completed
 type slashCommandCompleteMsg struct{}
+
+// notesDataMsg contains notes data received from the agent
+type notesDataMsg struct {
+	notes []types.NoteData
+}
 
 // operationStartMsg signals that a long-running operation has started
 type operationStartMsg struct {

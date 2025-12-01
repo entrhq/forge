@@ -133,6 +133,10 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		debugLog.Printf("Received viewResultMsg")
 		return m.handleViewResult(msg)
 
+	case tuitypes.ViewNoteMsg:
+		debugLog.Printf("Received viewNoteMsg")
+		return m.handleViewNote(msg)
+
 	case tea.WindowSizeMsg:
 		debugLog.Printf("Received tea.WindowSizeMsg: width=%d, height=%d", msg.Width, msg.Height)
 		return m.handleWindowResize(msg)
@@ -258,6 +262,24 @@ func (m *model) handleViewResult(msg tuitypes.ViewResultMsg) (tea.Model, tea.Cmd
 	}
 	// If result not found, just close the list
 	m.resultList.Deactivate()
+	return m, nil
+}
+
+// handleViewNote processes note selection from the notes list
+func (m *model) handleViewNote(msg tuitypes.ViewNoteMsg) (tea.Model, tea.Cmd) {
+	if msg.Note != nil {
+		// Build note detail content
+		content := fmt.Sprintf("Note ID: %s\n", msg.Note.ID)
+		content += fmt.Sprintf("Tags: [%s]\n", strings.Join(msg.Note.Tags, ", "))
+		content += fmt.Sprintf("Created: %s\n", msg.Note.CreatedAt)
+		content += fmt.Sprintf("Updated: %s\n\n", msg.Note.UpdatedAt)
+		content += msg.Note.Content
+
+		// Push note detail overlay on top of notes list (allows back navigation)
+		overlay := overlay.NewToolResultOverlay("Note Detail", content, m.width, m.height)
+		m.overlay.pushOverlay(tuitypes.OverlayModeToolResult, overlay)
+		return m, nil
+	}
 	return m, nil
 }
 
@@ -400,7 +422,7 @@ func (m *model) handleKeyPress(msg tea.KeyMsg, vpCmd, tiCmd, spinnerCmd tea.Cmd)
 			updated, cmd := m.overlay.overlay.Update(msg, m, m)
 			// If overlay returns nil, it wants to close
 			if updated == nil {
-				m.overlay.deactivate()
+				m.ClearOverlay()
 			} else {
 				// updated is already an Overlay interface, no need for type assertion
 				m.overlay.overlay = updated

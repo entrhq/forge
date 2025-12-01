@@ -248,10 +248,7 @@ func (s *SettingsOverlay) handleEscape(actions types.ActionHandler) (types.Overl
 		s.showUnsavedChangesDialog(actions)
 		return s, nil
 	}
-	if actions != nil {
-		actions.ClearOverlay()
-		return nil, nil
-	}
+	// Return nil to signal close - caller will handle ClearOverlay()
 	return nil, nil
 }
 
@@ -698,20 +695,15 @@ func (s *SettingsOverlay) showUnsavedChangesDialog(actions types.ActionHandler) 
 		title:   "Unsaved Changes",
 		message: "You have unsaved changes. Save before closing?",
 		onYes: func() {
-			// Ignore error from saveSettings - we're closing anyway
+			// Save settings and clear state - handleConfirmInput will close overlay
 			_ = s.saveSettings() //nolint:errcheck
 			s.hasChanges = false
 			s.confirmDialog = nil
-			if actions != nil {
-				actions.ClearOverlay()
-			}
 		},
 		onNo: func() {
+			// Discard changes and clear state - handleConfirmInput will close overlay
 			s.hasChanges = false
 			s.confirmDialog = nil
-			if actions != nil {
-				actions.ClearOverlay()
-			}
 		},
 	}
 }
@@ -924,23 +916,17 @@ func (s *SettingsOverlay) handleConfirmInput(msg tea.Msg) (types.Overlay, tea.Cm
 			if s.confirmDialog.onYes != nil {
 				s.confirmDialog.onYes()
 			}
-			// Check if we should close the overlay after saving
-			shouldClose := s.confirmDialog == nil && !s.hasChanges
-			if shouldClose {
-				return nil, nil
-			}
-			return s, nil
+			// After onYes callback, confirmDialog and hasChanges should both be cleared
+			// Return nil to close the overlay
+			return nil, nil
 
 		case "n", "N":
 			if s.confirmDialog.onNo != nil {
 				s.confirmDialog.onNo()
 			}
-			// Check if we should close the overlay after discarding
-			shouldClose := s.confirmDialog == nil && !s.hasChanges
-			if shouldClose {
-				return nil, nil
-			}
-			return s, nil
+			// After onNo callback, confirmDialog and hasChanges should both be cleared
+			// Return nil to close the overlay
+			return nil, nil
 
 		case keyEsc:
 			// Cancel - just close dialog and return to editing

@@ -183,12 +183,13 @@ func run(ctx context.Context, cliConfig *CLIConfig) error {
 	// Create notes manager for scratchpad
 	notesManager := notes.NewManager()
 
-	// Create agent with headless system prompt, disabled interactive tools, and context management
+	// Create agent with headless system prompt, disabled interactive tools, context management, and shared notes manager
 	ag := agent.NewDefaultAgent(
 		provider,
 		agent.WithCustomInstructions(systemPrompt),
 		agent.WithDisabledTools("ask_question", "converse"),
 		agent.WithContextManager(contextManager),
+		agent.WithNotesManager(notesManager),
 	)
 
 	// Register coding tools with workspace guard
