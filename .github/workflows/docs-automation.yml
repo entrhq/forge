@@ -100,24 +100,27 @@ jobs:
       - name: Extract PR Context
         id: pr_context
         run: |
-          # Get PR details - works for both issue_comment and pull_request events
-          PR_DATA='${{ steps.pr.outputs.result }}'
-          PR_TITLE=$(echo "$PR_DATA" | jq -r '.title')
-          PR_NUMBER=$(echo "$PR_DATA" | jq -r '.number')
+          # Extract PR details using jq from the GitHub Script output
+          PR_NUMBER=$(echo '${{ steps.pr.outputs.result }}' | jq -r '.number')
           
           # Get changed files
           CHANGED_FILES=$(gh pr view $PR_NUMBER --json files --jq '.files[].path' | tr '\n' ',')
           
-          # Get PR body and escape it properly for multiline
-          PR_BODY=$(echo "$PR_DATA" | jq -r '.body')
-          
-          # Export for next steps using multiline format
+          # Export simple values
           echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
-          echo "pr_title=$PR_TITLE" >> $GITHUB_OUTPUT
           echo "changed_files=$CHANGED_FILES" >> $GITHUB_OUTPUT
+          
+          # Export PR title using multiline format to handle special characters
+          {
+            echo "pr_title<<EOF"
+            echo '${{ steps.pr.outputs.result }}' | jq -r '.title'
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+          
+          # Export PR body using multiline format to handle special characters
           {
             echo "pr_body<<EOF"
-            echo "$PR_BODY"
+            echo '${{ steps.pr.outputs.result }}' | jq -r '.body // ""'
             echo "EOF"
           } >> $GITHUB_OUTPUT
         env:
@@ -126,34 +129,63 @@ jobs:
       - name: Generate Forge Configuration
         id: config
         run: |
-          # Build custom instructions using cat with heredoc to avoid shell interpretation
-          BASE_INSTRUCTIONS=$(cat <<'INSTRUCTIONS_EOF'
+          # Write PR context to temp files to avoid shell quoting issues
+          cat > /tmp/pr_title.txt <<'EOF'
+          ${{ steps.pr_context.outputs.pr_title }}
+          EOF
+                    
+                    cat > /tmp/pr_body.txt <<'EOF'
+          ${{ steps.pr_context.outputs.pr_body }}
+          EOF
+                    
+                    cat > /tmp/changed_files.txt <<'EOF'
+          ${{ steps.pr_context.outputs.changed_files }}
+          EOF
+          
+          # Build base instructions
+          cat > /tmp/base_instructions.txt <<'EOF'
           You are a documentation assistant. Analyze the following pull request and update relevant documentation files to reflect the changes.
+
+          PR Title: 
+          EOF
           
-          PR Title: ${{ steps.pr_context.outputs.pr_title }}
-          PR Description: ${{ steps.pr_context.outputs.pr_body }}
-          Changed Files: ${{ steps.pr_context.outputs.changed_files }}
+          # Append PR context
+          cat /tmp/pr_title.txt >> /tmp/base_instructions.txt
+          echo "" >> /tmp/base_instructions.txt
+          echo "" >> /tmp/base_instructions.txt
+          echo "PR Description:" >> /tmp/base_instructions.txt
+          cat /tmp/pr_body.txt >> /tmp/base_instructions.txt
+          echo "" >> /tmp/base_instructions.txt
+          echo "" >> /tmp/base_instructions.txt
+          echo "Changed Files: $(cat /tmp/changed_files.txt)" >> /tmp/base_instructions.txt
+          echo "" >> /tmp/base_instructions.txt
+          echo "" >> /tmp/base_instructions.txt
           
+          # Append focus areas
+          cat >> /tmp/base_instructions.txt <<'EOF'
           Focus on:
           1. Updating existing documentation that references changed functionality
           2. Adding new documentation for new features
           3. Updating examples if code interfaces changed
           4. Maintaining consistency with existing documentation style
           5. Only modifying markdown documentation files
-          INSTRUCTIONS_EOF
-          )
+          EOF
           
+          # Handle custom instructions
           if [ -n "${{ inputs.custom_instructions }}" ]; then
-            INSTRUCTIONS=$(cat <<CUSTOM_EOF
-          $BASE_INSTRUCTIONS
-          
-          Additional Instructions:
+            echo "" >> /tmp/base_instructions.txt
+            echo "" >> /tmp/base_instructions.txt
+            echo "Additional Instructions:" >> /tmp/base_instructions.txt
+            cat >> /tmp/base_instructions.txt <<'EOF'
           ${{ inputs.custom_instructions }}
-          CUSTOM_EOF
-          )
-          else
-            INSTRUCTIONS="$BASE_INSTRUCTIONS"
+          EOF
           fi
+          
+          # Read final instructions
+          INSTRUCTIONS=$(cat /tmp/base_instructions.txt)
+          
+          # Clean up temp files
+          rm -f /tmp/pr_title.txt /tmp/pr_body.txt /tmp/changed_files.txt /tmp/base_instructions.txt
 
           # Build file allow/deny lists
           IFS=',' read -ra ALLOW_PATTERNS <<< "${{ inputs.file_patterns }}"
@@ -162,74 +194,81 @@ jobs:
           ALLOW_JSON=$(printf '%s\n' "${ALLOW_PATTERNS[@]}" | jq -R . | jq -s .)
           DENY_JSON=$(printf '%s\n' "${DENY_PATTERNS[@]}" | jq -R . | jq -s .)
 
-          # Generate config based on mode
+          # Generate config using jq for proper JSON encoding
+          TASK_JSON=$(printf '%s' "$INSTRUCTIONS" | jq -R -s .)
+          
           if [ "${{ inputs.mode }}" = "open_pr" ]; then
-            CONFIG=$(cat <<EOF
-          {
-            "task": $(echo "$INSTRUCTIONS" | jq -R -s .),
-            "mode": "write",
-            "workspace_dir": ".",
-            "constraints": {
-              "max_files": 50,
-              "max_lines_changed": 2000,
-              "allowed_patterns": $ALLOW_JSON,
-              "denied_patterns": $DENY_JSON,
-              "max_tokens": 1000000,
-              "timeout": "10m"
-            },
-            "artifacts": {
-              "enabled": true,
-              "output_dir": ".forge/artifacts",
-              "json": true,
-              "markdown": true,
-              "metrics": true
-            },
-            "git": {
-              "auto_commit": true,
-              "create_pr": true,
-              "auto_push": true,
-              "branch": "${{ inputs.pr_branch_prefix }}-pr-${{ steps.pr_context.outputs.pr_number }}",
-              "commit_message": "docs: automated documentation update for PR #${{ steps.pr_context.outputs.pr_number }}",
-              "pr_title": "docs: Update documentation for PR #${{ steps.pr_context.outputs.pr_number }}",
-              "pr_body": "Automated documentation updates based on changes in #${{ steps.pr_context.outputs.pr_number }}",
-              "pr_draft": false
-            }
-          }
-          EOF
-          )
+            jq -n \
+              --argjson task "$TASK_JSON" \
+              --argjson allow "$ALLOW_JSON" \
+              --argjson deny "$DENY_JSON" \
+              --arg branch "${{ inputs.pr_branch_prefix }}-pr-${{ steps.pr_context.outputs.pr_number }}" \
+              --arg pr_num "${{ steps.pr_context.outputs.pr_number }}" \
+              '{
+                "task": $task,
+                "mode": "write",
+                "workspace_dir": ".",
+                "constraints": {
+                  "max_files": 50,
+                  "max_lines_changed": 2000,
+                  "allowed_patterns": $allow,
+                  "denied_patterns": $deny,
+                  "max_tokens": 1000000,
+                  "timeout": "10m"
+                },
+                "artifacts": {
+                  "enabled": true,
+                  "output_dir": ".forge/artifacts",
+                  "json": true,
+                  "markdown": true,
+                  "metrics": true
+                },
+                "git": {
+                  "auto_commit": true,
+                  "create_pr": true,
+                  "auto_push": true,
+                  "branch": $branch,
+                  "commit_message": ("docs: automated documentation update for PR #" + $pr_num),
+                  "pr_title": ("docs: Update documentation for PR #" + $pr_num),
+                  "pr_body": ("Automated documentation updates based on changes in #" + $pr_num),
+                  "pr_draft": false
+                }
+              }' > forge-config.json
           else
-            CONFIG=$(cat <<EOF
-          {
-            "task": $(echo "$INSTRUCTIONS" | jq -R -s .),
-            "mode": "write",
-            "workspace_dir": ".",
-            "constraints": {
-              "max_files": 50,
-              "max_lines_changed": 2000,
-              "allowed_patterns": $ALLOW_JSON,
-              "denied_patterns": $DENY_JSON,
-              "max_tokens": ${{ inputs.max_tokens }},
-              "timeout": "10m"
-            },
-            "artifacts": {
-              "enabled": true,
-              "output_dir": ".forge/artifacts",
-              "json": true,
-              "markdown": true,
-              "metrics": true
-            },
-            "git": {
-              "auto_commit": true,
-              "create_pr": false,
-              "auto_push": true,
-              "commit_message": "docs: automated documentation update for PR #${{ steps.pr_context.outputs.pr_number }}"
-            }
-          }
-          EOF
-          )
+            jq -n \
+              --argjson task "$TASK_JSON" \
+              --argjson allow "$ALLOW_JSON" \
+              --argjson deny "$DENY_JSON" \
+              --arg pr_num "${{ steps.pr_context.outputs.pr_number }}" \
+              --argjson max_tokens ${{ inputs.max_tokens }} \
+              '{
+                "task": $task,
+                "mode": "write",
+                "workspace_dir": ".",
+                "constraints": {
+                  "max_files": 50,
+                  "max_lines_changed": 2000,
+                  "allowed_patterns": $allow,
+                  "denied_patterns": $deny,
+                  "max_tokens": $max_tokens,
+                  "timeout": "10m"
+                },
+                "artifacts": {
+                  "enabled": true,
+                  "output_dir": ".forge/artifacts",
+                  "json": true,
+                  "markdown": true,
+                  "metrics": true
+                },
+                "git": {
+                  "auto_commit": true,
+                  "create_pr": false,
+                  "auto_push": true,
+                  "commit_message": ("docs: automated documentation update for PR #" + $pr_num)
+                }
+              }' > forge-config.json
           fi
-
-          echo "$CONFIG" > forge-config.json
+          
           echo "Generated configuration for mode: ${{ inputs.mode }}"
       
       - name: Configure Git
