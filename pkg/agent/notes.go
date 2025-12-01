@@ -13,7 +13,7 @@ func (a *DefaultAgent) handleNotesRequest(input *types.Input) {
 		// No params provided, use defaults
 		paramsInterface = types.NotesRequestParams{Limit: 10}
 	}
-	
+
 	params, ok := paramsInterface.(types.NotesRequestParams)
 	if !ok {
 		agentDebugLog.Printf("Invalid notes request params type")

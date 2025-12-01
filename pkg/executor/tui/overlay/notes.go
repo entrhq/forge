@@ -130,8 +130,6 @@ func NewNotesOverlay(notes []pkgtypes.NoteData, width, height int) *NotesOverlay
 	}
 }
 
-
-
 // Update handles messages for the notes overlay
 func (o *NotesOverlay) Update(msg tea.Msg, state types.StateProvider, actions types.ActionHandler) (types.Overlay, tea.Cmd) {
 	if !o.active {

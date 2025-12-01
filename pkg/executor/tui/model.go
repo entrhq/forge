@@ -93,11 +93,6 @@ type approvalRequestMsg struct {
 // slashCommandCompleteMsg signals that a slash command has completed
 type slashCommandCompleteMsg struct{}
 
-// notesDataMsg contains notes data received from the agent
-type notesDataMsg struct {
-	notes []types.NoteData
-}
-
 // operationStartMsg signals that a long-running operation has started
 type operationStartMsg struct {
 	message string // Loading message to display

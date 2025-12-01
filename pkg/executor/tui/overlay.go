@@ -63,12 +63,12 @@ func (o *overlayState) popOverlay() bool {
 		o.deactivate()
 		return false
 	}
-	
+
 	// Pop the last overlay from the stack
 	lastIdx := len(o.stack) - 1
 	prev := o.stack[lastIdx]
 	o.stack = o.stack[:lastIdx]
-	
+
 	// Restore it
 	o.mode = prev.mode
 	o.overlay = prev.overlay

@@ -17,7 +17,7 @@ func (m *model) SetOverlay(mode types.OverlayMode, overlay types.Overlay) {
 func (m *model) ClearOverlay() {
 	// Try to pop to previous overlay first
 	hadPrevious := m.overlay.popOverlay()
-	
+
 	// Only refocus textarea if we fully closed all overlays
 	if !hadPrevious {
 		m.textarea.Focus()

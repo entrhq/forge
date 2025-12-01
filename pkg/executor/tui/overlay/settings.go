@@ -208,14 +208,14 @@ func (s *SettingsOverlay) Update(msg tea.Msg, state types.StateProvider, actions
 		return s, nil
 	}
 
-	return s.handleKeyPress(keyMsg, actions)
+	return s.handleKeyPress(keyMsg)
 }
 
 // handleKeyPress processes keyboard input for the settings overlay
-func (s *SettingsOverlay) handleKeyPress(keyMsg tea.KeyMsg, actions types.ActionHandler) (types.Overlay, tea.Cmd) {
+func (s *SettingsOverlay) handleKeyPress(keyMsg tea.KeyMsg) (types.Overlay, tea.Cmd) {
 	switch keyMsg.String() {
 	case keyEsc, "q":
-		return s.handleEscape(actions)
+		return s.handleEscape()
 	case "ctrl+s":
 		return s.handleSave()
 	case "up", "k":
@@ -243,9 +243,9 @@ func (s *SettingsOverlay) handleKeyPress(keyMsg tea.KeyMsg, actions types.Action
 }
 
 // handleEscape handles the escape key press
-func (s *SettingsOverlay) handleEscape(actions types.ActionHandler) (types.Overlay, tea.Cmd) {
+func (s *SettingsOverlay) handleEscape() (types.Overlay, tea.Cmd) {
 	if s.hasChanges {
-		s.showUnsavedChangesDialog(actions)
+		s.showUnsavedChangesDialog()
 		return s, nil
 	}
 	// Return nil to signal close - caller will handle ClearOverlay()
@@ -690,7 +690,7 @@ func (s *SettingsOverlay) showDeleteConfirmation() {
 	}
 }
 
-func (s *SettingsOverlay) showUnsavedChangesDialog(actions types.ActionHandler) {
+func (s *SettingsOverlay) showUnsavedChangesDialog() {
 	s.confirmDialog = &confirmDialog{
 		title:   "Unsaved Changes",
 		message: "You have unsaved changes. Save before closing?",

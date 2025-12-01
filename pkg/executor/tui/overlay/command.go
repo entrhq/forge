@@ -74,7 +74,7 @@ func (c *CommandExecutionOverlay) Update(msg tea.Msg, state types.StateProvider,
 	// Handle command execution events first
 	if event, ok := msg.(*pkgtypes.AgentEvent); ok {
 		if event.IsCommandExecutionEvent() {
-			return c.handleCommandEvent(event, actions)
+			return c.handleCommandEvent(event)
 		}
 	}
 
@@ -107,7 +107,7 @@ func (c *CommandExecutionOverlay) Update(msg tea.Msg, state types.StateProvider,
 }
 
 // handleCommandEvent processes command execution events
-func (c *CommandExecutionOverlay) handleCommandEvent(event *pkgtypes.AgentEvent, actions types.ActionHandler) (types.Overlay, tea.Cmd) {
+func (c *CommandExecutionOverlay) handleCommandEvent(event *pkgtypes.AgentEvent) (types.Overlay, tea.Cmd) {
 	if event.CommandExecution == nil {
 		return c, nil
 	}
