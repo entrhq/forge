@@ -15,12 +15,14 @@ import (
 
 	"github.com/entrhq/forge/pkg/agent"
 	agentcontext "github.com/entrhq/forge/pkg/agent/context"
+	"github.com/entrhq/forge/pkg/agent/memory/notes"
 	"github.com/entrhq/forge/pkg/agent/tools"
 	appconfig "github.com/entrhq/forge/pkg/config"
 	"github.com/entrhq/forge/pkg/executor/headless"
 	"github.com/entrhq/forge/pkg/llm/openai"
 	"github.com/entrhq/forge/pkg/security/workspace"
 	"github.com/entrhq/forge/pkg/tools/coding"
+	"github.com/entrhq/forge/pkg/tools/scratchpad"
 	"gopkg.in/yaml.v3"
 )
 
@@ -178,6 +180,9 @@ func run(ctx context.Context, cliConfig *CLIConfig) error {
 	// Compose the headless system prompt with mode-specific guidance
 	systemPrompt := composeHeadlessSystemPrompt(execConfig.Mode)
 
+	// Create notes manager for scratchpad
+	notesManager := notes.NewManager()
+
 	// Create agent with headless system prompt, disabled interactive tools, and context management
 	ag := agent.NewDefaultAgent(
 		provider,
@@ -199,6 +204,22 @@ func run(ctx context.Context, cliConfig *CLIConfig) error {
 	for _, tool := range codingTools {
 		if regErr := ag.RegisterTool(tool); regErr != nil {
 			return fmt.Errorf("failed to register tool: %w", regErr)
+		}
+	}
+
+	// Register scratchpad tools
+	scratchpadTools := []tools.Tool{
+		scratchpad.NewAddNoteTool(notesManager),
+		scratchpad.NewListNotesTool(notesManager),
+		scratchpad.NewSearchNotesTool(notesManager),
+		scratchpad.NewListTagsTool(notesManager),
+		scratchpad.NewScratchNoteTool(notesManager),
+		scratchpad.NewUpdateNoteTool(notesManager),
+	}
+
+	for _, tool := range scratchpadTools {
+		if regErr := ag.RegisterTool(tool); regErr != nil {
+			return fmt.Errorf("failed to register scratchpad tool: %w", regErr)
 		}
 	}
 

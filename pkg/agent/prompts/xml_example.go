@@ -152,9 +152,23 @@ func generateArrayExample(name string, propSchema map[string]interface{}, indent
 		return builder.String()
 	}
 
-	// Simple array - show multiple elements
-	return fmt.Sprintf("%s<%s>item1</%s>\n%s<%s>item2</%s>\n",
-		indent, name, name, indent, name, name)
+	// Simple array of strings - show multiple elements with the same tag name
+	// This matches the XML unmarshaling pattern: Tags []string `xml:"tags>tag"`
+	// which expects: <tags><tag>value1</tag><tag>value2</tag></tags>
+	var builder strings.Builder
+	builder.WriteString(fmt.Sprintf("%s<%s>\n", indent, name))
+
+	// Generate 2 example items with singular form
+	singularName := name
+	if strings.HasSuffix(name, "s") {
+		singularName = name[:len(name)-1]
+	}
+
+	builder.WriteString(fmt.Sprintf("%s  <%s>item1</%s>\n", indent, singularName, singularName))
+	builder.WriteString(fmt.Sprintf("%s  <%s>item2</%s>\n", indent, singularName, singularName))
+	builder.WriteString(fmt.Sprintf("%s</%s>\n", indent, name))
+
+	return builder.String()
 }
 
 // generateObjectExample creates example for object properties

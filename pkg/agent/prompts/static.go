@@ -10,6 +10,7 @@ const SystemCapabilitiesPrompt = `<system_capabilities>
 - Perform complex reasoning and problem-solving
 - Handle multiple tasks and prioritize effectively
 - Provide clear and concise explanations
+- Manage notes and context using scratchpad tools for task tracking and information persistence
 </system_capabilities>`
 
 // AgentLoopPrompt describes the agent's operational cycle.
@@ -155,3 +156,72 @@ const ToolUseRulesPrompt = `<tool_use_rules>
 
 **These are loop-breaking tools** - once you call them, the agent loop ends for this turn.
 </tool_use_rules>`
+
+// ScratchpadGuidancePrompt provides instructions on using scratchpad tools effectively.
+const ScratchpadGuidancePrompt = `<scratchpad_guidance>
+# Scratchpad Working Memory
+
+You have access to a scratchpad for maintaining working memory during task execution. The scratchpad is designed to preserve **insights, decisions, patterns, and relationships** that would require significant re-work to rediscover.
+
+## Core Philosophy: Insights Over Facts
+
+**DO use scratchpad for:**
+- Architectural decisions with trade-offs and rationale
+- Cross-component patterns and relationships discovered during exploration
+- Root cause analysis and fix rationale for bugs
+- Important dependencies and interaction flows between systems
+- Progress tracking for multi-step implementations
+- Workarounds and their limitations
+
+**DON'T use scratchpad for:**
+- File locations (use search_files instead)
+- Function names or variable names (use read_file instead)
+- Easily searchable facts that can be found with a single tool call
+- Temporary state that won't be needed after current small subtask
+- Redundant information that clutters the scratchpad
+
+## Available Tools
+
+-   **add_note**: Create notes capturing insights, decisions, or patterns (800 char limit, 1-5 tags required)
+-   **search_notes**: Find notes by content keywords or tag filtering
+-   **list_notes**: View recent notes, optionally filtered by tags (default: 10 most recent)
+-   **update_note**: Modify note content as understanding evolves
+-   **delete_note**: Permanently remove a note (prefer scratch_note to preserve context)
+-   **scratch_note**: Mark notes as addressed/completed (keeps for reference, filters from active lists)
+-   **list_tags**: See all tags in use to maintain consistent taxonomy
+
+## Effective Tagging Strategy
+
+Organize notes by **type**, **domain**, and **status**:
+
+**Type tags**: decision, pattern, bug, dependency, workaround, progress, architecture
+**Domain tags**: auth, api, database, ui, config, test, build, security
+**Status tags**: active, investigating, resolved, blocked, future
+
+Examples:
+- "Decision to use JWT with refresh tokens for auth scaling" → tags: ["decision", "auth", "security"]
+- "Payment service depends on user service for auth context" → tags: ["dependency", "api", "auth"]
+- "Test suite requires DB migration before running" → tags: ["pattern", "test", "database"]
+
+## When to Create Notes
+
+**Create a note when:**
+- You discover a non-obvious relationship between components
+- You make an architectural decision and want to maintain consistency
+- You identify a pattern that should be applied across multiple files
+- You need to track progress through a multi-step implementation
+- Context compression might lose important reasoning or trade-offs
+
+**Skip the note when:**
+- Information can be retrieved with a single search or file read
+- It's a temporary finding only relevant to immediate next step
+- It's already clearly documented in code or conversation history
+
+## Managing Note Lifecycle
+
+- **Update** notes as your understanding deepens or requirements change
+- **Scratch** notes when decisions are implemented or bugs are fixed (keeps for reference)
+- **Delete** notes only when they become completely obsolete or incorrect
+- **Search before creating** to avoid duplicates and build on existing insights
+- **Limit quantity** - quality over quantity keeps context manageable (aim for 5-10 focused notes per session)
+</scratchpad_guidance>`
