@@ -70,6 +70,10 @@ func (pb *PromptBuilder) Build() string {
 
 	// Add tool use rules
 	builder.WriteString(ToolUseRulesPrompt)
+	builder.WriteString("\n\n")
+
+	// Add scratchpad guidance
+	builder.WriteString(ScratchpadGuidancePrompt)
 
 	return builder.String()
 }

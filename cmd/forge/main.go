@@ -15,12 +15,14 @@ import (
 
 	"github.com/entrhq/forge/pkg/agent"
 	agentcontext "github.com/entrhq/forge/pkg/agent/context"
+	"github.com/entrhq/forge/pkg/agent/memory/notes"
 	"github.com/entrhq/forge/pkg/agent/tools"
 	appconfig "github.com/entrhq/forge/pkg/config"
 	"github.com/entrhq/forge/pkg/executor/tui"
 	"github.com/entrhq/forge/pkg/llm/openai"
 	"github.com/entrhq/forge/pkg/security/workspace"
 	"github.com/entrhq/forge/pkg/tools/coding"
+	"github.com/entrhq/forge/pkg/tools/scratchpad"
 )
 
 const (
@@ -218,6 +220,9 @@ func runTUI(ctx context.Context, config *Config) error {
 		return fmt.Errorf("failed to create workspace guard: %w", err)
 	}
 
+	// Create notes manager for scratchpad
+	notesManager := notes.NewManager()
+
 	// Create agent with custom system prompt and context manager
 	ag := agent.NewDefaultAgent(
 		provider,
@@ -238,6 +243,22 @@ func runTUI(ctx context.Context, config *Config) error {
 	for _, tool := range codingTools {
 		if err := ag.RegisterTool(tool); err != nil {
 			return fmt.Errorf("failed to register tool: %w", err)
+		}
+	}
+
+	// Register scratchpad tools
+	scratchpadTools := []tools.Tool{
+		scratchpad.NewAddNoteTool(notesManager),
+		scratchpad.NewListNotesTool(notesManager),
+		scratchpad.NewSearchNotesTool(notesManager),
+		scratchpad.NewListTagsTool(notesManager),
+		scratchpad.NewScratchNoteTool(notesManager),
+		scratchpad.NewUpdateNoteTool(notesManager),
+	}
+
+	for _, tool := range scratchpadTools {
+		if err := ag.RegisterTool(tool); err != nil {
+			return fmt.Errorf("failed to register scratchpad tool: %w", err)
 		}
 	}
 
