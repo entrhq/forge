@@ -13,6 +13,14 @@ import (
 	"github.com/entrhq/forge/pkg/llm"
 )
 
+const (
+	// Section and field names
+	llmSection   = "llm"
+	modelField   = "model"
+	baseURLField = "base_url"
+	apiKeyField  = "api_key"
+)
+
 // SettingsOverlay provides a full interactive settings editor
 type SettingsOverlay struct {
 	width   int
@@ -142,6 +150,8 @@ func NewSettingsOverlayWithCallback(width, height int, onLLMSettingsChange func(
 }
 
 // loadSettings loads settings from config into editable sections
+//
+//nolint:gocyclo // UI settings loading has inherent complexity
 func (s *SettingsOverlay) loadSettings() {
 	if !config.IsInitialized() {
 		return
@@ -207,40 +217,40 @@ func (s *SettingsOverlay) loadSettings() {
 				}
 			}
 
-		case "llm":
+		case llmSection:
 			// Create text items for LLM configuration
 			// Order matters for a better UX
 			llmFields := []struct {
 				key         string
 				displayName string
 			}{
-				{"model", "Model"},
-				{"base_url", "Base URL"},
-				{"api_key", "API Key"},
+				{modelField, "Model"},
+				{baseURLField, "Base URL"},
+				{apiKeyField, "API Key"},
 			}
 
 			for _, field := range llmFields {
 				value := ""
-				
+
 				// Try to get value from runtime provider first (actual running config)
 				if s.provider != nil {
 					switch field.key {
-					case "model":
+					case modelField:
 						if model := s.provider.GetModel(); model != "" {
 							value = model
 						}
-					case "base_url":
+					case baseURLField:
 						if baseURL := s.provider.GetBaseURL(); baseURL != "" {
 							value = baseURL
 						}
-					case "api_key":
+					case apiKeyField:
 						if apiKey := s.provider.GetAPIKey(); apiKey != "" {
 							// Store actual API key - renderItem will handle masking for display
 							value = apiKey
 						}
 					}
 				}
-				
+
 				// Fall back to config file value if provider didn't have it
 				if value == "" {
 					if v, ok := data[field.key]; ok && v != nil {
@@ -490,6 +500,8 @@ func (s *SettingsOverlay) handleEnter() tea.Cmd {
 }
 
 // saveSettings saves changes back to config
+//
+//nolint:gocyclo // UI settings saving has inherent complexity
 func (s *SettingsOverlay) saveSettings() error {
 	if !config.IsInitialized() {
 		return fmt.Errorf("config not initialized")
@@ -522,7 +534,7 @@ func (s *SettingsOverlay) saveSettings() error {
 			}
 			data["patterns"] = patterns
 
-		case "llm":
+		case llmSection:
 			// Save text field values for LLM settings
 			for _, item := range section.items {
 				if item.itemType == itemTypeText {
@@ -628,7 +640,7 @@ func (s *SettingsOverlay) buildHelpText() string {
 		section := s.sections[s.selectedSection]
 		if s.selectedItem < len(section.items) {
 			item := section.items[s.selectedItem]
-			
+
 			switch item.itemType {
 			case itemTypeToggle:
 				shortcuts = append(shortcuts, "Space/Enter: Toggle")
@@ -737,8 +749,8 @@ func (s *SettingsOverlay) renderItem(item settingsItem, isFocused bool) string {
 			valueStyle = valueStyle.Foreground(types.BrightWhite)
 		}
 
-		out.WriteString(fmt.Sprintf("%s: %s", 
-			labelStyle.Render(item.displayName), 
+		out.WriteString(fmt.Sprintf("%s: %s",
+			labelStyle.Render(item.displayName),
 			valueStyle.Render(displayValue)))
 	}
 
@@ -903,22 +915,22 @@ func (s *SettingsOverlay) showTextFieldEditDialog() tea.Cmd {
 	}
 
 	item := &section.items[s.selectedItem]
-	
+
 	// Determine if this is an API key field for masking
 	isAPIKey := section.id == "llm" && item.key == "api_key"
-	
+
 	// Get current value as string
 	currentValue := ""
 	if str, ok := item.value.(string); ok {
 		currentValue = str
 	}
-	
+
 	// Determine field type based on whether it's an API key
 	fType := fieldTypeText
 	if isAPIKey {
 		fType = fieldTypePassword
 	}
-	
+
 	s.activeDialog = &inputDialog{
 		title: fmt.Sprintf("Edit %s", item.displayName),
 		fields: []inputField{
@@ -1215,6 +1227,8 @@ func (s *SettingsOverlay) renderWithConfirmation() string {
 }
 
 // renderInputDialog renders an input dialog
+//
+//nolint:gocyclo // UI dialog rendering has inherent complexity
 func (s *SettingsOverlay) renderInputDialog() string {
 	if s.activeDialog == nil {
 		return ""
@@ -1243,7 +1257,7 @@ func (s *SettingsOverlay) renderInputDialog() string {
 		case fieldTypeText, fieldTypePassword:
 			// Text input field - set a fixed width
 			const fieldWidth = 60
-			
+
 			fieldStyle := lipgloss.NewStyle().
 				Foreground(types.BrightWhite).
 				Background(types.DarkBg).

@@ -21,6 +21,8 @@ import (
 )
 
 // runHeadless executes the headless mode
+//
+//nolint:gocyclo
 func runHeadless(ctx context.Context, config *Config) error {
 	// Load and validate configuration
 	execConfig, err := loadAndValidateConfig(config)
