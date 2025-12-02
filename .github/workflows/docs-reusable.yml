@@ -90,6 +90,11 @@ jobs:
           pr_number: ${{ github.event.pull_request.number || github.event.issue.number }}
           github_token: ${{ steps.app_token.outputs.token }}
 
+      - name: Configure Git
+        run: |
+          git config --global user.name "forge[bot]"
+          git config --global user.email "forge@noreply.entrhq.com"
+
       - name: Generate Forge Configuration
         id: forge_config
         uses: ./.github/actions/forge-config
