@@ -18,7 +18,7 @@ inputs:
   model:
     description: LLM model to use (e.g., gpt-4, claude-3-5-sonnet-20241022, google/gemini-2.5-pro)
     required: false
-    default: 'claude-3-5-sonnet-20241022'
+    default: 'anthropic/claude-sonnet-4.5'
 outputs:
   exit_code:
     description: Exit code from Forge execution
