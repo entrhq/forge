@@ -64,10 +64,10 @@ runs:
         # Run Forge and capture exit code (without eval to prevent injection)
         set +e
         if [ -n "${{ inputs.model }}" ]; then
-          forge --config "${{ inputs.config_path }}" --model "${{ inputs.model }}"
+          forge --headless --headless-config "${{ inputs.config_path }}" --model "${{ inputs.model }}"
           EXIT_CODE=$?
         else
-          forge --config "${{ inputs.config_path }}"
+          forge --headless --headless-config "${{ inputs.config_path }}"
           EXIT_CODE=$?
         fi
         set -e
