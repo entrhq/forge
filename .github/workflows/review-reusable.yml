@@ -18,6 +18,16 @@ on:
         required: false
         type: string
         default: 'google/gemini-2.5-pro'
+      file_patterns:
+        description: 'Comma-separated file patterns to allow (e.g., "**/*.py,**/*.go")'
+        required: false
+        type: string
+        default: '**/*'
+      deny_patterns:
+        description: 'Comma-separated file patterns to deny (e.g., "vendor/**,node_modules/**")'
+        required: false
+        type: string
+        default: 'vendor/**,node_modules/**,.git/**,**/*.min.js,**/*.min.css'
     secrets:
       OPENAI_API_KEY:
         description: 'OpenAI API key (or compatible API key)'
@@ -113,6 +123,8 @@ jobs:
           pr_body: ${{ steps.pr_context.outputs.pr_body }}
           changed_files: ${{ steps.pr_context.outputs.changed_files }}
           custom_instructions: ${{ inputs.custom_instructions }}
+          file_patterns: ${{ inputs.file_patterns }}
+          deny_patterns: ${{ inputs.deny_patterns }}
           mode: 'read-only'
           pr_number: ${{ steps.pr_context.outputs.pr_number }}
           max_tokens: ${{ inputs.max_tokens }}
