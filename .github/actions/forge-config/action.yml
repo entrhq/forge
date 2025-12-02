@@ -141,9 +141,10 @@ runs:
         done
 
         if [ "$MODE_VALID" = false ]; then
-          echo "::warning::Invalid mode '$MODE' provided." \
-               "Valid modes: read-only, open_pr, direct." \
-               "Falling back to 'direct' mode."
+          MSG="Invalid mode '$MODE' provided. "
+          MSG+="Valid modes: read-only, open_pr, direct. "
+          MSG+="Falling back to 'direct' mode."
+          echo "::warning::$MSG"
           MODE="direct"
         fi
 
