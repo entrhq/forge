@@ -1,4 +1,4 @@
-name: Automated Documentation Updates
+name: Automated Test Creation
 
 on:
   workflow_call:
@@ -7,42 +7,42 @@ on:
         description: 'Execution mode: direct (commit to current branch) or pr (open pull request)'
         required: false
         type: string
-        default: 'direct'
+        default: 'pr'
       custom_instructions:
-        description: 'Custom instructions for the documentation agent'
+        description: 'Custom instructions for the test generation agent'
         required: false
         type: string
         default: ''
       file_patterns:
-        description: 'Comma-separated file patterns to allow (e.g., "**/*.md,docs/**")'
+        description: 'Comma-separated file patterns to allow for test files (e.g., "**/*_test.go,**/*_test.py")'
         required: false
         type: string
-        default: '**/*.md,docs/**,**/README'
+        default: '**/*_test.go,**/*_test.py,**/test_*.py,**/*.test.ts,**/*.test.js,**/*.spec.ts,**/*.spec.js'
       deny_patterns:
         description: 'Comma-separated file patterns to deny (e.g., "vendor/**,node_modules/**")'
         required: false
         type: string
-        default: 'vendor/**,node_modules/**,.git/**'
+        default: 'vendor/**,node_modules/**,.git/**,dist/**,build/**'
       pr_branch_prefix:
-        description: 'Prefix for documentation PR branches (only used in pr mode)'
+        description: 'Prefix for test PR branches (only used in pr mode)'
         required: false
         type: string
-        default: 'forge/docs'
+        default: 'forge/tests'
       max_tokens:
         description: 'Maximum token budget for the LLM execution'
         required: false
         type: number
-        default: 1000000
+        default: 2000000
       max_files:
-        description: 'Maximum number of files to modify'
+        description: 'Maximum number of test files to create/modify'
         required: false
         type: number
-        default: 50
+        default: 30
       max_lines_changed:
         description: 'Maximum total lines that can be changed'
         required: false
         type: number
-        default: 2000
+        default: 3000
       model:
         description: 'LLM model to use (e.g. google/gemini-2.5-pro)'
         required: false
@@ -63,7 +63,7 @@ on:
         required: true
 
 jobs:
-  update-docs:
+  create-tests:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -100,14 +100,23 @@ jobs:
         uses: ./.github/actions/forge-config
         with:
           task_description: |
-            You are a documentation assistant. Analyze the following pull request and update relevant documentation files to reflect the changes.
+            You are a test creation assistant. Analyze the following pull request and create comprehensive tests for the changes.
             
             Focus on:
-            1. Updating existing documentation that references changed functionality
-            2. Adding new documentation for new features
-            3. Updating examples if code interfaces changed
-            4. Maintaining consistency with existing documentation style
-            5. Only modifying markdown documentation files
+            1. Writing tests for new functionality introduced in the PR
+            2. Adding test cases for modified functions/methods
+            3. Ensuring edge cases and error conditions are covered
+            4. Following the project's existing test patterns and conventions
+            5. Writing clear, maintainable tests with good descriptions
+            6. Including both positive and negative test cases
+            7. Testing boundary conditions and error handling
+            
+            Guidelines:
+            - Match the testing framework used in the project (detect from existing tests)
+            - Use descriptive test names that explain what is being tested
+            - Keep tests focused and independent
+            - Add comments explaining complex test scenarios
+            - Ensure tests are deterministic and don't rely on external state
           pr_title: ${{ steps.pr_context.outputs.pr_title }}
           pr_body: ${{ steps.pr_context.outputs.pr_body }}
           changed_files: ${{ steps.pr_context.outputs.changed_files }}
@@ -120,9 +129,9 @@ jobs:
           max_lines_changed: "${{ inputs.max_lines_changed }}"
           git_mode: "${{ inputs.mode }}"
           git_branch: "${{ inputs.mode == 'pr' && format('{0}-pr-{1}', inputs.pr_branch_prefix, steps.pr_context.outputs.pr_number) || '' }}"
-          git_commit_message: "${{ format('docs: automated documentation update for PR #{0}', steps.pr_context.outputs.pr_number) }}"
-          git_pr_title: "${{ format('docs: Update documentation for PR #{0}', steps.pr_context.outputs.pr_number) }}"
-          git_pr_body: "${{ format('Automated documentation updates based on changes in #{0}', steps.pr_context.outputs.pr_number) }}"
+          git_commit_message: "${{ format('test: add tests for PR #{0}', steps.pr_context.outputs.pr_number) }}"
+          git_pr_title: "${{ format('test: Add tests for PR #{0}', steps.pr_context.outputs.pr_number) }}"
+          git_pr_body: "${{ format('Automated test creation based on changes in #{0}\n\nThis PR adds comprehensive test coverage for the changes introduced in the original PR.', steps.pr_context.outputs.pr_number) }}"
           git_pr_draft: "false"
 
       - name: Run Forge
@@ -144,22 +153,26 @@ jobs:
             const prNumber = '${{ steps.pr_context.outputs.pr_number }}';
             const mode = '${{ inputs.mode }}';
             
-            let comment = '## 🤖 Documentation Update Results\n\n';
+            let comment = '## 🧪 Test Creation Results\n\n';
             
             if (exitCode === '0') {
-              comment += '✅ Documentation updates completed successfully!\n\n';
+              comment += '✅ Test creation completed successfully!\n\n';
               
               if (mode === 'pr') {
-                comment += '📝 A pull request with documentation updates has been created.\n';
+                comment += '📝 A pull request with new tests has been created.\n';
+                comment += '\nPlease review the generated tests to ensure they:\n';
+                comment += '- Cover the key functionality from this PR\n';
+                comment += '- Follow project testing conventions\n';
+                comment += '- Are clear and maintainable\n';
               } else {
-                comment += '📝 Documentation has been updated directly in this PR.\n';
+                comment += '📝 Tests have been added directly to this PR.\n';
               }
               
               if ('${{ steps.forge.outputs.artifacts_path }}') {
                 comment += '\n📊 Execution artifacts are available in the workflow run.\n';
               }
             } else {
-              comment += '❌ Documentation update failed.\n\n';
+              comment += '❌ Test creation failed.\n\n';
               comment += 'Please check the workflow logs for details.\n';
             }
             

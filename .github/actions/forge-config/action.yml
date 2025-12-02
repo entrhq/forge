@@ -16,37 +16,94 @@ inputs:
   custom_instructions:
     description: Additional custom instructions to append
     required: false
+  
+  # Workspace settings
+  workspace_dir:
+    description: Workspace directory path
+    required: false
+    default: "."
+  mode:
+    description: Operation mode (read-only or write)
+    required: false
+    default: "write"
+  
+  # File constraints
   file_patterns:
     description: Comma-separated glob patterns for allowed files
     required: false
-    default: "**/*.md,**/README"
+    default: "**/*"
   deny_patterns:
     description: Comma-separated glob patterns for denied files
     required: false
     default: "node_modules/**,vendor/**,.git/**"
-  mode:
-    description: Operation mode (read-only, open_pr, or direct)
+  
+  # Tool constraints
+  allowed_tools:
+    description: Comma-separated list of allowed tools
     required: false
-    default: "direct"
-  pr_branch_prefix:
-    description: Prefix for PR branch names (when mode=open_pr)
-    required: false
-    default: "forge/docs"
-  pr_number:
-    description: PR number for branch naming and commit messages
-    required: false
+    default: "read_file,list_files,search_files,execute_command,write_file,apply_diff,add_note,list_notes,search_notes,list_tags,scratch_note,update_note"
+  
+  # Resource constraints
   max_tokens:
     description: Maximum tokens for the task
     required: false
     default: "1000000"
   max_files:
-    description: Maximum number of files to modify
+    description: Maximum number of files to modify (write mode only)
     required: false
     default: "50"
   max_lines_changed:
-    description: Maximum total lines that can be changed
+    description: Maximum total lines that can be changed (write mode only)
     required: false
     default: "2000"
+  timeout:
+    description: Task timeout duration
+    required: false
+    default: "10m"
+  
+  # Artifacts settings
+  artifacts_enabled:
+    description: Enable artifact generation
+    required: false
+    default: "true"
+  artifacts_output_dir:
+    description: Artifact output directory
+    required: false
+    default: ".forge/artifacts"
+  artifacts_json:
+    description: Generate JSON artifacts
+    required: false
+    default: "true"
+  artifacts_markdown:
+    description: Generate markdown artifacts
+    required: false
+    default: "true"
+  artifacts_metrics:
+    description: Generate metrics artifacts
+    required: false
+    default: "true"
+  
+  # Git settings
+  git_mode:
+    description: Git operation mode (pr, direct, or none)
+    required: false
+    default: "none"
+  git_branch:
+    description: Git branch name (for pr mode)
+    required: false
+  git_commit_message:
+    description: Git commit message
+    required: false
+  git_pr_title:
+    description: PR title (for pr mode)
+    required: false
+  git_pr_body:
+    description: PR body (for pr mode)
+    required: false
+  git_pr_draft:
+    description: Create PR as draft
+    required: false
+    default: "false"
 outputs:
   config_path:
     description: Path to the generated configuration file
@@ -122,138 +179,101 @@ runs:
         # Build file allow/deny lists
         IFS=',' read -ra ALLOW_PATTERNS <<< "${{ inputs.file_patterns }}"
         IFS=',' read -ra DENY_PATTERNS <<< "${{ inputs.deny_patterns }}"
+        IFS=',' read -ra ALLOWED_TOOLS <<< "${{ inputs.allowed_tools }}"
 
         ALLOW_JSON=$(printf '%s\n' "${ALLOW_PATTERNS[@]}" | jq -R . | jq -s .)
         DENY_JSON=$(printf '%s\n' "${DENY_PATTERNS[@]}" | jq -R . | jq -s .)
+        TOOLS_JSON=$(printf '%s\n' "${ALLOWED_TOOLS[@]}" | jq -R . | jq -s .)
 
         # Generate config using jq for proper JSON encoding
         TASK_JSON=$(printf '%s' "$INSTRUCTIONS" | jq -R -s .)
 
-        # Validate mode parameter
-        MODE="${{ inputs.mode }}"
-        case "$MODE" in
-          "read-only"|"open_pr"|"direct")
-            # Valid mode
+        # Build base config
+        jq -n \
+          --argjson task "$TASK_JSON" \
+          --arg mode "${{ inputs.mode }}" \
+          --arg workspace "${{ inputs.workspace_dir }}" \
+          --argjson allow "$ALLOW_JSON" \
+          --argjson deny "$DENY_JSON" \
+          --argjson tools "$TOOLS_JSON" \
+          --argjson max_tokens "${{ inputs.max_tokens }}" \
+          --argjson max_files "${{ inputs.max_files }}" \
+          --argjson max_lines "${{ inputs.max_lines_changed }}" \
+          --arg timeout "${{ inputs.timeout }}" \
+          --argjson artifacts_enabled "${{ inputs.artifacts_enabled }}" \
+          --arg artifacts_dir "${{ inputs.artifacts_output_dir }}" \
+          --argjson artifacts_json "${{ inputs.artifacts_json }}" \
+          --argjson artifacts_md "${{ inputs.artifacts_markdown }}" \
+          --argjson artifacts_metrics "${{ inputs.artifacts_metrics }}" \
+          '{
+          "task": $task,
+          "mode": $mode,
+          "workspace_dir": $workspace,
+          "constraints": {
+            "allowed_patterns": $allow,
+            "denied_patterns": $deny,
+            "allowed_tools": $tools,
+            "max_tokens": $max_tokens,
+            "timeout": $timeout
+          },
+          "artifacts": {
+            "enabled": $artifacts_enabled,
+            "output_dir": $artifacts_dir,
+            "json": $artifacts_json,
+            "markdown": $artifacts_md,
+            "metrics": $artifacts_metrics
+          }
+        }' > /tmp/base_config.json
+
+        # Add write mode constraints if mode is write
+        if [ "${{ inputs.mode }}" = "write" ]; then
+          jq --argjson max_files "${{ inputs.max_files }}" \
+             --argjson max_lines "${{ inputs.max_lines_changed }}" \
+             '.constraints.max_files = $max_files | .constraints.max_lines_changed = $max_lines' \
+             /tmp/base_config.json > /tmp/config_with_write.json
+          mv /tmp/config_with_write.json /tmp/base_config.json
+        fi
+
+        # Add git configuration based on git_mode
+        GIT_MODE="${{ inputs.git_mode }}"
+        case "$GIT_MODE" in
+          "pr")
+            jq --arg branch "${{ inputs.git_branch }}" \
+               --arg commit_msg "${{ inputs.git_commit_message }}" \
+               --arg pr_title "${{ inputs.git_pr_title }}" \
+               --arg pr_body "${{ inputs.git_pr_body }}" \
+               --argjson pr_draft "${{ inputs.git_pr_draft }}" \
+               '.git = {
+                 "auto_commit": true,
+                 "auto_push": true,
+                 "create_pr": true,
+                 "branch": $branch,
+                 "commit_message": $commit_msg,
+                 "pr_title": $pr_title,
+                 "pr_body": $pr_body,
+                 "pr_draft": $pr_draft
+               }' /tmp/base_config.json > forge-config.json
+            ;;
+          "direct")
+            jq --arg commit_msg "${{ inputs.git_commit_message }}" \
+               '.git = {
+                 "auto_commit": true,
+                 "auto_push": false,
+                 "create_pr": false,
+                 "commit_message": $commit_msg
+               }' /tmp/base_config.json > forge-config.json
+            ;;
+          "none")
+            cp /tmp/base_config.json forge-config.json
             ;;
           *)
-            echo "::warning::Invalid mode '$MODE'. Supported modes are: read-only, open_pr, direct. Falling back to 'direct'."
-            MODE="direct"
+            echo "::warning::Invalid git_mode '$GIT_MODE'. Supported modes are: pr, direct, none. Using 'none'."
+            cp /tmp/base_config.json forge-config.json
             ;;
         esac
 
-        if [ "$MODE" = "read-only" ]; then
-          jq -n \
-            --argjson task "$TASK_JSON" \
-            --argjson allow "$ALLOW_JSON" \
-            --argjson deny "$DENY_JSON" \
-            --argjson max_tokens ${{ inputs.max_tokens }} \
-            '{
-            "task": $task,
-            "mode": "read-only",
-            "workspace_dir": ".",
-            "constraints": {
-              "allowed_patterns": $allow,
-              "denied_patterns": $deny,
-              "allowed_tools": [
-                "read_file",
-                "list_files",
-                "search_files",
-                "execute_command",
-                "add_note",
-                "list_notes",
-                "search_notes",
-                "list_tags",
-                "scratch_note",
-                "update_note"
-              ],
-              "max_tokens": $max_tokens,
-              "timeout": "10m"
-            },
-            "artifacts": {
-              "enabled": true,
-              "output_dir": ".forge/artifacts",
-              "json": true,
-              "markdown": true,
-              "metrics": true
-            }
-          }' > forge-config.json
-        elif [ "$MODE" = "open_pr" ]; then
-          jq -n \
-            --argjson task "$TASK_JSON" \
-            --argjson allow "$ALLOW_JSON" \
-            --argjson deny "$DENY_JSON" \
-            --arg branch "${{ inputs.pr_branch_prefix }}-pr-${{ inputs.pr_number }}" \
-            --arg pr_num "${{ inputs.pr_number }}" \
-            --argjson max_tokens ${{ inputs.max_tokens }} \
-            --argjson max_files ${{ inputs.max_files }} \
-            --argjson max_lines ${{ inputs.max_lines_changed }} \
-            '{
-            "task": $task,
-            "mode": "write",
-            "workspace_dir": ".",
-            "constraints": {
-              "max_files": $max_files,
-              "max_lines_changed": $max_lines,
-              "allowed_patterns": $allow,
-              "denied_patterns": $deny,
-              "max_tokens": $max_tokens,
-              "timeout": "10m"
-            },
-            "artifacts": {
-              "enabled": true,
-              "output_dir": ".forge/artifacts",
-              "json": true,
-              "markdown": true,
-              "metrics": true
-            },
-            "git": {
-              "auto_commit": true,
-              "create_pr": true,
-              "auto_push": true,
-              "branch": $branch,
-              "commit_message": ("docs: automated documentation update for PR #" + $pr_num),
-              "pr_title": ("docs: Update documentation for PR #" + $pr_num),
-              "pr_body": ("Automated documentation updates based on changes in #" + $pr_num),
-              "pr_draft": false
-            }
-          }' > forge-config.json
-        else
-          jq -n \
-            --argjson task "$TASK_JSON" \
-            --argjson allow "$ALLOW_JSON" \
-            --argjson deny "$DENY_JSON" \
-            --argjson max_tokens ${{ inputs.max_tokens }} \
-            --argjson max_files ${{ inputs.max_files }} \
-            --argjson max_lines ${{ inputs.max_lines_changed }} \
-            '{
-            "task": $task,
-            "mode": "write",
-            "workspace_dir": ".",
-            "constraints": {
-              "max_files": $max_files,
-              "max_lines_changed": $max_lines,
-              "allowed_patterns": $allow,
-              "denied_patterns": $deny,
-              "max_tokens": $max_tokens,
-              "timeout": "10m"
-            },
-            "artifacts": {
-              "enabled": true,
-              "output_dir": ".forge/artifacts",
-              "json": true,
-              "markdown": true,
-              "metrics": true
-            },
-            "git": {
-              "auto_commit": true,
-              "auto_push": false,
-              "create_pr": false
-            }
-          }' > forge-config.json
-        fi
-
         # Clean up temp files
-        rm -f /tmp/task_desc.txt /tmp/pr_title.txt /tmp/pr_body.txt /tmp/changed_files.txt /tmp/instructions.txt
+        rm -f /tmp/task_desc.txt /tmp/pr_title.txt /tmp/pr_body.txt /tmp/changed_files.txt /tmp/instructions.txt /tmp/base_config.json
 
         # Output config path
         echo "config_path=forge-config.json" >> $GITHUB_OUTPUT

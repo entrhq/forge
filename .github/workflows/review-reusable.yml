@@ -180,9 +180,10 @@ jobs:
           custom_instructions: ${{ inputs.custom_instructions }}
           file_patterns: ${{ inputs.file_patterns }}
           deny_patterns: ${{ inputs.deny_patterns }}
-          mode: 'read-only'
-          pr_number: ${{ steps.pr_context.outputs.pr_number }}
-          max_tokens: ${{ inputs.max_tokens }}
+          mode: "read-only"
+          allowed_tools: "read_file,list_files,search_files,execute_command,add_note,list_notes,search_notes,list_tags,scratch_note,update_note"
+          max_tokens: "${{ inputs.max_tokens }}"
+          git_mode: "none"
 
       - name: Run Forge
         id: forge
