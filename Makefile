@@ -1,4 +1,4 @@
-.PHONY: test lint fmt clean examples run-example help install-tools tidy install uninstall build
+.PHONY: test lint fmt clean examples run-example help install-tools tidy install uninstall build validate-workflows
 
 # Go parameters
 GOCMD=go
@@ -32,6 +32,22 @@ lint: ## Run linters
 		golangci-lint run ./...; \
 	else \
 		echo "golangci-lint not installed. Run 'make install-tools' to install."; \
+		exit 1; \
+	fi
+
+validate-workflows: ## Validate GitHub Actions workflows
+	@echo "Validating GitHub Actions workflows..."
+	@if command -v actionlint > /dev/null; then \
+		actionlint .github/workflows/*.yml; \
+	elif command -v gh > /dev/null; then \
+		for workflow in .github/workflows/*.yml; do \
+			echo "Validating $${workflow}..."; \
+			gh workflow view "$$(basename "$${workflow}")" --yaml > /dev/null 2>&1 && echo "✓ $$(basename "$${workflow}")" || (echo "✗ $$(basename "$${workflow}")"; exit 1); \
+		done; \
+	else \
+		echo "Neither actionlint nor gh CLI found. Install one of:"; \
+		echo "  - actionlint: brew install actionlint"; \
+		echo "  - gh: brew install gh"; \
 		exit 1; \
 	fi
 
@@ -94,6 +110,6 @@ uninstall: ## Remove forge binary from GOPATH/bin
 
 dev: run-example ## Run in development mode (alias for run-example)
 
-all: tidy fmt lint test examples ## Run all checks and build examples
+all: tidy fmt lint validate-workflows test examples ## Run all checks and build examples
 
 .DEFAULT_GOAL := help

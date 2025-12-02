@@ -8,13 +8,8 @@ on:
         required: false
         type: string
         default: 'direct_commit'
-      model:
-        description: 'LLM model to use'
-        required: false
-        type: string
-        default: 'google/gemini-2.5-pro'
       custom_instructions:
-        description: 'Custom instructions for the agent'
+        description: 'Custom instructions for the documentation agent'
         required: false
         type: string
         default: ''
@@ -22,7 +17,7 @@ on:
         description: 'Comma-separated file patterns to allow (e.g., "**/*.md,docs/**")'
         required: false
         type: string
-        default: '**/*.md,docs/**'
+        default: '**/*.md,docs/**,**/README'
       deny_patterns:
         description: 'Comma-separated file patterns to deny (e.g., "vendor/**,node_modules/**")'
         required: false
@@ -32,24 +27,39 @@ on:
         description: 'Prefix for documentation PR branches (only used in open_pr mode)'
         required: false
         type: string
-        default: 'docs/automated-update'
+        default: 'forge/docs'
       max_tokens:
         description: 'Maximum token budget for the LLM execution'
         required: false
         type: number
         default: 1000000
+      max_files:
+        description: 'Maximum number of files to modify'
+        required: false
+        type: number
+        default: 50
+      max_lines_changed:
+        description: 'Maximum total lines that can be changed'
+        required: false
+        type: number
+        default: 2000
+      model:
+        description: 'LLM model to use (e.g. google/gemini-2.5-pro)'
+        required: false
+        type: string
+        default: 'google/gemini-2.5-pro'
     secrets:
       OPENAI_API_KEY:
-        description: 'OpenAI API key for LLM access'
+        description: 'OpenAI API key (or compatible API key)'
         required: true
       OPENAI_BASE_URL:
-        description: 'Base URL for OpenAI API (if using a custom endpoint)'
+        description: 'OpenAI API base URL (for compatible APIs)'
         required: false
       GH_APP_ID:
         description: 'GitHub App ID for generating tokens with PR permissions'
         required: true
       GH_APP_PRIVATE_KEY:
-        description: 'GitHub App private key for token generation'
+        description: 'GitHub App private key for authentication'
         required: true
 
 jobs:
@@ -61,311 +71,92 @@ jobs:
     
     steps:
       - name: Generate GitHub App Token
-        id: app-token
+        id: app_token
         uses: actions/create-github-app-token@v1
         with:
           app-id: ${{ secrets.GH_APP_ID }}
           private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
-      
-      - name: Get PR details
-        id: pr
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const prNumber = context.issue?.number || context.payload.pull_request?.number;
-            if (!prNumber) {
-              core.setFailed('Could not determine PR number');
-              return null;
-            }
-            const pr = await github.rest.pulls.get({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: prNumber
-            });
-            return pr.data;
-      
-      - name: Checkout code
+
+      - name: Checkout Repository
         uses: actions/checkout@v4
         with:
+          token: ${{ steps.app_token.outputs.token }}
           fetch-depth: 0
-          ref: ${{ fromJson(steps.pr.outputs.result).head.ref }}
-      
-      - name: Setup Go
-        uses: actions/setup-go@v5
-      
-      - name: Install Forge
-        run: |
-          go install github.com/entrhq/forge/cmd/forge@latest
-      
+
       - name: Extract PR Context
         id: pr_context
-        run: |
-          # Extract PR details using jq from the GitHub Script output
-          PR_NUMBER=$(echo '${{ steps.pr.outputs.result }}' | jq -r '.number')
-          
-          # Get changed files
-          CHANGED_FILES=$(gh pr view $PR_NUMBER --json files --jq '.files[].path' | tr '\n' ',')
-          
-          # Export simple values
-          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
-          echo "changed_files=$CHANGED_FILES" >> $GITHUB_OUTPUT
-          
-          # Export PR title using multiline format to handle special characters
-          {
-            echo "pr_title<<EOF"
-            echo '${{ steps.pr.outputs.result }}' | jq -r '.title'
-            echo "EOF"
-          } >> $GITHUB_OUTPUT
-          
-          # Export PR body using multiline format to handle special characters
-          {
-            echo "pr_body<<EOF"
-            echo '${{ steps.pr.outputs.result }}' | jq -r '.body // ""'
-            echo "EOF"
-          } >> $GITHUB_OUTPUT
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-      
+        uses: ./.github/actions/pr-context
+        with:
+          pr_number: ${{ github.event.pull_request.number || github.event.issue.number }}
+          github_token: ${{ steps.app_token.outputs.token }}
+
       - name: Generate Forge Configuration
-        id: config
-        run: |
-          # Write PR context to temp files to avoid shell quoting issues
-          cat > /tmp/pr_title.txt <<'EOF'
-          ${{ steps.pr_context.outputs.pr_title }}
-          EOF
-                    
-                    cat > /tmp/pr_body.txt <<'EOF'
-          ${{ steps.pr_context.outputs.pr_body }}
-          EOF
-                    
-                    cat > /tmp/changed_files.txt <<'EOF'
-          ${{ steps.pr_context.outputs.changed_files }}
-          EOF
-          
-          # Build base instructions
-          cat > /tmp/base_instructions.txt <<'EOF'
-          You are a documentation assistant. Analyze the following pull request and update relevant documentation files to reflect the changes.
+        id: forge_config
+        uses: ./.github/actions/forge-config
+        with:
+          task_description: |
+            You are a documentation assistant. Analyze the following pull request and update relevant documentation files to reflect the changes.
+            
+            Focus on:
+            1. Updating existing documentation that references changed functionality
+            2. Adding new documentation for new features
+            3. Updating examples if code interfaces changed
+            4. Maintaining consistency with existing documentation style
+            5. Only modifying markdown documentation files
+          pr_title: ${{ steps.pr_context.outputs.pr_title }}
+          pr_body: ${{ steps.pr_context.outputs.pr_body }}
+          changed_files: ${{ steps.pr_context.outputs.changed_files }}
+          custom_instructions: ${{ inputs.custom_instructions }}
+          file_patterns: ${{ inputs.file_patterns }}
+          deny_patterns: ${{ inputs.deny_patterns }}
+          mode: ${{ inputs.mode }}
+          pr_branch_prefix: ${{ inputs.pr_branch_prefix }}
+          pr_number: ${{ steps.pr_context.outputs.pr_number }}
+          max_tokens: ${{ inputs.max_tokens }}
+          max_files: ${{ inputs.max_files }}
+          max_lines_changed: ${{ inputs.max_lines_changed }}
 
-          PR Title: 
-          EOF
-          
-          # Append PR context
-          cat /tmp/pr_title.txt >> /tmp/base_instructions.txt
-          echo "" >> /tmp/base_instructions.txt
-          echo "" >> /tmp/base_instructions.txt
-          echo "PR Description:" >> /tmp/base_instructions.txt
-          cat /tmp/pr_body.txt >> /tmp/base_instructions.txt
-          echo "" >> /tmp/base_instructions.txt
-          echo "" >> /tmp/base_instructions.txt
-          echo "Changed Files: $(cat /tmp/changed_files.txt)" >> /tmp/base_instructions.txt
-          echo "" >> /tmp/base_instructions.txt
-          echo "" >> /tmp/base_instructions.txt
-          
-          # Append focus areas
-          cat >> /tmp/base_instructions.txt <<'EOF'
-          Focus on:
-          1. Updating existing documentation that references changed functionality
-          2. Adding new documentation for new features
-          3. Updating examples if code interfaces changed
-          4. Maintaining consistency with existing documentation style
-          5. Only modifying markdown documentation files
-          EOF
-          
-          # Handle custom instructions
-          if [ -n "${{ inputs.custom_instructions }}" ]; then
-            echo "" >> /tmp/base_instructions.txt
-            echo "" >> /tmp/base_instructions.txt
-            echo "Additional Instructions:" >> /tmp/base_instructions.txt
-            cat >> /tmp/base_instructions.txt <<'EOF'
-          ${{ inputs.custom_instructions }}
-          EOF
-          fi
-          
-          # Read final instructions
-          INSTRUCTIONS=$(cat /tmp/base_instructions.txt)
-          
-          # Clean up temp files
-          rm -f /tmp/pr_title.txt /tmp/pr_body.txt /tmp/changed_files.txt /tmp/base_instructions.txt
-
-          # Build file allow/deny lists
-          IFS=',' read -ra ALLOW_PATTERNS <<< "${{ inputs.file_patterns }}"
-          IFS=',' read -ra DENY_PATTERNS <<< "${{ inputs.deny_patterns }}"
-
-          ALLOW_JSON=$(printf '%s\n' "${ALLOW_PATTERNS[@]}" | jq -R . | jq -s .)
-          DENY_JSON=$(printf '%s\n' "${DENY_PATTERNS[@]}" | jq -R . | jq -s .)
-
-          # Generate config using jq for proper JSON encoding
-          TASK_JSON=$(printf '%s' "$INSTRUCTIONS" | jq -R -s .)
-          
-          if [ "${{ inputs.mode }}" = "open_pr" ]; then
-            jq -n \
-              --argjson task "$TASK_JSON" \
-              --argjson allow "$ALLOW_JSON" \
-              --argjson deny "$DENY_JSON" \
-              --arg branch "${{ inputs.pr_branch_prefix }}-pr-${{ steps.pr_context.outputs.pr_number }}" \
-              --arg pr_num "${{ steps.pr_context.outputs.pr_number }}" \
-              '{
-                "task": $task,
-                "mode": "write",
-                "workspace_dir": ".",
-                "constraints": {
-                  "max_files": 50,
-                  "max_lines_changed": 2000,
-                  "allowed_patterns": $allow,
-                  "denied_patterns": $deny,
-                  "max_tokens": 1000000,
-                  "timeout": "10m"
-                },
-                "artifacts": {
-                  "enabled": true,
-                  "output_dir": ".forge/artifacts",
-                  "json": true,
-                  "markdown": true,
-                  "metrics": true
-                },
-                "git": {
-                  "auto_commit": true,
-                  "create_pr": true,
-                  "auto_push": true,
-                  "branch": $branch,
-                  "commit_message": ("docs: automated documentation update for PR #" + $pr_num),
-                  "pr_title": ("docs: Update documentation for PR #" + $pr_num),
-                  "pr_body": ("Automated documentation updates based on changes in #" + $pr_num),
-                  "pr_draft": false
-                }
-              }' > forge-config.json
-          else
-            jq -n \
-              --argjson task "$TASK_JSON" \
-              --argjson allow "$ALLOW_JSON" \
-              --argjson deny "$DENY_JSON" \
-              --arg pr_num "${{ steps.pr_context.outputs.pr_number }}" \
-              --argjson max_tokens ${{ inputs.max_tokens }} \
-              '{
-                "task": $task,
-                "mode": "write",
-                "workspace_dir": ".",
-                "constraints": {
-                  "max_files": 50,
-                  "max_lines_changed": 2000,
-                  "allowed_patterns": $allow,
-                  "denied_patterns": $deny,
-                  "max_tokens": $max_tokens,
-                  "timeout": "10m"
-                },
-                "artifacts": {
-                  "enabled": true,
-                  "output_dir": ".forge/artifacts",
-                  "json": true,
-                  "markdown": true,
-                  "metrics": true
-                },
-                "git": {
-                  "auto_commit": true,
-                  "create_pr": false,
-                  "auto_push": true,
-                  "commit_message": ("docs: automated documentation update for PR #" + $pr_num)
-                }
-              }' > forge-config.json
-          fi
-          
-          echo "Generated configuration for mode: ${{ inputs.mode }}"
-      
-      - name: Configure Git
-        run: |
-          git config --global user.name "anvxl"
-          git config --global user.email "anvxl@entr.net.au"
-      
       - name: Run Forge
         id: forge
-        run: |
-          forge --headless --headless-config forge-config.json --model "${{ inputs.model }}" 2>&1 | tee forge-output.log
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
-      
-      - name: Upload Forge Artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
+        uses: ./.github/actions/forge-runner
         with:
-          name: forge-artifacts-pr-${{ steps.pr_context.outputs.pr_number }}
-          path: .forge/artifacts/
-          retention-days: 30
-          if-no-files-found: warn
-      
-      - name: Post Summary Comment
+          config_path: ${{ steps.forge_config.outputs.config_path }}
+          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+          openai_base_url: ${{ secrets.OPENAI_BASE_URL }}
+          model: ${{ inputs.model }}
+
+      - name: Comment on PR
         if: always()
         uses: actions/github-script@v7
         with:
-          github-token: ${{ steps.app-token.outputs.token }}
+          github-token: ${{ steps.app_token.outputs.token }}
           script: |
-            const fs = require('fs');
-            
-            // Read structured data from JSON files
-            let metrics = {};
-            let execution = {};
-            
-            try {
-              const metricsData = fs.readFileSync('.forge/artifacts/metrics.json', 'utf8');
-              metrics = JSON.parse(metricsData);
-            } catch (err) {
-              console.log('Could not read metrics.json:', err.message);
-            }
-            
-            try {
-              const execData = fs.readFileSync('.forge/artifacts/execution.json', 'utf8');
-              execution = JSON.parse(execData);
-            } catch (err) {
-              console.log('Could not read execution.json:', err.message);
-            }
-            
+            const exitCode = '${{ steps.forge.outputs.exit_code }}';
+            const prNumber = '${{ steps.pr_context.outputs.pr_number }}';
             const mode = '${{ inputs.mode }}';
-            const success = '${{ steps.forge.outcome }}' === 'success';
-            const prNumber = context.issue.number || context.payload.pull_request.number;
             
-            // Build comment body with structured data
-            let body = `## 🤖 Automated Documentation Update\n\n`;
-            body += `**Mode:** ${mode}\n`;
-            body += `**Status:** ${success ? '✅ Success' : '❌ Failed'}\n`;
-            body += `**Triggered by:** @${context.payload.comment?.user?.login || context.actor}\n\n`;
+            let comment = '## 🤖 Documentation Update Results\n\n';
             
-            // Add metrics if available
-            if (metrics.files_modified || metrics.total_tokens) {
-              body += `### 📊 Metrics\n\n`;
-              if (metrics.files_modified) body += `- Files Modified: **${metrics.files_modified}**\n`;
-              if (metrics.total_tokens) body += `- Total Tokens: **${metrics.total_tokens.toLocaleString()}**\n`;
-              if (metrics.execution_time) body += `- Execution Time: **${metrics.execution_time}**\n`;
-              body += `\n`;
-            }
-            
-            if (mode === 'direct_commit') {
-              body += `### Changes Committed\n\n`;
-              body += `Documentation updates have been committed directly to this PR branch.\n\n`;
-            } else {
-              body += `### Documentation PR Created\n\n`;
-              body += `A separate pull request has been created with documentation updates.\n`;
-              body += `Please review and merge it after this PR is merged.\n\n`;
-            }
-            
-            // Add quality gates if available
-            if (execution.quality_gates && Object.keys(execution.quality_gates).length > 0) {
-              body += `<details>\n<summary>Quality Gates</summary>\n\n`;
-              for (const [gate, result] of Object.entries(execution.quality_gates)) {
-                const status = result.passed ? '✅' : '❌';
-                body += `- ${status} **${gate}**: ${result.message || 'OK'}\n`;
+            if (exitCode === '0') {
+              comment += '✅ Documentation updates completed successfully!\n\n';
+              
+              if (mode === 'open_pr') {
+                comment += '📝 A pull request with documentation updates has been created.\n';
+              } else {
+                comment += '📝 Documentation has been updated directly in this PR.\n';
               }
-              body += `\n</details>\n\n`;
+              
+              if ('${{ steps.forge.outputs.artifacts_path }}') {
+                comment += '\n📊 Execution artifacts are available in the workflow run.\n';
+              }
+            } else {
+              comment += '❌ Documentation update failed.\n\n';
+              comment += 'Please check the workflow logs for details.\n';
             }
-            
-            body += `<details>\n<summary>📦 Artifacts</summary>\n\n`;
-            body += `Execution details have been uploaded as workflow artifacts:\n`;
-            body += `- [View Artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})\n`;
-            body += `</details>`;
             
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: prNumber,
-              body: body
+              body: comment
             });

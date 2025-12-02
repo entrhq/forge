@@ -1,0 +1,78 @@
+name: Extract PR Context
+description: Safely extract PR details including title, body, changed files, and author information
+inputs:
+  pr_number:
+    description: Pull request number to extract context from
+    required: true
+  github_token:
+    description: GitHub token for API access
+    required: true
+outputs:
+  pr_number:
+    description: The PR number
+    value: ${{ steps.extract.outputs.pr_number }}
+  pr_title:
+    description: The PR title
+    value: ${{ steps.extract.outputs.pr_title }}
+  pr_body:
+    description: The PR body/description
+    value: ${{ steps.extract.outputs.pr_body }}
+  pr_author:
+    description: The PR author username
+    value: ${{ steps.extract.outputs.pr_author }}
+  changed_files:
+    description: Comma-separated list of changed file paths
+    value: ${{ steps.extract.outputs.changed_files }}
+
+runs:
+  using: composite
+  steps:
+    - name: Get PR Details
+      id: pr_data
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ inputs.github_token }}
+        script: |
+          const pr = await github.rest.pulls.get({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            pull_number: ${{ inputs.pr_number }}
+          });
+          return pr.data;
+
+    - name: Extract PR Context
+      id: extract
+      shell: bash
+      run: |
+        # Extract PR details using jq from the GitHub Script output
+        PR_NUMBER=$(echo '${{ steps.pr_data.outputs.result }}' | jq -r '.number')
+        
+        # Get changed files
+        CHANGED_FILES=$(gh pr view $PR_NUMBER --json files --jq '.files[].path' | tr '\n' ',')
+        
+        # Export simple values
+        echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+        echo "changed_files=$CHANGED_FILES" >> $GITHUB_OUTPUT
+        
+        # Export PR title using multiline format to handle special characters
+        {
+          echo "pr_title<<EOF"
+          echo '${{ steps.pr_data.outputs.result }}' | jq -r '.title'
+          echo "EOF"
+        } >> $GITHUB_OUTPUT
+        
+        # Export PR body using multiline format to handle special characters
+        {
+          echo "pr_body<<EOF"
+          echo '${{ steps.pr_data.outputs.result }}' | jq -r '.body // ""'
+          echo "EOF"
+        } >> $GITHUB_OUTPUT
+        
+        # Export PR author
+        {
+          echo "pr_author<<EOF"
+          echo '${{ steps.pr_data.outputs.result }}' | jq -r '.user.login'
+          echo "EOF"
+        } >> $GITHUB_OUTPUT
+      env:
+        GH_TOKEN: ${{ inputs.github_token }}

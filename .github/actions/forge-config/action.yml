@@ -1,0 +1,210 @@
+name: Generate Forge Configuration
+description: Generate a Forge configuration file for documentation or code tasks
+inputs:
+  task_description:
+    description: The main task description for Forge
+    required: true
+  pr_title:
+    description: Pull request title
+    required: false
+  pr_body:
+    description: Pull request body/description
+    required: false
+  changed_files:
+    description: Comma-separated list of changed files
+    required: false
+  custom_instructions:
+    description: Additional custom instructions to append
+    required: false
+  file_patterns:
+    description: Comma-separated glob patterns for allowed files
+    required: false
+    default: "**/*.md,**/README"
+  deny_patterns:
+    description: Comma-separated glob patterns for denied files
+    required: false
+    default: "node_modules/**,vendor/**,.git/**"
+  mode:
+    description: Operation mode (open_pr or direct)
+    required: false
+    default: "direct"
+  pr_branch_prefix:
+    description: Prefix for PR branch names (when mode=open_pr)
+    required: false
+    default: "forge/docs"
+  pr_number:
+    description: PR number for branch naming and commit messages
+    required: false
+  max_tokens:
+    description: Maximum tokens for the task
+    required: false
+    default: "1000000"
+  max_files:
+    description: Maximum number of files to modify
+    required: false
+    default: "50"
+  max_lines_changed:
+    description: Maximum total lines that can be changed
+    required: false
+    default: "2000"
+outputs:
+  config_path:
+    description: Path to the generated configuration file
+    value: ${{ steps.generate.outputs.config_path }}
+
+runs:
+  using: composite
+  steps:
+    - name: Generate Configuration
+      id: generate
+      shell: bash
+      run: |
+        # Write inputs to temp files to avoid shell quoting issues
+        cat > /tmp/task_desc.txt <<'EOF'
+        ${{ inputs.task_description }}
+        EOF
+
+        if [ -n "${{ inputs.pr_title }}" ]; then
+          cat > /tmp/pr_title.txt <<'EOF'
+        ${{ inputs.pr_title }}
+        EOF
+        fi
+
+        if [ -n "${{ inputs.pr_body }}" ]; then
+          cat > /tmp/pr_body.txt <<'EOF'
+        ${{ inputs.pr_body }}
+        EOF
+        fi
+
+        if [ -n "${{ inputs.changed_files }}" ]; then
+          cat > /tmp/changed_files.txt <<'EOF'
+        ${{ inputs.changed_files }}
+        EOF
+        fi
+
+        # Build task instructions
+        cat /tmp/task_desc.txt > /tmp/instructions.txt
+
+        # Add PR context if provided
+        if [ -f /tmp/pr_title.txt ]; then
+          echo "" >> /tmp/instructions.txt
+          echo "" >> /tmp/instructions.txt
+          echo "PR Title: " >> /tmp/instructions.txt
+          cat /tmp/pr_title.txt >> /tmp/instructions.txt
+        fi
+
+        if [ -f /tmp/pr_body.txt ]; then
+          echo "" >> /tmp/instructions.txt
+          echo "" >> /tmp/instructions.txt
+          echo "PR Description:" >> /tmp/instructions.txt
+          cat /tmp/pr_body.txt >> /tmp/instructions.txt
+        fi
+
+        if [ -f /tmp/changed_files.txt ]; then
+          echo "" >> /tmp/instructions.txt
+          echo "" >> /tmp/instructions.txt
+          echo "Changed Files: $(cat /tmp/changed_files.txt)" >> /tmp/instructions.txt
+        fi
+
+        # Add custom instructions if provided
+        if [ -n "${{ inputs.custom_instructions }}" ]; then
+          echo "" >> /tmp/instructions.txt
+          echo "" >> /tmp/instructions.txt
+          echo "Additional Instructions:" >> /tmp/instructions.txt
+          cat >> /tmp/instructions.txt <<'EOF'
+        ${{ inputs.custom_instructions }}
+        EOF
+        fi
+
+        # Read final instructions
+        INSTRUCTIONS=$(cat /tmp/instructions.txt)
+
+        # Build file allow/deny lists
+        IFS=',' read -ra ALLOW_PATTERNS <<< "${{ inputs.file_patterns }}"
+        IFS=',' read -ra DENY_PATTERNS <<< "${{ inputs.deny_patterns }}"
+
+        ALLOW_JSON=$(printf '%s\n' "${ALLOW_PATTERNS[@]}" | jq -R . | jq -s .)
+        DENY_JSON=$(printf '%s\n' "${DENY_PATTERNS[@]}" | jq -R . | jq -s .)
+
+        # Generate config using jq for proper JSON encoding
+        TASK_JSON=$(printf '%s' "$INSTRUCTIONS" | jq -R -s .)
+
+        if [ "${{ inputs.mode }}" = "open_pr" ]; then
+          jq -n \
+            --argjson task "$TASK_JSON" \
+            --argjson allow "$ALLOW_JSON" \
+            --argjson deny "$DENY_JSON" \
+            --arg branch "${{ inputs.pr_branch_prefix }}-pr-${{ inputs.pr_number }}" \
+            --arg pr_num "${{ inputs.pr_number }}" \
+            --argjson max_files ${{ inputs.max_files }} \
+            --argjson max_lines ${{ inputs.max_lines_changed }} \
+            '{
+            "task": $task,
+            "mode": "write",
+            "workspace_dir": ".",
+            "constraints": {
+              "max_files": $max_files,
+              "max_lines_changed": $max_lines,
+              "allowed_patterns": $allow,
+              "denied_patterns": $deny,
+              "max_tokens": 1000000,
+              "timeout": "10m"
+            },
+            "artifacts": {
+              "enabled": true,
+              "output_dir": ".forge/artifacts",
+              "json": true,
+              "markdown": true,
+              "metrics": true
+            },
+            "git": {
+              "auto_commit": true,
+              "create_pr": true,
+              "auto_push": true,
+              "branch": $branch,
+              "commit_message": ("docs: automated documentation update for PR #" + $pr_num),
+              "pr_title": ("docs: Update documentation for PR #" + $pr_num),
+              "pr_body": ("Automated documentation updates based on changes in #" + $pr_num),
+              "pr_draft": false
+            }
+          }' > forge-config.json
+        else
+          jq -n \
+            --argjson task "$TASK_JSON" \
+            --argjson allow "$ALLOW_JSON" \
+            --argjson deny "$DENY_JSON" \
+            --argjson max_tokens ${{ inputs.max_tokens }} \
+            --argjson max_files ${{ inputs.max_files }} \
+            --argjson max_lines ${{ inputs.max_lines_changed }} \
+            '{
+            "task": $task,
+            "mode": "write",
+            "workspace_dir": ".",
+            "constraints": {
+              "max_files": $max_files,
+              "max_lines_changed": $max_lines,
+              "allowed_patterns": $allow,
+              "denied_patterns": $deny,
+              "max_tokens": $max_tokens,
+              "timeout": "10m"
+            },
+            "artifacts": {
+              "enabled": true,
+              "output_dir": ".forge/artifacts",
+              "json": true,
+              "markdown": true,
+              "metrics": true
+            },
+            "git": {
+              "auto_commit": true,
+              "auto_push": false,
+              "create_pr": false
+            }
+          }' > forge-config.json
+        fi
+
+        # Clean up temp files
+        rm -f /tmp/task_desc.txt /tmp/pr_title.txt /tmp/pr_body.txt /tmp/changed_files.txt /tmp/instructions.txt
+
+        # Output config path
+        echo "config_path=forge-config.json" >> $GITHUB_OUTPUT
