@@ -113,7 +113,7 @@ jobs:
           pr_body: ${{ steps.pr_context.outputs.pr_body }}
           changed_files: ${{ steps.pr_context.outputs.changed_files }}
           custom_instructions: ${{ inputs.custom_instructions }}
-          mode: 'autonomous'
+          mode: 'read-only'
           pr_number: ${{ steps.pr_context.outputs.pr_number }}
           max_tokens: ${{ inputs.max_tokens }}
 
