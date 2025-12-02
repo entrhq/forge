@@ -92,11 +92,10 @@ jobs:
             2. **How to Post Inline Comments (USE execute_command):**
                After reviewing each file, if you found issues, POST THEM IMMEDIATELY:
                
-               Example for posting comments on a single file:
+               Example for posting inline comments on a single file:
                ```bash
                execute_command with:
                echo '{
-                 "body": "Reviewing pkg/config/llm.go",
                  "event": "COMMENT",
                  "comments": [
                    {
@@ -112,6 +111,8 @@ jobs:
                  ]
                }' | gh api repos/{owner}/{repo}/pulls/${{ steps.pr_context.outputs.pr_number }}/reviews --input -
                ```
+               
+               **CRITICAL:** Do NOT include a "body" field when posting inline comments - only provide the "comments" array. The "body" field creates announcement comments that clutter the PR.
                
                **Key Review Focus Areas:**
                - Code quality, readability, and maintainability
@@ -191,6 +192,7 @@ jobs:
           openai_api_key: ${{ secrets.OPENAI_API_KEY }}
           openai_base_url: ${{ secrets.OPENAI_BASE_URL }}
           model: ${{ inputs.model }}
+          github_token: ${{ steps.app_token.outputs.token }}
 
       - name: Check Review Status
         if: always()
