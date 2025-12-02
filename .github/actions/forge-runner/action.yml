@@ -84,6 +84,7 @@ runs:
       env:
         OPENAI_API_KEY: ${{ inputs.openai_api_key }}
         OPENAI_BASE_URL: ${{ inputs.openai_base_url }}
+        GH_TOKEN: ${{ github.token }}
 
     - name: Upload Artifacts
       if: always() && steps.run.outputs.artifacts_path
