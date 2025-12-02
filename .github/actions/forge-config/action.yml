@@ -156,6 +156,7 @@ runs:
             --argjson deny "$DENY_JSON" \
             --arg branch "${{ inputs.pr_branch_prefix }}-pr-${{ inputs.pr_number }}" \
             --arg pr_num "${{ inputs.pr_number }}" \
+            --argjson max_tokens ${{ inputs.max_tokens }} \
             --argjson max_files ${{ inputs.max_files }} \
             --argjson max_lines ${{ inputs.max_lines_changed }} \
             '{
@@ -167,7 +168,7 @@ runs:
               "max_lines_changed": $max_lines,
               "allowed_patterns": $allow,
               "denied_patterns": $deny,
-              "max_tokens": 1000000,
+              "max_tokens": $max_tokens,
               "timeout": "10m"
             },
             "artifacts": {
