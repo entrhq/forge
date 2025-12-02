@@ -54,6 +54,33 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var spinnerCmd tea.Cmd
 	m.spinner, spinnerCmd = m.spinner.Update(msg)
 
+	// Forward ALL messages to active overlay first (including custom messages like cursorBlinkMsg)
+	// This ensures overlays can handle their own custom message types
+	if m.overlay.isActive() && m.overlay.overlay != nil {
+		updatedOverlay, overlayCmd := m.overlay.overlay.Update(msg, m, m)
+		
+		// If overlay returns nil, it wants to close
+		if updatedOverlay == nil {
+			m.ClearOverlay()
+			// Continue processing the message in the main model
+		} else {
+			m.overlay.overlay = updatedOverlay
+			
+			// For KeyMsg and MouseMsg, we still need to handle them in the main model too
+			// For other message types, the overlay handling is sufficient
+			if _, isKeyMsg := msg.(tea.KeyMsg); !isKeyMsg {
+				if _, isMouseMsg := msg.(tea.MouseMsg); !isMouseMsg {
+					// Not a key or mouse message, overlay has fully handled it
+					return m, tea.Batch(overlayCmd, spinnerCmd)
+				}
+			}
+			
+			// Key/Mouse messages continue to be processed by main model
+			// This allows textarea updates and other keyboard handling
+			spinnerCmd = tea.Batch(overlayCmd, spinnerCmd)
+		}
+	}
+
 	// Handle command palette keyboard input BEFORE updating textarea
 	// This prevents Enter from being processed by textarea when palette is active
 	if keyMsg, ok := msg.(tea.KeyMsg); ok && m.commandPalette.IsActive() {
@@ -198,15 +225,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case *types.AgentEvent:
 		debugLog.Printf("Received *types.AgentEvent: %s", msg.Type)
 
-		// If overlay is active and it's a command execution event, forward to overlay
-		if m.overlay.isActive() && msg.IsCommandExecutionEvent() {
-			var overlayCmd tea.Cmd
-			m.overlay.overlay, overlayCmd = m.overlay.overlay.Update(msg, m, m)
-			// Still handle the event in the main model too
-			m.handleAgentEvent(msg)
-			return m, tea.Batch(tiCmd, vpCmd, overlayCmd, spinnerCmd)
-		}
-
+		// Note: AgentEvent forwarding to overlay is now handled in the early message forwarding section
 		// Update viewport BEFORE handling event (important for streaming)
 		m.viewport, vpCmd = m.viewport.Update(msg)
 		m.handleAgentEvent(msg)
@@ -214,26 +233,11 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.MouseMsg:
 		debugLog.Printf("Received tea.MouseMsg")
-		// Handle mouse events (especially scroll wheel) for viewport
-		// If overlay is active, forward mouse events to it
-		if m.overlay.isActive() {
-			var overlayCmd tea.Cmd
-			updatedOverlay, overlayCmd := m.overlay.overlay.Update(msg, m, m)
-
-			// Check if overlay returned nil (signals to close)
-			if updatedOverlay == nil {
-				m.overlay.deactivate()
-				m.viewport.SetContent(m.content.String())
-				m.viewport.GotoBottom()
-				return m, overlayCmd
-			}
-
-			m.overlay.overlay = updatedOverlay
-			return m, overlayCmd
+		// Note: Mouse event forwarding to overlay is now handled in the early message forwarding section
+		// Route mouse events to viewport for scrolling (only if no overlay is active)
+		if !m.overlay.isActive() {
+			m.viewport, vpCmd = m.viewport.Update(msg)
 		}
-
-		// Route mouse events to viewport for scrolling
-		m.viewport, vpCmd = m.viewport.Update(msg)
 		return m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
 
 	case tea.KeyMsg:
@@ -416,22 +420,9 @@ func (m *model) handleKeyPress(msg tea.KeyMsg, vpCmd, tiCmd, spinnerCmd tea.Cmd)
 	// Command palette handling is now done earlier in Update() before textarea update
 	// This prevents the duplicate handling issue
 
-	// If an overlay is active, pass keys to the overlay
-	if m.overlay.isActive() {
-		if m.overlay.overlay != nil {
-			updated, cmd := m.overlay.overlay.Update(msg, m, m)
-			// If overlay returns nil, it wants to close
-			if updated == nil {
-				m.ClearOverlay()
-			} else {
-				// updated is already an Overlay interface, no need for type assertion
-				m.overlay.overlay = updated
-			}
-			return m, tea.Batch(cmd, spinnerCmd)
-		}
-		// If overlay is marked active but nil, deactivate it
-		m.overlay.deactivate()
-	}
+	// Note: Overlay keyboard handling is now done in the main Update() function
+	// to ensure all messages (including custom types) reach the overlay.
+	// KeyMsg handling here is skipped if overlay is active since it's already processed.
 
 	// If result list is active, pass keys to the result list
 	if m.resultList.IsActive() {
