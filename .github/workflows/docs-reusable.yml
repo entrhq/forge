@@ -92,8 +92,8 @@ jobs:
 
       - name: Configure Git
         run: |
-          git config --global user.name "forge[bot]"
-          git config --global user.email "forge@noreply.entrhq.com"
+          git config --global user.name "anvxl"
+          git config --global user.email "anvxl@entr.net.au"
 
       - name: Generate Forge Configuration
         id: forge_config
