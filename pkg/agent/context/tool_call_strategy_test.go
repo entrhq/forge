@@ -40,6 +40,21 @@ func (m *MockLLMProvider) GetModelInfo() *types.ModelInfo {
 	return args.Get(0).(*types.ModelInfo)
 }
 
+func (m *MockLLMProvider) GetModel() string {
+	args := m.Called()
+	return args.String(0)
+}
+
+func (m *MockLLMProvider) GetBaseURL() string {
+	args := m.Called()
+	return args.String(0)
+}
+
+func (m *MockLLMProvider) GetAPIKey() string {
+	args := m.Called()
+	return args.String(0)
+}
+
 // TestExtractToolName tests the extractToolName helper function
 func TestExtractToolName(t *testing.T) {
 	tests := []struct {

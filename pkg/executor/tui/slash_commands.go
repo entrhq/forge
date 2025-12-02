@@ -482,7 +482,7 @@ func handleSettingsCommand(m *model, args []string) interface{} {
 	onLLMSettingsChange := func() error {
 		return m.reloadLLMProvider()
 	}
-	
+
 	settingsOverlay := overlay.NewSettingsOverlayWithCallback(m.width, m.height, onLLMSettingsChange, m.provider)
 	m.overlay.activateAndClearStack(tuitypes.OverlayModeSettings, settingsOverlay)
 

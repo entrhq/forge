@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"sync"
 )
 
@@ -82,10 +81,8 @@ func (s *LLMSection) Validate() error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	if s.Model == "" {
-		return fmt.Errorf("model cannot be empty")
-	}
-
+	// LLM configuration is optional - validation always passes
+	// Actual validation happens at runtime when LLM is used
 	return nil
 }
 

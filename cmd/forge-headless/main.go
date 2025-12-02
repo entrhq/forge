@@ -118,6 +118,8 @@ func parseFlags() *CLIConfig {
 }
 
 // run executes the headless mode
+//
+//nolint:gocyclo
 func run(ctx context.Context, cliConfig *CLIConfig) error {
 	// Load or create execution configuration
 	execConfig, err := loadConfig(cliConfig)

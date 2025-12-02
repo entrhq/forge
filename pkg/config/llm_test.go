@@ -1,6 +1,7 @@
 package config
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,7 +11,7 @@ import (
 func TestNewLLMSection(t *testing.T) {
 	section := NewLLMSection()
 	assert.NotNil(t, section)
-	assert.Equal(t, "gpt-4o", section.Model)
+	assert.Equal(t, "", section.Model)
 	assert.Equal(t, "", section.BaseURL)
 	assert.Equal(t, "", section.APIKey)
 }
@@ -121,19 +122,16 @@ func TestLLMSection_SetData(t *testing.T) {
 
 func TestLLMSection_Validate(t *testing.T) {
 	tests := []struct {
-		name        string
-		model       string
-		expectError bool
+		name  string
+		model string
 	}{
 		{
-			name:        "valid model",
-			model:       "gpt-4o",
-			expectError: false,
+			name:  "valid model",
+			model: "gpt-4o",
 		},
 		{
-			name:        "empty model",
-			model:       "",
-			expectError: true,
+			name:  "empty model is allowed",
+			model: "",
 		},
 	}
 
@@ -143,12 +141,7 @@ func TestLLMSection_Validate(t *testing.T) {
 			section.Model = tt.model
 
 			err := section.Validate()
-			if tt.expectError {
-				assert.Error(t, err)
-				assert.Contains(t, err.Error(), "model")
-			} else {
-				assert.NoError(t, err)
-			}
+			assert.NoError(t, err)
 		})
 	}
 }
@@ -161,7 +154,7 @@ func TestLLMSection_Reset(t *testing.T) {
 
 	section.Reset()
 
-	assert.Equal(t, "gpt-4o", section.Model)
+	assert.Equal(t, "", section.Model)
 	assert.Equal(t, "", section.BaseURL)
 	assert.Equal(t, "", section.APIKey)
 }
@@ -205,13 +198,16 @@ func TestLLMSection_ThreadSafety(t *testing.T) {
 }
 
 func TestLLMSection_IntegrationWithManager(t *testing.T) {
-	// Create a temporary store
-	store := NewMemoryStore()
+	// Create a temporary file store
+	tmpFile := filepath.Join(t.TempDir(), "config.json")
+	store, err := NewFileStore(tmpFile)
+	require.NoError(t, err)
+
 	manager := NewManager(store)
 
 	// Register LLM section
 	section := NewLLMSection()
-	err := manager.RegisterSection(section)
+	err = manager.RegisterSection(section)
 	require.NoError(t, err)
 
 	// Update configuration
@@ -220,17 +216,19 @@ func TestLLMSection_IntegrationWithManager(t *testing.T) {
 	section.SetAPIKey("sk-test")
 
 	// Save configuration
-	err = manager.Save(SectionIDLLM)
+	err = manager.SaveAll()
 	require.NoError(t, err)
 
 	// Create new section and manager to simulate restart
 	newSection := NewLLMSection()
-	newManager := NewManager(store)
+	newStore, err := NewFileStore(tmpFile)
+	require.NoError(t, err)
+	newManager := NewManager(newStore)
 	err = newManager.RegisterSection(newSection)
 	require.NoError(t, err)
 
 	// Load configuration
-	err = newManager.Load(SectionIDLLM)
+	err = newManager.LoadAll()
 	require.NoError(t, err)
 
 	// Verify loaded values

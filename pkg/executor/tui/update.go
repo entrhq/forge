@@ -58,14 +58,14 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// This ensures overlays can handle their own custom message types
 	if m.overlay.isActive() && m.overlay.overlay != nil {
 		updatedOverlay, overlayCmd := m.overlay.overlay.Update(msg, m, m)
-		
+
 		// If overlay returns nil, it wants to close
 		if updatedOverlay == nil {
 			m.ClearOverlay()
 			// Continue processing the message in the main model
 		} else {
 			m.overlay.overlay = updatedOverlay
-			
+
 			// For KeyMsg and MouseMsg, we still need to handle them in the main model too
 			// For other message types, the overlay handling is sufficient
 			if _, isKeyMsg := msg.(tea.KeyMsg); !isKeyMsg {
@@ -74,7 +74,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, tea.Batch(overlayCmd, spinnerCmd)
 				}
 			}
-			
+
 			// Key/Mouse messages continue to be processed by main model
 			// This allows textarea updates and other keyboard handling
 			spinnerCmd = tea.Batch(overlayCmd, spinnerCmd)

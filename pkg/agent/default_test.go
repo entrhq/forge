@@ -27,6 +27,18 @@ func (m *mockProvider) GetModelInfo() *types.ModelInfo {
 	return &types.ModelInfo{Name: "mock-model"}
 }
 
+func (m *mockProvider) GetModel() string {
+	return "mock-model"
+}
+
+func (m *mockProvider) GetBaseURL() string {
+	return "https://mock.api"
+}
+
+func (m *mockProvider) GetAPIKey() string {
+	return "mock-key"
+}
+
 // TestMemoryAddAndRetrieve verifies that messages are properly added to memory
 // and can be retrieved for token counting
 func TestMemoryAddAndRetrieve(t *testing.T) {
