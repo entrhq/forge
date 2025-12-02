@@ -139,7 +139,7 @@ jobs:
           fi
 
       - name: Comment on Failure
-        if: always() && steps.forge.outputs.exit_code != '0'
+        if: always() && steps.forge.outcome == 'failure'
         uses: actions/github-script@v7
         with:
           github-token: ${{ steps.app_token.outputs.token }}

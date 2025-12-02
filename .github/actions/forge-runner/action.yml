@@ -61,17 +61,15 @@ runs:
         echo "Running Forge with config: ${{ inputs.config_path }}"
         cat "${{ inputs.config_path }}"
         
-        # Build Forge command with optional model flag
-        FORGE_CMD="forge --config \"${{ inputs.config_path }}\""
-        
-        if [ -n "${{ inputs.model }}" ]; then
-          FORGE_CMD="$FORGE_CMD --model \"${{ inputs.model }}\""
-        fi
-        
-        # Run Forge and capture exit code
+        # Run Forge and capture exit code (without eval to prevent injection)
         set +e
-        eval $FORGE_CMD
-        EXIT_CODE=$?
+        if [ -n "${{ inputs.model }}" ]; then
+          forge --config "${{ inputs.config_path }}" --model "${{ inputs.model }}"
+          EXIT_CODE=$?
+        else
+          forge --config "${{ inputs.config_path }}"
+          EXIT_CODE=$?
+        fi
         set -e
         
         echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT

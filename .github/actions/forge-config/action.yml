@@ -129,7 +129,19 @@ runs:
         # Generate config using jq for proper JSON encoding
         TASK_JSON=$(printf '%s' "$INSTRUCTIONS" | jq -R -s .)
 
-        if [ "${{ inputs.mode }}" = "read-only" ]; then
+        # Validate mode parameter
+        MODE="${{ inputs.mode }}"
+        case "$MODE" in
+          "read-only"|"open_pr"|"direct")
+            # Valid mode
+            ;;
+          *)
+            echo "::warning::Invalid mode '$MODE'. Supported modes are: read-only, open_pr, direct. Falling back to 'direct'."
+            MODE="direct"
+            ;;
+        esac
+
+        if [ "$MODE" = "read-only" ]; then
           jq -n \
             --argjson task "$TASK_JSON" \
             --argjson max_tokens ${{ inputs.max_tokens }} \
@@ -149,13 +161,14 @@ runs:
               "metrics": true
             }
           }' > forge-config.json
-        elif [ "${{ inputs.mode }}" = "open_pr" ]; then
+        elif [ "$MODE" = "open_pr" ]; then
           jq -n \
             --argjson task "$TASK_JSON" \
             --argjson allow "$ALLOW_JSON" \
             --argjson deny "$DENY_JSON" \
             --arg branch "${{ inputs.pr_branch_prefix }}-pr-${{ inputs.pr_number }}" \
             --arg pr_num "${{ inputs.pr_number }}" \
+            --argjson max_tokens ${{ inputs.max_tokens }} \
             --argjson max_files ${{ inputs.max_files }} \
             --argjson max_lines ${{ inputs.max_lines_changed }} \
             '{
@@ -167,7 +180,7 @@ runs:
               "max_lines_changed": $max_lines,
               "allowed_patterns": $allow,
               "denied_patterns": $deny,
-              "max_tokens": 1000000,
+              "max_tokens": $max_tokens,
               "timeout": "10m"
             },
             "artifacts": {
