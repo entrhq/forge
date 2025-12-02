@@ -49,10 +49,9 @@ func TestConstraintManager_ReadOnlyMode(t *testing.T) {
 			errType:   ViolationReadOnlyMode,
 		},
 		{
-			name:      "execute_command blocked in read-only mode",
+			name:      "execute_command allowed in read-only mode",
 			toolName:  "execute_command",
-			wantError: true,
-			errType:   ViolationReadOnlyMode,
+			wantError: false,
 		},
 		{
 			name:      "task_completion allowed (loop-breaking tool)",

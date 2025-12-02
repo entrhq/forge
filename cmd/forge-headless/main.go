@@ -118,6 +118,8 @@ func parseFlags() *CLIConfig {
 }
 
 // run executes the headless mode
+//
+//nolint:gocyclo
 func run(ctx context.Context, cliConfig *CLIConfig) error {
 	// Load or create execution configuration
 	execConfig, err := loadConfig(cliConfig)
@@ -192,7 +194,7 @@ func run(ctx context.Context, cliConfig *CLIConfig) error {
 		agent.WithNotesManager(notesManager),
 	)
 
-	// Register coding tools with workspace guard
+	// Register coding tools with workspace guard, filtered by constraints
 	codingTools := []tools.Tool{
 		coding.NewReadFileTool(guard),
 		coding.NewWriteFileTool(guard),
@@ -203,6 +205,10 @@ func run(ctx context.Context, cliConfig *CLIConfig) error {
 	}
 
 	for _, tool := range codingTools {
+		// Filter tools based on allowed_tools constraint
+		if !execConfig.Constraints.ShouldRegisterTool(tool.Name()) {
+			continue
+		}
 		if regErr := ag.RegisterTool(tool); regErr != nil {
 			return fmt.Errorf("failed to register tool: %w", regErr)
 		}

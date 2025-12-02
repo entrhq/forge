@@ -287,10 +287,11 @@ func (cm *ConstraintManager) calculateTotalLinesRemoved() int {
 	return total
 }
 
-// isFileModifyingTool returns true if the tool modifies files or executes commands
+// isFileModifyingTool returns true if the tool modifies files
+// Note: execute_command is allowed in read-only mode for inspection purposes
 func isFileModifyingTool(toolName string) bool {
 	switch toolName {
-	case "write_file", "apply_diff", "execute_command":
+	case "write_file", "apply_diff":
 		return true
 	default:
 		return false

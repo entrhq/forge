@@ -144,12 +144,28 @@ runs:
         if [ "$MODE" = "read-only" ]; then
           jq -n \
             --argjson task "$TASK_JSON" \
+            --argjson allow "$ALLOW_JSON" \
+            --argjson deny "$DENY_JSON" \
             --argjson max_tokens ${{ inputs.max_tokens }} \
             '{
             "task": $task,
             "mode": "read-only",
             "workspace_dir": ".",
             "constraints": {
+              "allowed_patterns": $allow,
+              "denied_patterns": $deny,
+              "allowed_tools": [
+                "read_file",
+                "list_files",
+                "search_files",
+                "execute_command",
+                "add_note",
+                "list_notes",
+                "search_notes",
+                "list_tags",
+                "scratch_note",
+                "update_note"
+              ],
               "max_tokens": $max_tokens,
               "timeout": "10m"
             },

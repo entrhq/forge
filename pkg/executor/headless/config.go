@@ -168,6 +168,23 @@ func (c *Config) Validate() error {
 	return nil
 }
 
+// ShouldRegisterTool determines if a tool should be registered based on constraints
+func (c *ConstraintConfig) ShouldRegisterTool(toolName string) bool {
+	// If no allowed_tools specified, all tools are allowed
+	if len(c.AllowedTools) == 0 {
+		return true
+	}
+
+	// Check if tool is in allowed list
+	for _, allowed := range c.AllowedTools {
+		if allowed == toolName {
+			return true
+		}
+	}
+
+	return false
+}
+
 // DefaultConfig returns a default configuration suitable for most use cases
 func DefaultConfig() *Config {
 	return &Config{
