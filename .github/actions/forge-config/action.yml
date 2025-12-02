@@ -25,7 +25,7 @@ inputs:
     required: false
     default: "node_modules/**,vendor/**,.git/**"
   mode:
-    description: Operation mode (open_pr or direct)
+    description: Operation mode (read-only, open_pr, or direct)
     required: false
     default: "direct"
   pr_branch_prefix:
@@ -129,7 +129,27 @@ runs:
         # Generate config using jq for proper JSON encoding
         TASK_JSON=$(printf '%s' "$INSTRUCTIONS" | jq -R -s .)
 
-        if [ "${{ inputs.mode }}" = "open_pr" ]; then
+        if [ "${{ inputs.mode }}" = "read-only" ]; then
+          jq -n \
+            --argjson task "$TASK_JSON" \
+            --argjson max_tokens ${{ inputs.max_tokens }} \
+            '{
+            "task": $task,
+            "mode": "read-only",
+            "workspace_dir": ".",
+            "constraints": {
+              "max_tokens": $max_tokens,
+              "timeout": "10m"
+            },
+            "artifacts": {
+              "enabled": true,
+              "output_dir": ".forge/artifacts",
+              "json": true,
+              "markdown": true,
+              "metrics": true
+            }
+          }' > forge-config.json
+        elif [ "${{ inputs.mode }}" = "open_pr" ]; then
           jq -n \
             --argjson task "$TASK_JSON" \
             --argjson allow "$ALLOW_JSON" \
