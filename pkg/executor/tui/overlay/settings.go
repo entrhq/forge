@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/entrhq/forge/pkg/config"
 	"github.com/entrhq/forge/pkg/executor/tui/types"
+	"github.com/entrhq/forge/pkg/llm"
 )
 
 // SettingsOverlay provides a full interactive settings editor
@@ -32,6 +34,15 @@ type SettingsOverlay struct {
 	// Dialog state
 	activeDialog  *inputDialog
 	confirmDialog *confirmDialog
+
+	// Runtime provider for displaying actual values
+	provider llm.Provider
+
+	// Callback for when LLM settings change
+	onLLMSettingsChange func() error
+
+	// Cursor blink state
+	cursorBlink bool
 }
 
 // settingsSection represents a section with its items
@@ -86,6 +97,7 @@ type fieldType int
 
 const (
 	fieldTypeText fieldType = iota
+	fieldTypePassword
 	fieldTypeRadio
 )
 
@@ -105,15 +117,24 @@ type confirmDialog struct {
 
 // NewSettingsOverlay creates a new interactive settings overlay
 func NewSettingsOverlay(width, height int) *SettingsOverlay {
+	return NewSettingsOverlayWithCallback(width, height, nil, nil)
+}
+
+// NewSettingsOverlayWithCallback creates a new settings overlay with an optional callback
+// that is invoked when LLM settings are saved.
+func NewSettingsOverlayWithCallback(width, height int, onLLMSettingsChange func() error, provider llm.Provider) *SettingsOverlay {
 	overlay := &SettingsOverlay{
-		width:           width,
-		height:          height,
-		focused:         true,
-		selectedSection: 0,
-		selectedItem:    0,
-		hasChanges:      false,
-		editMode:        false,
-		scrollOffset:    0,
+		width:               width,
+		height:              height,
+		focused:             true,
+		selectedSection:     0,
+		selectedItem:        0,
+		hasChanges:          false,
+		provider:            provider,
+		onLLMSettingsChange: onLLMSettingsChange,
+		editMode:            false,
+		scrollOffset:        0,
+		cursorBlink:         true,
 	}
 
 	overlay.loadSettings()
@@ -185,14 +206,81 @@ func (s *SettingsOverlay) loadSettings() {
 					}
 				}
 			}
+
+		case "llm":
+			// Create text items for LLM configuration
+			// Order matters for a better UX
+			llmFields := []struct {
+				key         string
+				displayName string
+			}{
+				{"model", "Model"},
+				{"base_url", "Base URL"},
+				{"api_key", "API Key"},
+			}
+
+			for _, field := range llmFields {
+				value := ""
+				
+				// Try to get value from runtime provider first (actual running config)
+				if s.provider != nil {
+					switch field.key {
+					case "model":
+						if model := s.provider.GetModel(); model != "" {
+							value = model
+						}
+					case "base_url":
+						if baseURL := s.provider.GetBaseURL(); baseURL != "" {
+							value = baseURL
+						}
+					case "api_key":
+						if apiKey := s.provider.GetAPIKey(); apiKey != "" {
+							// Store actual API key - renderItem will handle masking for display
+							value = apiKey
+						}
+					}
+				}
+				
+				// Fall back to config file value if provider didn't have it
+				if value == "" {
+					if v, ok := data[field.key]; ok && v != nil {
+						value = fmt.Sprintf("%v", v)
+					}
+				}
+
+				item := settingsItem{
+					key:         field.key,
+					displayName: field.displayName,
+					value:       value,
+					itemType:    itemTypeText,
+					modified:    false,
+				}
+				section.items = append(section.items, item)
+			}
 		}
 
 		s.sections = append(s.sections, section)
 	}
 }
 
+// cursorBlinkMsg is sent periodically to toggle cursor visibility
+type cursorBlinkMsg struct{}
+
+// tickCursorBlink returns a command that sends a cursor blink message
+func tickCursorBlink() tea.Cmd {
+	return tea.Tick(time.Millisecond*530, func(t time.Time) tea.Msg {
+		return cursorBlinkMsg{}
+	})
+}
+
 // Update handles messages for the interactive settings overlay
 func (s *SettingsOverlay) Update(msg tea.Msg, state types.StateProvider, actions types.ActionHandler) (types.Overlay, tea.Cmd) {
+	// Handle cursor blink
+	if _, ok := msg.(cursorBlinkMsg); ok {
+		s.cursorBlink = !s.cursorBlink
+		return s, tickCursorBlink()
+	}
+
 	// Handle active dialog input first
 	if s.activeDialog != nil {
 		return s.handleDialogInput(msg)
@@ -226,16 +314,18 @@ func (s *SettingsOverlay) handleKeyPress(keyMsg tea.KeyMsg) (types.Overlay, tea.
 		s.navigateLeft()
 	case "right", "l":
 		s.navigateRight()
-	case " ", keyEnter:
+	case " ":
 		s.toggleCurrent()
+	case keyEnter:
+		return s, s.handleEnter()
 	case keyTab:
 		s.nextSection()
 	case "shift+tab":
 		s.prevSection()
 	case "a":
-		s.handleAddPattern()
+		return s, s.handleAddPattern()
 	case "e":
-		s.handleEditPattern()
+		return s, s.handleEditPattern()
 	case "d":
 		s.handleDeletePattern()
 	}
@@ -257,23 +347,28 @@ func (s *SettingsOverlay) handleSave() (types.Overlay, tea.Cmd) {
 	if s.hasChanges {
 		if err := s.saveSettings(); err == nil {
 			s.hasChanges = false
+			// Don't reload settings here - provider will be stale until next overlay open
+			// The onLLMSettingsChange callback reloads the provider in the agent,
+			// but this overlay instance still has the old provider reference
 		}
 	}
 	return s, nil
 }
 
 // handleAddPattern handles adding a new pattern
-func (s *SettingsOverlay) handleAddPattern() {
+func (s *SettingsOverlay) handleAddPattern() tea.Cmd {
 	if s.isInWhitelistSection() {
-		s.showAddPatternDialog()
+		return s.showAddPatternDialog()
 	}
+	return nil
 }
 
 // handleEditPattern handles editing a selected pattern
-func (s *SettingsOverlay) handleEditPattern() {
+func (s *SettingsOverlay) handleEditPattern() tea.Cmd {
 	if s.isInWhitelistSection() && s.isPatternSelected() {
-		s.showEditPatternDialog()
+		return s.showEditPatternDialog()
 	}
+	return nil
 }
 
 // handleDeletePattern handles deleting a selected pattern
@@ -361,6 +456,39 @@ func (s *SettingsOverlay) toggleCurrent() {
 	}
 }
 
+// handleEnter handles the enter key press for editing text items
+func (s *SettingsOverlay) handleEnter() tea.Cmd {
+	if len(s.sections) == 0 {
+		return nil
+	}
+
+	section := &s.sections[s.selectedSection]
+	if s.selectedItem >= len(section.items) {
+		return nil
+	}
+
+	item := &section.items[s.selectedItem]
+
+	// Handle different item types
+	var cmd tea.Cmd
+	switch item.itemType {
+	case itemTypeToggle:
+		// Space key already handles toggles, but enter should also work
+		s.toggleCurrent()
+
+	case itemTypeText:
+		// Show edit dialog for text items (LLM settings)
+		cmd = s.showTextFieldEditDialog()
+
+	case itemTypeList:
+		// For list items (like whitelist patterns), show edit dialog
+		if section.id == sectionCommandWhitelist {
+			cmd = s.handleEditPattern()
+		}
+	}
+	return cmd
+}
+
 // saveSettings saves changes back to config
 func (s *SettingsOverlay) saveSettings() error {
 	if !config.IsInitialized() {
@@ -393,6 +521,14 @@ func (s *SettingsOverlay) saveSettings() error {
 				}
 			}
 			data["patterns"] = patterns
+
+		case "llm":
+			// Save text field values for LLM settings
+			for _, item := range section.items {
+				if item.itemType == itemTypeText {
+					data[item.key] = item.value
+				}
+			}
 		}
 
 		// Update section
@@ -402,7 +538,23 @@ func (s *SettingsOverlay) saveSettings() error {
 	}
 
 	// Save all changes
-	return manager.SaveAll()
+	if err := manager.SaveAll(); err != nil {
+		return err
+	}
+
+	// If LLM settings were changed and we have a callback, invoke it
+	if s.onLLMSettingsChange != nil {
+		for _, section := range s.sections {
+			if section.id == "llm" {
+				if err := s.onLLMSettingsChange(); err != nil {
+					return fmt.Errorf("failed to reload LLM settings: %w", err)
+				}
+				break
+			}
+		}
+	}
+
+	return nil
 }
 
 // View renders the interactive settings overlay
@@ -469,12 +621,28 @@ func (s *SettingsOverlay) buildHelpText() string {
 	shortcuts := []string{
 		"↑↓/jk: Navigate",
 		"Tab/←→/hl: Switch section",
-		"Space/Enter: Toggle",
+	}
+
+	// Add context-specific shortcuts based on current item type
+	if len(s.sections) > 0 && s.selectedSection < len(s.sections) {
+		section := s.sections[s.selectedSection]
+		if s.selectedItem < len(section.items) {
+			item := section.items[s.selectedItem]
+			
+			switch item.itemType {
+			case itemTypeToggle:
+				shortcuts = append(shortcuts, "Space/Enter: Toggle")
+			case itemTypeText:
+				shortcuts = append(shortcuts, "Enter: Edit")
+			case itemTypeList:
+				shortcuts = append(shortcuts, "Enter/e: Edit")
+			}
+		}
 	}
 
 	// Add whitelist-specific shortcuts if in that section
 	if s.isInWhitelistSection() {
-		shortcuts = append(shortcuts, "a: Add", "e: Edit", "d: Delete")
+		shortcuts = append(shortcuts, "a: Add", "d: Delete")
 	}
 
 	shortcuts = append(shortcuts, "Ctrl+S: Save", "Esc/q: Close")
@@ -555,7 +723,23 @@ func (s *SettingsOverlay) renderItem(item settingsItem, isFocused bool) string {
 	case itemTypeList:
 		out.WriteString(fmt.Sprintf("• %s", labelStyle.Render(item.displayName)))
 	case itemTypeText:
-		out.WriteString(fmt.Sprintf("%s: %v", labelStyle.Render(item.displayName), item.value))
+		// Check if this is an API key field by examining the item key directly
+		isAPIKey := item.key == "api_key"
+
+		// Display value - mask API keys
+		displayValue := fmt.Sprintf("%v", item.value)
+		if isAPIKey && displayValue != "" {
+			displayValue = "••••••••"
+		}
+
+		valueStyle := lipgloss.NewStyle().Foreground(types.MutedGray)
+		if isFocused {
+			valueStyle = valueStyle.Foreground(types.BrightWhite)
+		}
+
+		out.WriteString(fmt.Sprintf("%s: %s", 
+			labelStyle.Render(item.displayName), 
+			valueStyle.Render(displayValue)))
 	}
 
 	if item.modified {
@@ -583,7 +767,7 @@ func (s *SettingsOverlay) isPatternSelected() bool {
 	return len(section.items) > 0 && s.selectedItem < len(section.items)
 }
 
-func (s *SettingsOverlay) showAddPatternDialog() {
+func (s *SettingsOverlay) showAddPatternDialog() tea.Cmd {
 	s.activeDialog = &inputDialog{
 		title: "Add Whitelist Pattern",
 		fields: []inputField{
@@ -614,20 +798,22 @@ func (s *SettingsOverlay) showAddPatternDialog() {
 		selectedField: 0,
 		onConfirm: func(values map[string]string) error {
 			s.addPattern(values["pattern"], values["description"], values["type"])
+			s.activeDialog = nil
 			return nil
 		},
 		onCancel: func() {
 			s.activeDialog = nil
 		},
 	}
+	return tickCursorBlink()
 }
 
-func (s *SettingsOverlay) showEditPatternDialog() {
+func (s *SettingsOverlay) showEditPatternDialog() tea.Cmd {
 	section := s.sections[s.selectedSection]
 	item := section.items[s.selectedItem]
 	data, ok := item.value.(map[string]interface{})
 	if !ok {
-		return
+		return nil
 	}
 
 	// Get the type value, default to "prefix" if not present
@@ -668,12 +854,14 @@ func (s *SettingsOverlay) showEditPatternDialog() {
 		selectedField: 0,
 		onConfirm: func(values map[string]string) error {
 			s.updatePattern(s.selectedItem, values["pattern"], values["description"], values["type"])
+			s.activeDialog = nil
 			return nil
 		},
 		onCancel: func() {
 			s.activeDialog = nil
 		},
 	}
+	return tickCursorBlink()
 }
 
 func (s *SettingsOverlay) showDeleteConfirmation() {
@@ -706,6 +894,62 @@ func (s *SettingsOverlay) showUnsavedChangesDialog() {
 			s.confirmDialog = nil
 		},
 	}
+}
+
+func (s *SettingsOverlay) showTextFieldEditDialog() tea.Cmd {
+	section := &s.sections[s.selectedSection]
+	if s.selectedItem >= len(section.items) {
+		return nil
+	}
+
+	item := &section.items[s.selectedItem]
+	
+	// Determine if this is an API key field for masking
+	isAPIKey := section.id == "llm" && item.key == "api_key"
+	
+	// Get current value as string
+	currentValue := ""
+	if str, ok := item.value.(string); ok {
+		currentValue = str
+	}
+	
+	// Determine field type based on whether it's an API key
+	fType := fieldTypeText
+	if isAPIKey {
+		fType = fieldTypePassword
+	}
+	
+	s.activeDialog = &inputDialog{
+		title: fmt.Sprintf("Edit %s", item.displayName),
+		fields: []inputField{
+			{
+				label:     item.displayName,
+				key:       "value",
+				value:     currentValue,
+				fieldType: fType,
+				maxLength: 500,
+				validator: func(v string) error {
+					if v == "" {
+						return fmt.Errorf("%s cannot be empty", item.displayName)
+					}
+					return nil
+				},
+			},
+		},
+		selectedField: 0,
+		onConfirm: func(values map[string]string) error {
+			newValue := values["value"]
+			item.value = newValue
+			item.modified = true
+			s.hasChanges = true
+			s.activeDialog = nil
+			return nil
+		},
+		onCancel: func() {
+			s.activeDialog = nil
+		},
+	}
+	return tickCursorBlink()
 }
 
 func (s *SettingsOverlay) addPattern(pattern, description, matchType string) {
@@ -792,6 +1036,8 @@ func (s *SettingsOverlay) handleDialogInput(msg tea.Msg) (types.Overlay, tea.Cmd
 		s.handleDialogSpace()
 	case "backspace":
 		s.handleDialogBackspace()
+	case "ctrl+u":
+		s.handleDialogClear()
 	default:
 		s.handleDialogCharInput(keyMsg)
 	}
@@ -831,8 +1077,7 @@ func (s *SettingsOverlay) handleDialogConfirm() (types.Overlay, tea.Cmd) {
 		}
 	}
 
-	// Clear the dialog after successful confirmation
-	s.activeDialog = nil
+	// Dialog is cleared by onConfirm callback
 	return s, nil
 }
 
@@ -858,7 +1103,7 @@ func (s *SettingsOverlay) handleDialogSpace() {
 
 	if field.fieldType == fieldTypeRadio && len(field.options) > 0 {
 		s.toggleRadioButton(field)
-	} else if field.fieldType == fieldTypeText {
+	} else if field.fieldType == fieldTypeText || field.fieldType == fieldTypePassword {
 		s.addSpaceToTextField(field)
 	}
 }
@@ -887,8 +1132,21 @@ func (s *SettingsOverlay) addSpaceToTextField(field *inputField) {
 // handleDialogBackspace handles backspace key in dialog
 func (s *SettingsOverlay) handleDialogBackspace() {
 	field := &s.activeDialog.fields[s.activeDialog.selectedField]
-	if field.fieldType == fieldTypeText && len(field.value) > 0 {
-		field.value = field.value[:len(field.value)-1]
+	if (field.fieldType == fieldTypeText || field.fieldType == fieldTypePassword) && len(field.value) > 0 {
+		// Use rune-based slicing to properly handle multi-byte UTF-8 characters
+		runes := []rune(field.value)
+		if len(runes) > 0 {
+			field.value = string(runes[:len(runes)-1])
+			field.errorMsg = ""
+		}
+	}
+}
+
+// handleDialogClear clears the current field value
+func (s *SettingsOverlay) handleDialogClear() {
+	field := &s.activeDialog.fields[s.activeDialog.selectedField]
+	if field.fieldType == fieldTypeText || field.fieldType == fieldTypePassword {
+		field.value = ""
 		field.errorMsg = ""
 	}
 }
@@ -896,7 +1154,7 @@ func (s *SettingsOverlay) handleDialogBackspace() {
 // handleDialogCharInput handles character input in dialog
 func (s *SettingsOverlay) handleDialogCharInput(keyMsg tea.KeyMsg) {
 	field := &s.activeDialog.fields[s.activeDialog.selectedField]
-	if field.fieldType == fieldTypeText {
+	if field.fieldType == fieldTypeText || field.fieldType == fieldTypePassword {
 		if len(keyMsg.String()) == 1 && (field.maxLength == 0 || len(field.value) < field.maxLength) {
 			field.value += keyMsg.String()
 			field.errorMsg = ""
@@ -982,21 +1240,42 @@ func (s *SettingsOverlay) renderInputDialog() string {
 
 		// Field content based on type
 		switch field.fieldType {
-		case fieldTypeText:
-			// Text input field
+		case fieldTypeText, fieldTypePassword:
+			// Text input field - set a fixed width
+			const fieldWidth = 60
+			
 			fieldStyle := lipgloss.NewStyle().
 				Foreground(types.BrightWhite).
 				Background(types.DarkBg).
-				Padding(0, 1)
+				Padding(0, 1).
+				Width(fieldWidth)
 
 			if isSelected {
 				fieldStyle = fieldStyle.Border(lipgloss.RoundedBorder()).
 					BorderForeground(types.SalmonPink)
 			}
 
+			// Mask password fields
 			value := field.value
+			if field.fieldType == fieldTypePassword && value != "" {
+				value = strings.Repeat("•", len(value))
+			}
 			if isSelected {
-				value += "▸" // Cursor
+				// Blinking cursor
+				if s.cursorBlink {
+					value += "▸"
+				} else {
+					value += " " // Space maintains field width when cursor is hidden
+				}
+			}
+
+			// Truncate from the left if value is too long (show end of string)
+			// Account for padding (2 chars) when calculating max displayable length
+			// Use rune-based slicing to avoid splitting multi-byte UTF-8 characters
+			maxDisplayLen := fieldWidth - 2
+			runes := []rune(value)
+			if len(runes) > maxDisplayLen {
+				value = string(runes[len(runes)-maxDisplayLen:])
 			}
 
 			content.WriteString(fieldStyle.Render(value))
@@ -1051,13 +1330,12 @@ func (s *SettingsOverlay) renderInputDialog() string {
 	buttonStyle := lipgloss.NewStyle().Foreground(types.MutedGray)
 	content.WriteString(buttonStyle.Render(buttonRow))
 
-	// Create dialog box
+	// Create dialog box with fixed width to prevent wrapping
 	dialogStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(types.SalmonPink).
 		Background(types.DarkBg).
-		Padding(1, 2).
-		Width(60)
+		Padding(1, 2)
 
 	return dialogStyle.Render(content.String())
 }

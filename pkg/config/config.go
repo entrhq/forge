@@ -34,6 +34,10 @@ func Initialize(configPath string) error {
 		return err
 	}
 
+	if err := manager.RegisterSection(NewLLMSection()); err != nil {
+		return err
+	}
+
 	// Load configuration
 	if err := manager.LoadAll(); err != nil {
 		return err
@@ -111,6 +115,26 @@ func IsToolAutoApproved(toolName string) bool {
 		return false
 	}
 	return autoApproval.IsToolAutoApproved(toolName)
+}
+
+// GetLLM returns the LLM settings section from global config.
+// Returns nil if config is not initialized.
+func GetLLM() *LLMSection {
+	if !IsInitialized() {
+		return nil
+	}
+
+	section, ok := Global().GetSection("llm")
+	if !ok {
+		return nil
+	}
+
+	llm, ok := section.(*LLMSection)
+	if !ok {
+		return nil
+	}
+
+	return llm
 }
 
 // IsCommandWhitelisted checks if a command is whitelisted for auto-approval.

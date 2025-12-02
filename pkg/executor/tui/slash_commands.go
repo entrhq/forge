@@ -478,9 +478,12 @@ func getCurrentBranch(workingDir string) (string, error) {
 
 // handleSettingsCommand shows the settings configuration
 func handleSettingsCommand(m *model, args []string) interface{} {
-	// Create and activate settings overlay, clearing any existing overlay stack
-	// This ensures settings replaces the current overlay hierarchy rather than stacking on top
-	settingsOverlay := overlay.NewSettingsOverlay(m.width, m.height)
+	// Create settings overlay with callback for LLM settings changes
+	onLLMSettingsChange := func() error {
+		return m.reloadLLMProvider()
+	}
+	
+	settingsOverlay := overlay.NewSettingsOverlayWithCallback(m.width, m.height, onLLMSettingsChange, m.provider)
 	m.overlay.activateAndClearStack(tuitypes.OverlayModeSettings, settingsOverlay)
 
 	return nil

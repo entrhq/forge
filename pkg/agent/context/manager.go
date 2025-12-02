@@ -72,6 +72,12 @@ func (m *Manager) SetEventChannel(eventChan chan<- *types.AgentEvent) {
 	}
 }
 
+// SetProvider updates the LLM provider used by this context manager.
+// This is called when the agent's provider is hot-reloaded.
+func (m *Manager) SetProvider(provider llm.Provider) {
+	m.llm = provider
+}
+
 // EvaluateAndSummarize evaluates all strategies and performs summarization if needed.
 // This operation blocks the agent loop but emits events to keep the TUI responsive.
 // Returns the total number of messages summarized across all strategies.
