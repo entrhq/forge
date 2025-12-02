@@ -129,6 +129,22 @@ runs:
         # Generate config using jq for proper JSON encoding
         TASK_JSON=$(printf '%s' "$INSTRUCTIONS" | jq -R -s .)
 
+        # Validate mode input
+        MODE="${{ inputs.mode }}"
+        VALID_MODES=("read-only" "open_pr" "direct")
+        MODE_VALID=false
+        for valid_mode in "${VALID_MODES[@]}"; do
+          if [ "$MODE" = "$valid_mode" ]; then
+            MODE_VALID=true
+            break
+          fi
+        done
+
+        if [ "$MODE_VALID" = false ]; then
+          echo "::warning::Invalid mode '$MODE' provided. Valid modes are:"\
+            "read-only, open_pr, direct. Falling back to default 'direct' mode."
+        fi
+
         if [ "${{ inputs.mode }}" = "read-only" ]; then
           jq -n \
             --argjson task "$TASK_JSON" \
