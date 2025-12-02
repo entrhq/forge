@@ -75,50 +75,98 @@ jobs:
         uses: ./.github/actions/forge-config
         with:
           task_description: |
-            You are a code review assistant. Review PR #${{ steps.pr_context.outputs.pr_number }} and post inline comments using GitHub CLI.
+            You are a code review assistant. Your task is to review PR #${{ steps.pr_context.outputs.pr_number }} and provide comprehensive feedback through inline comments and a summary review.
             
-            **Review Focus Areas:**
-            1. Code quality, readability, and maintainability
-            2. Potential bugs, edge cases, and error handling
-            3. Performance considerations and optimization opportunities
-            4. Security vulnerabilities and best practices
-            5. Architecture and design patterns
-            6. Test coverage and quality
-            7. Documentation completeness
+            **Review Process:**
             
-            **How to Post Review Comments:**
-            Use the execute_command tool with the gh CLI:
-            - General comment: gh pr review ${{ steps.pr_context.outputs.pr_number }} --comment -b "Your review feedback here"
-            - Approve PR: gh pr review ${{ steps.pr_context.outputs.pr_number }} --approve -b "LGTM! Summary here"
-            - Request changes: gh pr review ${{ steps.pr_context.outputs.pr_number }} --request-changes -b "Issues found: ..."
+            1. **Examine the Changes:**
+               - Read all changed files to understand the scope and intent of the PR
+               - Identify the key modifications and their purpose
+               - Note any patterns or themes across the changes
             
-            **Steps:**
-            1. Read the changed files to understand the modifications
-            2. Analyze the code for issues and improvements
-            3. Post your review using gh CLI commands
+            2. **Conduct Detailed Analysis:**
+               Focus on these critical areas:
+               - Code quality, readability, and maintainability
+               - Potential bugs, edge cases, and error handling
+               - Performance considerations and optimization opportunities
+               - Security vulnerabilities and best practices
+               - Architecture and design patterns
+               - Test coverage and quality
+               - Documentation completeness and accuracy
             
-            **Review Posting Instructions:**
-            - For inline comments on specific lines, use the GitHub API:
-              ```bash
-              echo '{
-                "body": "Overall review summary",
-                "event": "COMMENT",
-                "comments": [
-                  {
-                    "path": "src/file.go",
-                    "line": 42,
-                    "body": "Your inline comment here"
-                  }
-                ]
-              }' | gh api repos/{owner}/{repo}/pulls/${{ steps.pr_context.outputs.pr_number }}/reviews --input -
-              ```
-            - For general PR-level comments, use: `gh pr review ${{ steps.pr_context.outputs.pr_number }} --comment -b "your comment"`
-            - To approve: `gh pr review ${{ steps.pr_context.outputs.pr_number }} --approve -b "[Insert your approval summary here]"`
-            - To request changes: `gh pr review ${{ steps.pr_context.outputs.pr_number }} --request-changes -b "[Insert your change request summary here]"`
-            - Event types for API reviews: COMMENT (neutral), APPROVE, REQUEST_CHANGES
+            3. **Post Inline Comments:**
+               For specific issues or suggestions, add inline comments directly on the relevant code lines.
+               Use the GitHub API to post inline comments:
+               ```bash
+               echo '{
+                 "body": "Review in progress...",
+                 "event": "COMMENT",
+                 "comments": [
+                   {
+                     "path": "path/to/file.go",
+                     "line": 42,
+                     "body": "Specific feedback about this line or block of code"
+                   },
+                   {
+                     "path": "path/to/another.go",
+                     "line": 15,
+                     "body": "Another inline comment with suggestions"
+                   }
+                 ]
+               }' | gh api repos/{owner}/{repo}/pulls/${{ steps.pr_context.outputs.pr_number }}/reviews --input -
+               ```
             
-            Note: The GH_TOKEN environment variable is already configured for authentication.
-            Prefer using inline comments via the API for specific code feedback.
+            4. **Provide a Summary Review:**
+               After posting inline comments, you MUST provide a comprehensive summary comment that includes:
+               - Overview of what was reviewed (list the key files and changes)
+               - Summary of findings (categorize by severity: critical issues, suggestions, positive observations)
+               - Overall assessment of code quality
+               - Any cross-cutting concerns or patterns observed
+               - Recommendation (approve, request changes, or comment only)
+               
+               Post the summary using:
+               ```bash
+               gh pr review ${{ steps.pr_context.outputs.pr_number }} --comment -b "
+               ## Review Summary
+               
+               **Files Reviewed:**
+               - file1.go: [brief description]
+               - file2.go: [brief description]
+               
+               **Key Findings:**
+               
+               🔴 **Critical Issues:** [if any]
+               - Issue 1
+               - Issue 2
+               
+               🟡 **Suggestions:** [if any]
+               - Suggestion 1
+               - Suggestion 2
+               
+               ✅ **Positive Observations:** [if any]
+               - Good practice 1
+               - Good practice 2
+               
+               **Overall Assessment:**
+               [Your overall evaluation of the PR quality and readiness]
+               
+               **Recommendation:**
+               [Approve / Request Changes / Comment Only]
+               "
+               ```
+            
+            **GitHub CLI Commands Reference:**
+            - Inline comments: Use API endpoint as shown above
+            - Summary comment: `gh pr review ${{ steps.pr_context.outputs.pr_number }} --comment -b "your summary"`
+            - Approve: `gh pr review ${{ steps.pr_context.outputs.pr_number }} --approve -b "LGTM! [summary]"`
+            - Request changes: `gh pr review ${{ steps.pr_context.outputs.pr_number }} --request-changes -b "Issues found: [summary]"`
+            
+            **Important Notes:**
+            - The GH_TOKEN environment variable is already configured for authentication
+            - Always provide both inline comments AND a summary review
+            - Be constructive and specific in your feedback
+            - Highlight both issues and good practices
+            - Use markdown formatting in your comments for better readability
           pr_title: ${{ steps.pr_context.outputs.pr_title }}
           pr_body: ${{ steps.pr_context.outputs.pr_body }}
           changed_files: ${{ steps.pr_context.outputs.changed_files }}
