@@ -141,11 +141,13 @@ runs:
         done
 
         if [ "$MODE_VALID" = false ]; then
-          echo "::warning::Invalid mode '$MODE' provided. Valid modes are:"\
-            "read-only, open_pr, direct. Falling back to default 'direct' mode."
+          echo "::warning::Invalid mode '$MODE' provided." \
+               "Valid modes: read-only, open_pr, direct." \
+               "Falling back to 'direct' mode."
+          MODE="direct"
         fi
 
-        if [ "${{ inputs.mode }}" = "read-only" ]; then
+        if [ "$MODE" = "read-only" ]; then
           jq -n \
             --argjson task "$TASK_JSON" \
             --argjson max_tokens ${{ inputs.max_tokens }} \
@@ -165,7 +167,7 @@ runs:
               "metrics": true
             }
           }' > forge-config.json
-        elif [ "${{ inputs.mode }}" = "open_pr" ]; then
+        elif [ "$MODE" = "open_pr" ]; then
           jq -n \
             --argjson task "$TASK_JSON" \
             --argjson allow "$ALLOW_JSON" \
