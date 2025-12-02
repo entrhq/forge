@@ -1,0 +1,162 @@
+name: Automated Documentation Updates
+
+on:
+  workflow_call:
+    inputs:
+      mode:
+        description: 'Execution mode: direct_commit or open_pr'
+        required: false
+        type: string
+        default: 'direct_commit'
+      custom_instructions:
+        description: 'Custom instructions for the documentation agent'
+        required: false
+        type: string
+        default: ''
+      file_patterns:
+        description: 'Comma-separated file patterns to allow (e.g., "**/*.md,docs/**")'
+        required: false
+        type: string
+        default: '**/*.md,docs/**,**/README'
+      deny_patterns:
+        description: 'Comma-separated file patterns to deny (e.g., "vendor/**,node_modules/**")'
+        required: false
+        type: string
+        default: 'vendor/**,node_modules/**,.git/**'
+      pr_branch_prefix:
+        description: 'Prefix for documentation PR branches (only used in open_pr mode)'
+        required: false
+        type: string
+        default: 'forge/docs'
+      max_tokens:
+        description: 'Maximum token budget for the LLM execution'
+        required: false
+        type: number
+        default: 1000000
+      max_files:
+        description: 'Maximum number of files to modify'
+        required: false
+        type: number
+        default: 50
+      max_lines_changed:
+        description: 'Maximum total lines that can be changed'
+        required: false
+        type: number
+        default: 2000
+      model:
+        description: 'LLM model to use (e.g. google/gemini-2.5-pro)'
+        required: false
+        type: string
+        default: 'google/gemini-2.5-pro'
+    secrets:
+      OPENAI_API_KEY:
+        description: 'OpenAI API key (or compatible API key)'
+        required: true
+      OPENAI_BASE_URL:
+        description: 'OpenAI API base URL (for compatible APIs)'
+        required: false
+      GH_APP_ID:
+        description: 'GitHub App ID for generating tokens with PR permissions'
+        required: true
+      GH_APP_PRIVATE_KEY:
+        description: 'GitHub App private key for authentication'
+        required: true
+
+jobs:
+  update-docs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    
+    steps:
+      - name: Generate GitHub App Token
+        id: app_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ steps.app_token.outputs.token }}
+          fetch-depth: 0
+
+      - name: Extract PR Context
+        id: pr_context
+        uses: ./.github/actions/pr-context
+        with:
+          pr_number: ${{ github.event.pull_request.number || github.event.issue.number }}
+          github_token: ${{ steps.app_token.outputs.token }}
+
+      - name: Generate Forge Configuration
+        id: forge_config
+        uses: ./.github/actions/forge-config
+        with:
+          task_description: |
+            You are a documentation assistant. Analyze the following pull request and update relevant documentation files to reflect the changes.
+            
+            Focus on:
+            1. Updating existing documentation that references changed functionality
+            2. Adding new documentation for new features
+            3. Updating examples if code interfaces changed
+            4. Maintaining consistency with existing documentation style
+            5. Only modifying markdown documentation files
+          pr_title: ${{ steps.pr_context.outputs.pr_title }}
+          pr_body: ${{ steps.pr_context.outputs.pr_body }}
+          changed_files: ${{ steps.pr_context.outputs.changed_files }}
+          custom_instructions: ${{ inputs.custom_instructions }}
+          file_patterns: ${{ inputs.file_patterns }}
+          deny_patterns: ${{ inputs.deny_patterns }}
+          mode: ${{ inputs.mode }}
+          pr_branch_prefix: ${{ inputs.pr_branch_prefix }}
+          pr_number: ${{ steps.pr_context.outputs.pr_number }}
+          max_tokens: ${{ inputs.max_tokens }}
+          max_files: ${{ inputs.max_files }}
+          max_lines_changed: ${{ inputs.max_lines_changed }}
+
+      - name: Run Forge
+        id: forge
+        uses: ./.github/actions/forge-runner
+        with:
+          config_path: ${{ steps.forge_config.outputs.config_path }}
+          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+          openai_base_url: ${{ secrets.OPENAI_BASE_URL }}
+          model: ${{ inputs.model }}
+
+      - name: Comment on PR
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ steps.app_token.outputs.token }}
+          script: |
+            const exitCode = '${{ steps.forge.outputs.exit_code }}';
+            const prNumber = '${{ steps.pr_context.outputs.pr_number }}';
+            const mode = '${{ inputs.mode }}';
+            
+            let comment = '## 🤖 Documentation Update Results\n\n';
+            
+            if (exitCode === '0') {
+              comment += '✅ Documentation updates completed successfully!\n\n';
+              
+              if (mode === 'open_pr') {
+                comment += '📝 A pull request with documentation updates has been created.\n';
+              } else {
+                comment += '📝 Documentation has been updated directly in this PR.\n';
+              }
+              
+              if ('${{ steps.forge.outputs.artifacts_path }}') {
+                comment += '\n📊 Execution artifacts are available in the workflow run.\n';
+              }
+            } else {
+              comment += '❌ Documentation update failed.\n\n';
+              comment += 'Please check the workflow logs for details.\n';
+            }
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: comment
+            });

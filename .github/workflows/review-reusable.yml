@@ -1,0 +1,158 @@
+name: Automated Code Review
+
+on:
+  workflow_call:
+    inputs:
+      custom_instructions:
+        description: 'Custom instructions for the code review agent'
+        required: false
+        type: string
+        default: ''
+      max_tokens:
+        description: 'Maximum token budget for the LLM execution'
+        required: false
+        type: number
+        default: 1000000
+      model:
+        description: 'LLM model to use (e.g. google/gemini-2.5-pro)'
+        required: false
+        type: string
+        default: 'google/gemini-2.5-pro'
+    secrets:
+      OPENAI_API_KEY:
+        description: 'OpenAI API key (or compatible API key)'
+        required: true
+      OPENAI_BASE_URL:
+        description: 'OpenAI API base URL (for compatible APIs)'
+        required: false
+      GH_APP_ID:
+        description: 'GitHub App ID for generating tokens with PR permissions'
+        required: true
+      GH_APP_PRIVATE_KEY:
+        description: 'GitHub App private key for authentication'
+        required: true
+
+jobs:
+  code-review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    
+    steps:
+      - name: Generate GitHub App Token
+        id: app_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ steps.app_token.outputs.token }}
+          fetch-depth: 0
+
+      - name: Extract PR Context
+        id: pr_context
+        uses: ./.github/actions/pr-context
+        with:
+          pr_number: ${{ github.event.pull_request.number || github.event.issue.number }}
+          github_token: ${{ steps.app_token.outputs.token }}
+
+      - name: Generate Forge Configuration
+        id: forge_config
+        uses: ./.github/actions/forge-config
+        with:
+          task_description: |
+            You are a code review assistant. Review PR #${{ steps.pr_context.outputs.pr_number }} and post inline comments using GitHub CLI.
+            
+            **Review Focus Areas:**
+            1. Code quality, readability, and maintainability
+            2. Potential bugs, edge cases, and error handling
+            3. Performance considerations and optimization opportunities
+            4. Security vulnerabilities and best practices
+            5. Architecture and design patterns
+            6. Test coverage and quality
+            7. Documentation completeness
+            
+            **How to Post Review Comments:**
+            Use the execute_command tool with the gh CLI:
+            - General comment: gh pr review ${{ steps.pr_context.outputs.pr_number }} --comment -b "Your review feedback here"
+            - Approve PR: gh pr review ${{ steps.pr_context.outputs.pr_number }} --approve -b "LGTM! Summary here"
+            - Request changes: gh pr review ${{ steps.pr_context.outputs.pr_number }} --request-changes -b "Issues found: ..."
+            
+            **Steps:**
+            1. Read the changed files to understand the modifications
+            2. Analyze the code for issues and improvements
+            3. Post your review using gh CLI commands
+            
+            **Review Posting Instructions:**
+            - For inline comments on specific lines, use the GitHub API:
+              ```bash
+              echo '{
+                "body": "Overall review summary",
+                "event": "COMMENT",
+                "comments": [
+                  {
+                    "path": "src/file.go",
+                    "line": 42,
+                    "body": "Your inline comment here"
+                  }
+                ]
+              }' | gh api repos/{owner}/{repo}/pulls/${{ steps.pr_context.outputs.pr_number }}/reviews --input -
+              ```
+            - For general PR-level comments, use: `gh pr review ${{ steps.pr_context.outputs.pr_number }} --comment -b "your comment"`
+            - To approve: `gh pr review ${{ steps.pr_context.outputs.pr_number }} --approve -b "[Insert your approval summary here]"`
+            - To request changes: `gh pr review ${{ steps.pr_context.outputs.pr_number }} --request-changes -b "[Insert your change request summary here]"`
+            - Event types for API reviews: COMMENT (neutral), APPROVE, REQUEST_CHANGES
+            
+            Note: The GH_TOKEN environment variable is already configured for authentication.
+            Prefer using inline comments via the API for specific code feedback.
+          pr_title: ${{ steps.pr_context.outputs.pr_title }}
+          pr_body: ${{ steps.pr_context.outputs.pr_body }}
+          changed_files: ${{ steps.pr_context.outputs.changed_files }}
+          custom_instructions: ${{ inputs.custom_instructions }}
+          mode: 'autonomous'
+          pr_number: ${{ steps.pr_context.outputs.pr_number }}
+          max_tokens: ${{ inputs.max_tokens }}
+
+      - name: Run Forge
+        id: forge
+        uses: ./.github/actions/forge-runner
+        with:
+          config_path: ${{ steps.forge_config.outputs.config_path }}
+          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+          openai_base_url: ${{ secrets.OPENAI_BASE_URL }}
+          model: ${{ inputs.model }}
+
+      - name: Check Review Status
+        if: always()
+        shell: bash
+        run: |
+          if [ "${{ steps.forge.outputs.exit_code }}" = "0" ]; then
+            echo "✅ Review completed successfully"
+            echo "The agent posted review comments directly to the PR using gh CLI"
+          else
+            echo "❌ Review failed with exit code ${{ steps.forge.outputs.exit_code }}"
+            exit 1
+          fi
+
+      - name: Comment on Failure
+        if: always() && steps.forge.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ steps.app_token.outputs.token }}
+          script: |
+            const prNumber = '${{ steps.pr_context.outputs.pr_number }}';
+            
+            const comment = '## 🤖 Automated Code Review\n\n' +
+              '❌ Review generation failed.\n\n' +
+              'Please check the [workflow logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details.\n';
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: comment
+            });

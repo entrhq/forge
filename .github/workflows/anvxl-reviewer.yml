@@ -1,0 +1,24 @@
+name: Anvxl Reviewer Requested
+
+on:
+  pull_request:
+    types: [review_requested]
+
+jobs:
+  review:
+    # Only run when anvxl user is added as reviewer
+    if: github.event.requested_reviewer.login == 'anvxl'
+    permissions:
+      contents: write
+      pull-requests: write
+    uses: ./.github/workflows/review-reusable.yml
+    with:
+      model: 'google/gemini-2.5-pro'
+      max_tokens: 2000000
+      custom_instructions: |
+        Be thorough but concise. Ensure all technical details are accurate in your review.
+    secrets:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
+      GH_APP_ID: ${{ secrets.GH_APP_ID }}
+      GH_APP_PRIVATE_KEY: ${{ secrets.GH_APP_PRIVATE_KEY }}
