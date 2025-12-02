@@ -75,17 +75,45 @@ jobs:
         uses: ./.github/actions/forge-config
         with:
           task_description: |
-            You are a code review assistant. Your task is to review PR #${{ steps.pr_context.outputs.pr_number }} and provide comprehensive feedback through inline comments and a summary review.
+            You are a code review assistant. Your task is to review PR #${{ steps.pr_context.outputs.pr_number }} and POST COMMENTS using the execute_command tool.
             
-            **Review Process:**
+            **CRITICAL: You MUST use execute_command to post comments. Reading files alone is NOT sufficient.**
             
-            1. **Examine the Changes:**
-               - Read all changed files to understand the scope and intent of the PR
-               - Identify the key modifications and their purpose
-               - Note any patterns or themes across the changes
+            **Review Process - DO THIS ITERATIVELY FILE BY FILE:**
             
-            2. **Conduct Detailed Analysis:**
-               Focus on these critical areas:
+            1. **Review One File at a Time:**
+               - Read the first changed file
+               - Analyze it for issues (bugs, style, security, performance, etc.)
+               - IMMEDIATELY post inline comments for that file using execute_command
+               - Move to the next file and repeat
+               
+               This iterative approach ensures comments are posted incrementally, not deferred.
+            
+            2. **How to Post Inline Comments (USE execute_command):**
+               After reviewing each file, if you found issues, POST THEM IMMEDIATELY:
+               
+               Example for posting comments on a single file:
+               ```bash
+               execute_command with:
+               echo '{
+                 "body": "Reviewing pkg/config/llm.go",
+                 "event": "COMMENT",
+                 "comments": [
+                   {
+                     "path": "pkg/config/llm.go",
+                     "line": 42,
+                     "body": "Consider adding validation for empty API keys to prevent runtime errors."
+                   },
+                   {
+                     "path": "pkg/config/llm.go",
+                     "line": 67,
+                     "body": "This mutex lock could cause contention under high load. Consider using sync.RWMutex for read-heavy scenarios."
+                   }
+                 ]
+               }' | gh api repos/{owner}/{repo}/pulls/${{ steps.pr_context.outputs.pr_number }}/reviews --input -
+               ```
+               
+               **Key Review Focus Areas:**
                - Code quality, readability, and maintainability
                - Potential bugs, edge cases, and error handling
                - Performance considerations and optimization opportunities
@@ -94,38 +122,16 @@ jobs:
                - Test coverage and quality
                - Documentation completeness and accuracy
             
-            3. **Post Inline Comments:**
-               For specific issues or suggestions, add inline comments directly on the relevant code lines.
-               Use the GitHub API to post inline comments:
-               ```bash
-               echo '{
-                 "body": "Review in progress...",
-                 "event": "COMMENT",
-                 "comments": [
-                   {
-                     "path": "path/to/file.go",
-                     "line": 42,
-                     "body": "Specific feedback about this line or block of code"
-                   },
-                   {
-                     "path": "path/to/another.go",
-                     "line": 15,
-                     "body": "Another inline comment with suggestions"
-                   }
-                 ]
-               }' | gh api repos/{owner}/{repo}/pulls/${{ steps.pr_context.outputs.pr_number }}/reviews --input -
-               ```
-            
-            4. **Provide a Summary Review:**
-               After posting inline comments, you MUST provide a comprehensive summary comment that includes:
+            3. **After Reviewing ALL Files, Post a Summary:**
+               Once you've reviewed all files and posted inline comments, use execute_command to post a final summary:
                - Overview of what was reviewed (list the key files and changes)
                - Summary of findings (categorize by severity: critical issues, suggestions, positive observations)
                - Overall assessment of code quality
                - Any cross-cutting concerns or patterns observed
                - Recommendation (approve, request changes, or comment only)
                
-               Post the summary using:
                ```bash
+               execute_command with:
                gh pr review ${{ steps.pr_context.outputs.pr_number }} --comment -b "
                ## Review Summary
                
