@@ -244,10 +244,15 @@ runs:
         QUALITY_GATES='${{ inputs.quality_gates }}'
         if [ "$QUALITY_GATES" != "[]" ] && [ -n "$QUALITY_GATES" ]; then
           # Parse and add quality gates to config
-          jq --argjson gates "$QUALITY_GATES" \
-             '.quality_gates = {
-               "custom_validations": $gates
-             }' /tmp/base_config.json > /tmp/config_with_gates.json
+          # Transform input array to add required: true by default
+          GATES_WITH_REQUIRED=$(echo "$QUALITY_GATES" | jq -c 'map({
+            name: .name,
+            command: .command,
+            required: true
+          })')
+          
+          jq --argjson gates "$GATES_WITH_REQUIRED" \
+             '.quality_gates = $gates' /tmp/base_config.json > /tmp/config_with_gates.json
           mv /tmp/config_with_gates.json /tmp/base_config.json
         fi
 
