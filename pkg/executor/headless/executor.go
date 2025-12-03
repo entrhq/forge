@@ -136,11 +136,11 @@ func (e *Executor) Run(ctx context.Context) error {
 			case types.EventTypeApiCallStart:
 				e.logger.Infof("~ API call...")
 			case types.EventTypeToolCall:
-				e.logger.Infof("> tool: %s", event.ToolName)
+				e.logger.Infof("> tool: %s", e.formatToolCall(event))
 			case types.EventTypeToolResult:
-				e.logger.Infof("✓ tool: %s", event.ToolName)
+				e.logger.Infof("✓ tool: %s", e.formatToolCall(event))
 			case types.EventTypeToolResultError:
-				e.logger.Infof("✗ tool: %s", event.ToolName)
+				e.logger.Infof("✗ tool: %s", e.formatToolCall(event))
 			case types.EventTypeContextSummarizationStart:
 				e.logger.Infof("~ Summarizing context...")
 			}
@@ -576,4 +576,28 @@ func (e *Executor) fail(err error) error {
 	}
 
 	return err
+}
+
+// formatToolCall formats a tool call for display, showing parameters when available
+func (e *Executor) formatToolCall(event *types.AgentEvent) string {
+	if len(event.ToolInput) == 0 {
+		return event.ToolName
+	}
+
+	// Build a compact parameter summary
+	params := ""
+	count := 0
+	for key := range event.ToolInput {
+		if count > 0 {
+			params += ", "
+		}
+		params += key
+		count++
+		if count >= 3 {
+			params += ", ..."
+			break
+		}
+	}
+
+	return fmt.Sprintf("%s(%s)", event.ToolName, params)
 }
