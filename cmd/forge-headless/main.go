@@ -137,16 +137,43 @@ func run(ctx context.Context, cliConfig *CLIConfig) error {
 		return fmt.Errorf("failed to initialize configuration: %w", initErr)
 	}
 
-	// Create LLM provider
+	// Determine final LLM configuration (CLI args override config file)
+	finalModel := cliConfig.Model
+	finalBaseURL := cliConfig.BaseURL
+	finalAPIKey := cliConfig.APIKey
+
+	// Override with config file values if CLI args are not provided
+	if llmConfig := appconfig.GetLLM(); llmConfig != nil {
+		if cliConfig.Model == defaultModel {
+			// CLI used default, check config
+			if configModel := llmConfig.GetModel(); configModel != "" {
+				finalModel = configModel
+			}
+		}
+		if cliConfig.BaseURL == "" {
+			// CLI didn't specify base URL, check config
+			if configBaseURL := llmConfig.GetBaseURL(); configBaseURL != "" {
+				finalBaseURL = configBaseURL
+			}
+		}
+		if cliConfig.APIKey == "" {
+			// CLI didn't specify API key, check config
+			if configAPIKey := llmConfig.GetAPIKey(); configAPIKey != "" {
+				finalAPIKey = configAPIKey
+			}
+		}
+	}
+
+	// Create LLM provider with final configuration
 	providerOpts := []openai.ProviderOption{
-		openai.WithModel(cliConfig.Model),
+		openai.WithModel(finalModel),
 	}
 
-	if cliConfig.BaseURL != "" {
-		providerOpts = append(providerOpts, openai.WithBaseURL(cliConfig.BaseURL))
+	if finalBaseURL != "" {
+		providerOpts = append(providerOpts, openai.WithBaseURL(finalBaseURL))
 	}
 
-	provider, err := openai.NewProvider(cliConfig.APIKey, providerOpts...)
+	provider, err := openai.NewProvider(finalAPIKey, providerOpts...)
 	if err != nil {
 		return fmt.Errorf("failed to create LLM provider: %w", err)
 	}
