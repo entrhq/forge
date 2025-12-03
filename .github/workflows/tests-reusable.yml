@@ -138,6 +138,7 @@ jobs:
           git_pr_title: "${{ format('test: Add tests for PR #{0}', steps.pr_context.outputs.pr_number) }}"
           git_pr_body: "${{ format('Automated test creation based on changes in #{0}\n\nThis PR adds comprehensive test coverage for the changes introduced in the original PR.', steps.pr_context.outputs.pr_number) }}"
           git_pr_draft: "false"
+          quality_gates: '${{ inputs.quality_gates }}'
 
       - name: Run Forge
         id: forge
@@ -148,49 +149,6 @@ jobs:
           openai_base_url: ${{ secrets.OPENAI_BASE_URL }}
           model: ${{ inputs.model }}
 
-      - name: Run Quality Gates
-        if: inputs.quality_gates != '[]'
-        id: quality_gates
-        continue-on-error: true
-        shell: bash
-        run: |
-          set +e
-          echo "quality_results=" >> $GITHUB_OUTPUT
-          gates='${{ inputs.quality_gates }}'
-          
-          if [ "$gates" = "[]" ]; then
-            echo "No quality gates configured"
-            exit 0
-          fi
-          
-          all_passed=true
-          results=""
-          
-          echo "$gates" | jq -c '.[]' | while read gate; do
-            name=$(echo "$gate" | jq -r '.name')
-            command=$(echo "$gate" | jq -r '.command')
-            
-            echo "Running quality gate: $name"
-            echo "Command: $command"
-            
-            if eval "$command"; then
-              echo "✅ $name passed"
-              results="${results}✅ $name passed\n"
-            else
-              echo "❌ $name failed"
-              results="${results}❌ $name failed\n"
-              all_passed=false
-            fi
-          done
-          
-          echo -e "$results" > /tmp/quality_gate_results.txt
-          
-          if [ "$all_passed" = false ]; then
-            exit 1
-          fi
-
-
-
       - name: Comment on PR
         if: always()
         uses: actions/github-script@v7
@@ -200,34 +158,11 @@ jobs:
             const exitCode = '${{ steps.forge.outputs.exit_code }}';
             const prNumber = '${{ steps.pr_context.outputs.pr_number }}';
             const mode = '${{ inputs.mode }}';
-            const qualityGatesInput = '${{ inputs.quality_gates }}';
-            const qualityGatesRan = qualityGatesInput !== '[]';
-            const qualityGateStatus = '${{ steps.quality_gates.outcome }}';
             
             let comment = '## 🧪 Test Creation Results\n\n';
             
             if (exitCode === '0') {
               comment += '✅ Test creation completed successfully!\n\n';
-              
-              if (qualityGatesRan) {
-                comment += '### Quality Gate Results\n\n';
-                
-                if (qualityGateStatus === 'success') {
-                  comment += '✅ All quality gates passed!\n\n';
-                } else if (qualityGateStatus === 'failure') {
-                  comment += '⚠️ Some quality gates failed:\n\n';
-                }
-                
-                try {
-                  const gates = JSON.parse(qualityGatesInput);
-                  gates.forEach(gate => {
-                    comment += `- **${gate.name}**: \`${gate.command}\`\n`;
-                  });
-                  comment += '\n';
-                } catch (e) {
-                  comment += 'See workflow logs for details.\n\n';
-                }
-              }
               
               if (mode === 'pr') {
                 comment += '📝 A pull request with new tests has been created.\n';

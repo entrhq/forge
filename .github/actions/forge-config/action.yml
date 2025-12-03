@@ -104,6 +104,12 @@ inputs:
     description: Create PR as draft
     required: false
     default: "false"
+  
+  # Quality gates settings
+  quality_gates:
+    description: JSON array of quality gate commands to run
+    required: false
+    default: '[]'
 outputs:
   config_path:
     description: Path to the generated configuration file
@@ -232,6 +238,17 @@ runs:
              '.constraints.max_files = $max_files | .constraints.max_lines_changed = $max_lines' \
              /tmp/base_config.json > /tmp/config_with_write.json
           mv /tmp/config_with_write.json /tmp/base_config.json
+        fi
+
+        # Add quality gates if provided
+        QUALITY_GATES='${{ inputs.quality_gates }}'
+        if [ "$QUALITY_GATES" != "[]" ] && [ -n "$QUALITY_GATES" ]; then
+          # Parse and add quality gates to config
+          jq --argjson gates "$QUALITY_GATES" \
+             '.quality_gates = {
+               "custom_validations": $gates
+             }' /tmp/base_config.json > /tmp/config_with_gates.json
+          mv /tmp/config_with_gates.json /tmp/base_config.json
         fi
 
         # Add git configuration based on git_mode
