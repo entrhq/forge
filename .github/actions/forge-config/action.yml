@@ -269,6 +269,7 @@ runs:
                  "auto_commit": true,
                  "auto_push": true,
                  "create_pr": true,
+                 "commit_on_quality_fail": true,
                  "branch": $branch,
                  "commit_message": $commit_msg,
                  "pr_title": $pr_title,
