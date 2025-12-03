@@ -13,11 +13,6 @@ on:
         required: false
         type: string
         default: ''
-      source_patterns:
-        description: 'Comma-separated file patterns to read source files from (e.g., "**/*.go,**/*.py")'
-        required: false
-        type: string
-        default: '**/*.go,**/*.py,**/*.ts,**/*.js,**/*.jsx,**/*.tsx'
       file_patterns:
         description: 'Comma-separated file patterns to allow writing test files (e.g., "**/*_test.go,**/*_test.py")'
         required: false
@@ -131,7 +126,6 @@ jobs:
           pr_body: ${{ steps.pr_context.outputs.pr_body }}
           changed_files: ${{ steps.pr_context.outputs.changed_files }}
           custom_instructions: ${{ inputs.custom_instructions }}
-          read_patterns: ${{ inputs.source_patterns }}
           file_patterns: ${{ inputs.file_patterns }}
           deny_patterns: ${{ inputs.deny_patterns }}
           mode: "write"

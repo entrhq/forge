@@ -62,7 +62,7 @@ jobs:
       mode: 'pr'
       model: 'google/gemini-2.5-pro'
       pr_branch_prefix: 'tests/auto-generate'
-      source_patterns: '**/*.go,**/*.py,**/*.ts,**/*.js,**/*.jsx,**/*.tsx'
+      file_patterns: '**/*.go'
       max_tokens: 2000000
       quality_gates: |
         [
