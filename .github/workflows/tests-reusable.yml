@@ -13,8 +13,13 @@ on:
         required: false
         type: string
         default: ''
+      source_patterns:
+        description: 'Comma-separated file patterns to read source files from (e.g., "**/*.go,**/*.py")'
+        required: false
+        type: string
+        default: '**/*.go,**/*.py,**/*.ts,**/*.js,**/*.jsx,**/*.tsx'
       file_patterns:
-        description: 'Comma-separated file patterns to allow for test files (e.g., "**/*_test.go,**/*_test.py")'
+        description: 'Comma-separated file patterns to allow writing test files (e.g., "**/*_test.go,**/*_test.py")'
         required: false
         type: string
         default: '**/*_test.go,**/*_test.py,**/test_*.py,**/*.test.ts,**/*.test.js,**/*.spec.ts,**/*.spec.js'
@@ -48,6 +53,11 @@ on:
         required: false
         type: string
         default: 'google/gemini-2.5-pro'
+      quality_gates:
+        description: 'JSON array of quality gate commands to run (e.g., [{"name": "Go Tests", "command": "go test ./..."}, {"name": "Linter", "command": "golangci-lint run"}])'
+        required: false
+        type: string
+        default: '[]'
     secrets:
       OPENAI_API_KEY:
         description: 'OpenAI API key (or compatible API key)'
@@ -121,6 +131,7 @@ jobs:
           pr_body: ${{ steps.pr_context.outputs.pr_body }}
           changed_files: ${{ steps.pr_context.outputs.changed_files }}
           custom_instructions: ${{ inputs.custom_instructions }}
+          read_patterns: ${{ inputs.source_patterns }}
           file_patterns: ${{ inputs.file_patterns }}
           deny_patterns: ${{ inputs.deny_patterns }}
           mode: "write"
@@ -143,6 +154,49 @@ jobs:
           openai_base_url: ${{ secrets.OPENAI_BASE_URL }}
           model: ${{ inputs.model }}
 
+      - name: Run Quality Gates
+        if: inputs.quality_gates != '[]'
+        id: quality_gates
+        continue-on-error: true
+        shell: bash
+        run: |
+          set +e
+          echo "quality_results=" >> $GITHUB_OUTPUT
+          gates='${{ inputs.quality_gates }}'
+          
+          if [ "$gates" = "[]" ]; then
+            echo "No quality gates configured"
+            exit 0
+          fi
+          
+          all_passed=true
+          results=""
+          
+          echo "$gates" | jq -c '.[]' | while read gate; do
+            name=$(echo "$gate" | jq -r '.name')
+            command=$(echo "$gate" | jq -r '.command')
+            
+            echo "Running quality gate: $name"
+            echo "Command: $command"
+            
+            if eval "$command"; then
+              echo "✅ $name passed"
+              results="${results}✅ $name passed\n"
+            else
+              echo "❌ $name failed"
+              results="${results}❌ $name failed\n"
+              all_passed=false
+            fi
+          done
+          
+          echo -e "$results" > /tmp/quality_gate_results.txt
+          
+          if [ "$all_passed" = false ]; then
+            exit 1
+          fi
+
+
+
       - name: Comment on PR
         if: always()
         uses: actions/github-script@v7
@@ -152,11 +206,34 @@ jobs:
             const exitCode = '${{ steps.forge.outputs.exit_code }}';
             const prNumber = '${{ steps.pr_context.outputs.pr_number }}';
             const mode = '${{ inputs.mode }}';
+            const qualityGatesInput = '${{ inputs.quality_gates }}';
+            const qualityGatesRan = qualityGatesInput !== '[]';
+            const qualityGateStatus = '${{ steps.quality_gates.outcome }}';
             
             let comment = '## 🧪 Test Creation Results\n\n';
             
             if (exitCode === '0') {
               comment += '✅ Test creation completed successfully!\n\n';
+              
+              if (qualityGatesRan) {
+                comment += '### Quality Gate Results\n\n';
+                
+                if (qualityGateStatus === 'success') {
+                  comment += '✅ All quality gates passed!\n\n';
+                } else if (qualityGateStatus === 'failure') {
+                  comment += '⚠️ Some quality gates failed:\n\n';
+                }
+                
+                try {
+                  const gates = JSON.parse(qualityGatesInput);
+                  gates.forEach(gate => {
+                    comment += `- **${gate.name}**: \`${gate.command}\`\n`;
+                  });
+                  comment += '\n';
+                } catch (e) {
+                  comment += 'See workflow logs for details.\n\n';
+                }
+              }
               
               if (mode === 'pr') {
                 comment += '📝 A pull request with new tests has been created.\n';

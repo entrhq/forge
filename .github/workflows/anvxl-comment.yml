@@ -62,7 +62,14 @@ jobs:
       mode: 'pr'
       model: 'google/gemini-2.5-pro'
       pr_branch_prefix: 'tests/auto-generate'
+      source_patterns: '**/*.go,**/*.py,**/*.ts,**/*.js,**/*.jsx,**/*.tsx'
       max_tokens: 2000000
+      quality_gates: |
+        [
+          {"name": "Test", "command": "make test"},
+          {"name": "Format", "command": "make fmt"},
+          {"name": "Lint", "command": "make lint"}
+        ]
       custom_instructions: |
         Write comprehensive tests with clear descriptions. Focus on edge cases and error handling.
     secrets:
