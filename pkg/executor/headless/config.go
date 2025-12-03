@@ -66,10 +66,11 @@ type ConstraintConfig struct {
 
 // QualityGateConfig defines a quality gate to run before committing changes
 type QualityGateConfig struct {
-	Name       string `yaml:"name" json:"name"`
-	Command    string `yaml:"command" json:"command"`
-	Required   bool   `yaml:"required" json:"required"`
-	MaxRetries int    `yaml:"max_retries" json:"max_retries"` // Maximum number of retry attempts (default: 3)
+	Name       string        `yaml:"name" json:"name"`
+	Command    string        `yaml:"command" json:"command"`
+	Required   bool          `yaml:"required" json:"required"`
+	MaxRetries int           `yaml:"max_retries" json:"max_retries"` // Maximum number of retry attempts (default: 3)
+	Timeout    time.Duration `yaml:"timeout" json:"timeout"`         // Timeout for this quality gate (default: 3m)
 }
 
 // GitConfig defines git operation configuration

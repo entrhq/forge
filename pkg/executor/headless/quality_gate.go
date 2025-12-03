@@ -30,11 +30,19 @@ type CommandQualityGate struct {
 
 // NewCommandQualityGate creates a new command-based quality gate
 func NewCommandQualityGate(name, command string, required bool) *CommandQualityGate {
+	return NewCommandQualityGateWithTimeout(name, command, required, 3*time.Minute)
+}
+
+// NewCommandQualityGateWithTimeout creates a new command-based quality gate with custom timeout
+func NewCommandQualityGateWithTimeout(name, command string, required bool, timeout time.Duration) *CommandQualityGate {
+	if timeout <= 0 {
+		timeout = 3 * time.Minute // Default timeout
+	}
 	return &CommandQualityGate{
 		name:     name,
 		command:  command,
 		required: required,
-		timeout:  5 * time.Minute, // Default timeout
+		timeout:  timeout,
 	}
 }
 
@@ -50,6 +58,13 @@ func (g *CommandQualityGate) Required() bool {
 
 // Execute runs the quality gate command
 func (g *CommandQualityGate) Execute(ctx context.Context, workspaceDir string) error {
+	// Check if parent context is already cancelled before starting
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("quality gate '%s' skipped: parent context cancelled", g.name)
+	default:
+	}
+
 	// Create context with timeout
 	execCtx, cancel := context.WithTimeout(ctx, g.timeout)
 	defer cancel()
@@ -116,6 +131,11 @@ func (r *QualityGateRunner) RunAll(ctx context.Context, workspaceDir string, log
 		result := QualityGateResult{
 			Name:     gate.Name(),
 			Required: gate.Required(),
+		}
+
+		// Log that we're starting this gate
+		if logger != nil {
+			logger.Infof("  → Running quality gate: %s", gate.Name())
 		}
 
 		// Execute gate
@@ -228,7 +248,11 @@ func (r *QualityGateResults) FormatFeedbackMessage(retryCount, maxRetries int) s
 func CreateQualityGates(configs []QualityGateConfig) []QualityGate {
 	gates := make([]QualityGate, 0, len(configs))
 	for _, config := range configs {
-		gate := NewCommandQualityGate(config.Name, config.Command, config.Required)
+		timeout := config.Timeout
+		if timeout <= 0 {
+			timeout = 3 * time.Minute // Default timeout if not specified
+		}
+		gate := NewCommandQualityGateWithTimeout(config.Name, config.Command, config.Required, timeout)
 		gates = append(gates, gate)
 	}
 	return gates

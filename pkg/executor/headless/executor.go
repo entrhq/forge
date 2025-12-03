@@ -330,14 +330,18 @@ func (e *Executor) Run(ctx context.Context) error {
 	channels.Input <- types.NewUserInput(e.config.Task)
 
 	// Wait for completion or timeout
+	timedOut := false
 	select {
 	case <-channels.Done:
 		e.logger.Debugf("Agent completed - Done channel closed")
 	case <-execCtx.Done():
 		if execCtx.Err() == context.DeadlineExceeded {
-			return e.fail(fmt.Errorf("execution timeout exceeded"))
+			e.logger.Warningf("! Execution timeout exceeded - will attempt to preserve completed work")
+			timedOut = true
+			// Don't return early - let finalize() handle git operations
+		} else {
+			return e.fail(fmt.Errorf("execution canceled: %w", execCtx.Err()))
 		}
-		return e.fail(fmt.Errorf("execution canceled: %w", execCtx.Err()))
 	}
 
 	e.logger.Debugf("Waiting for event consumer to finish...")
@@ -345,7 +349,14 @@ func (e *Executor) Run(ctx context.Context) error {
 	<-eventDone
 	e.logger.Debugf("Event consumer finished")
 
-	// Finalize execution
+	// Handle timeout after events are processed
+	if timedOut {
+		e.summary.Status = statusPartialSuccess
+		e.summary.Error = "Execution timeout exceeded, but changes were preserved"
+		e.logger.Warningf("! Setting status to partial_success due to timeout")
+	}
+
+	// Finalize execution (this will commit changes even on timeout if configured)
 	return e.finalize(ctx)
 }
 

@@ -18,7 +18,7 @@ help: ## Display this help screen
 
 test: ## Run tests with coverage
 	@echo "Running tests..."
-	$(GOTEST) -v -race -coverprofile=coverage.out -covermode=atomic ./...
+	$(GOTEST) -v -race -timeout=5m -coverprofile=coverage.out -covermode=atomic ./...
 	@echo "\nCoverage report:"
 	$(GOCMD) tool cover -func=coverage.out
 
