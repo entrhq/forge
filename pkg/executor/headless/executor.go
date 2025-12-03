@@ -218,7 +218,7 @@ func (e *Executor) Run(ctx context.Context) error {
 
 				// Run quality gates before shutdown
 				if len(e.qualityGates.gates) > 0 {
-					results := e.qualityGates.RunAll(ctx, e.config.WorkspaceDir)
+					results := e.qualityGates.RunAll(ctx, e.config.WorkspaceDir, e.logger)
 
 					if !results.AllPassed {
 						e.qualityGateRetryCount++

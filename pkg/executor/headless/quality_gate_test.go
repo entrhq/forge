@@ -57,7 +57,7 @@ func TestQualityGateRunner_RunAll(t *testing.T) {
 			// Create temp workspace
 			tmpDir := t.TempDir()
 
-			results := runner.RunAll(ctx, tmpDir)
+			results := runner.RunAll(ctx, tmpDir, nil)
 
 			if results.AllPassed != tt.wantAllPassed {
 				t.Errorf("AllPassed = %v, want %v", results.AllPassed, tt.wantAllPassed)

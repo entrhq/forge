@@ -106,7 +106,7 @@ func NewQualityGateRunner(gates []QualityGate) *QualityGateRunner {
 }
 
 // RunAll executes all quality gates and returns results
-func (r *QualityGateRunner) RunAll(ctx context.Context, workspaceDir string) *QualityGateResults {
+func (r *QualityGateRunner) RunAll(ctx context.Context, workspaceDir string, logger *Logger) *QualityGateResults {
 	results := &QualityGateResults{
 		Results:   make([]QualityGateResult, 0, len(r.gates)),
 		AllPassed: true, // Start optimistic
@@ -123,8 +123,14 @@ func (r *QualityGateRunner) RunAll(ctx context.Context, workspaceDir string) *Qu
 		if err != nil {
 			result.Passed = false
 			result.Error = err.Error()
+			if logger != nil {
+				logger.QualityGate(gate.Name(), false, err.Error())
+			}
 		} else {
 			result.Passed = true
+			if logger != nil {
+				logger.QualityGate(gate.Name(), true, "")
+			}
 		}
 
 		results.Results = append(results.Results, result)

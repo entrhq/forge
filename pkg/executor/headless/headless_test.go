@@ -314,7 +314,7 @@ func TestQualityGateRunner(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			runner := NewQualityGateRunner(tt.gates)
-			results := runner.RunAll(context.Background(), "/tmp")
+			results := runner.RunAll(context.Background(), "/tmp", nil)
 
 			if results.AllPassed != tt.wantPassed {
 				t.Errorf("RunAll() AllPassed = %v, want %v", results.AllPassed, tt.wantPassed)
