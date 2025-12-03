@@ -37,19 +37,15 @@ runs:
     - name: Setup Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.23'
+        go-version: '1.24'
         cache: false
 
     - name: Install Forge
       shell: bash
       run: |
-        # Check if forge is already installed
-        if ! command -v forge &> /dev/null; then
-          echo "Installing Forge..."
-          go install github.com/entrhq/forge/cmd/forge@latest
-        else
-          echo "Forge already installed"
-        fi
+        echo "Installing latest version of Forge..."
+        go install github.com/entrhq/forge/cmd/forge@latest
+        forge --version || echo "Forge installed successfully"
 
     - name: Run Forge
       id: run

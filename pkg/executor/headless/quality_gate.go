@@ -102,6 +102,9 @@ type QualityGateError struct {
 }
 
 func (e *QualityGateError) Error() string {
+	if e.Output != "" {
+		return fmt.Sprintf("quality gate '%s' failed: %v\nOutput:\n%s", e.GateName, e.Err, e.Output)
+	}
 	return fmt.Sprintf("quality gate '%s' failed: %v", e.GateName, e.Err)
 }
 
