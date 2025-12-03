@@ -58,10 +58,10 @@ func (g *CommandQualityGate) Required() bool {
 
 // Execute runs the quality gate command
 func (g *CommandQualityGate) Execute(ctx context.Context, workspaceDir string) error {
-	// Check if parent context is already cancelled before starting
+	// Check if parent context is already canceled before starting
 	select {
 	case <-ctx.Done():
-		return fmt.Errorf("quality gate '%s' skipped: parent context cancelled", g.name)
+		return fmt.Errorf("quality gate '%s' skipped: parent context canceled", g.name)
 	default:
 	}
 

@@ -171,7 +171,7 @@ func (l *Logger) QualityGate(name string, passed bool, message string) {
 			fmt.Fprintf(l.writer, "%s  ✓ %s: passed%s\n", l.colorBoldGreen, name, l.colorReset)
 		} else {
 			fmt.Fprintf(l.writer, "%s  ✗ %s: failed%s\n", l.colorBoldRed, name, l.colorReset)
-			if message != "" && l.level >= LogLevelVerbose {
+			if message != "" {
 				fmt.Fprintf(l.writer, "%s    %s%s\n", l.colorGray, message, l.colorReset)
 			}
 		}
