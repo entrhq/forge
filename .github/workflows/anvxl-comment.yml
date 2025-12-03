@@ -15,7 +15,7 @@ jobs:
       pull-requests: write
     uses: ./.github/workflows/docs-reusable.yml
     with:
-      mode: 'open_pr'
+      mode: 'pr'
       model: 'google/gemini-2.5-pro'
       pr_branch_prefix: 'docs/auto-update'
       file_patterns: '**/*.md,docs/**'
@@ -48,4 +48,25 @@ jobs:
       OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
       GH_APP_ID: ${{ secrets.GH_APP_ID }}
       GH_APP_PRIVATE_KEY: ${{ secrets.GH_APP_PRIVATE_KEY }}
-      
+  
+  create-tests:
+    # Only run on PR comments that contain the trigger phrase tests
+    if: |
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '@anvxl tests')
+    permissions:
+      contents: write
+      pull-requests: write
+    uses: ./.github/workflows/tests-reusable.yml
+    with:
+      mode: 'pr'
+      model: 'google/gemini-2.5-pro'
+      pr_branch_prefix: 'tests/auto-generate'
+      max_tokens: 2000000
+      custom_instructions: |
+        Write comprehensive tests with clear descriptions. Focus on edge cases and error handling.
+    secrets:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
+      GH_APP_ID: ${{ secrets.GH_APP_ID }}
+      GH_APP_PRIVATE_KEY: ${{ secrets.GH_APP_PRIVATE_KEY }}
