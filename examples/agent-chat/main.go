@@ -106,8 +106,8 @@ func main() {
 
 	// Register custom calculator tool
 	calculator := &CalculatorTool{}
-	if err := ag.RegisterTool(calculator); err != nil {
-		log.Fatalf("Failed to register calculator tool: %v", err)
+	if regErr := ag.RegisterTool(calculator); regErr != nil {
+		log.Fatalf("Failed to register calculator tool: %v", regErr)
 	}
 
 	// Get current working directory for git operations

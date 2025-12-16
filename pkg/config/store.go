@@ -107,7 +107,7 @@ func (s *FileStore) Save() error {
 
 	// Create directory if it doesn't exist
 	dir := filepath.Dir(s.path)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0750); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 

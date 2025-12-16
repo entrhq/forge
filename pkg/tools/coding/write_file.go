@@ -79,7 +79,7 @@ func (t *WriteFileTool) Execute(ctx context.Context, argsXML []byte) (string, ma
 
 	// Create parent directories if they don't exist
 	dir := filepath.Dir(absPath)
-	if mkdirErr := os.MkdirAll(dir, 0755); mkdirErr != nil {
+	if mkdirErr := os.MkdirAll(dir, 0750); mkdirErr != nil {
 		return "", nil, fmt.Errorf("failed to create directories: %w", mkdirErr)
 	}
 

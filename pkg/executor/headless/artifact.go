@@ -35,7 +35,7 @@ func (w *ArtifactWriter) WriteAll(summary *ExecutionSummary) error {
 	}
 
 	// Ensure output directory exists
-	if err := os.MkdirAll(w.outputDir, 0755); err != nil {
+	if err := os.MkdirAll(w.outputDir, 0750); err != nil {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 
