@@ -170,7 +170,7 @@ func (c *ContextOverlay) Update(msg tea.Msg, state types.StateProvider, actions 
 	// Handle Enter key to close (in addition to Esc)
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
 		if keyMsg.Type == tea.KeyEnter {
-			return c, c.BaseOverlay.close(actions)
+			return c, c.close(actions)
 		}
 	}
 

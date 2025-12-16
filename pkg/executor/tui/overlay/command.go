@@ -123,10 +123,10 @@ func (c *CommandExecutionOverlay) handleCommandEvent(event *pkgtypes.AgentEvent)
 	case pkgtypes.EventTypeCommandOutput:
 		// Append new output and update viewport
 		c.output.WriteString(data.Output)
-		c.BaseOverlay.SetContent(c.output.String())
+		c.SetContent(c.output.String())
 
 		// Auto-scroll to bottom if we were already at the bottom
-		vp := c.BaseOverlay.Viewport()
+		vp := c.Viewport()
 		if vp.AtBottom() {
 			vp.GotoBottom()
 		}

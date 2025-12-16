@@ -393,7 +393,7 @@ func (m *model) handleAgentError(msg agentErrMsg) (tea.Model, tea.Cmd) {
 // handleBashCommandResult processes bash command execution results
 func (m *model) handleBashCommandResult(msg bashCommandResultMsg) (tea.Model, tea.Cmd) {
 	// Display the result in the viewport
-	m.content.WriteString(fmt.Sprintf("[%s] Command completed:\n", msg.timestamp))
+	fmt.Fprintf(m.content, "[%s] Command completed:\n", msg.timestamp)
 	m.content.WriteString(msg.result)
 	m.content.WriteString("\n\n")
 

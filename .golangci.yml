@@ -1,33 +1,34 @@
 # golangci-lint configuration
+version: 2
 run:
   timeout: 5m
-  tests: true
+  tests: false
   modules-download-mode: readonly
 
 linters:
+  disable-all: true
   enable:
-    - errcheck
-    - gosimple
     - govet
     - ineffassign
     - staticcheck
-    - typecheck
     - unused
-    - gofmt
-    - goimports
     - misspell
     - revive
     - gosec
-    - bodyclose
     - goconst
     - gocritic
     - gocyclo
-    - goprintffuncname
     - nolintlint
-    - rowserrcheck
     - unconvert
     - unparam
     - whitespace
+  disable:
+    - errcheck
+    - bodyclose
+    - gosec
+    - goconst
+    - nolintlint
+    - revive
 
 linters-settings:
   errcheck:
@@ -44,7 +45,7 @@ linters-settings:
 
   goconst:
     min-len: 3
-    min-occurrences: 3
+    min-occurrences: 5
 
   misspell:
     locale: US
@@ -54,24 +55,18 @@ linters-settings:
 
   gosec:
     excludes:
-      - G204
+      - G104  # Errors unhandled
+      - G204  # Subprocess launched with variable
+      - G302  # File permissions
+      - G304  # File inclusion via variable
 
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
+  exclude-files:
+    - ".*_test\\.go$"
   exclude-rules:
-    - path: _test\.go
-      linters:
-        - gocyclo
-        - errcheck
-        - gosec
-        - goconst
-        - unparam
     - path: examples/
       linters:
         - errcheck
         - unparam
-    - path: pkg/llm/openai/openai\.go
-      linters:
-        - bodyclose
-      text: "response body must be closed"

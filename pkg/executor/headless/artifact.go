@@ -201,7 +201,7 @@ func (w *ArtifactWriter) writeQualityGateAttempts(md *strings.Builder, attempts 
 		if !attempt.Passed {
 			attemptStatus = statusIconFail
 		}
-		md.WriteString(fmt.Sprintf("### Attempt %d: %s\n\n", attempt.AttemptNumber, attemptStatus))
+		fmt.Fprintf(md, "### Attempt %d: %s\n\n", attempt.AttemptNumber, attemptStatus)
 		w.writeQualityGateResults(md, attempt.Results)
 	}
 }
@@ -213,13 +213,13 @@ func (w *ArtifactWriter) writeQualityGateResults(md *strings.Builder, results []
 		if !result.Passed {
 			status = statusIconFail
 		}
-		md.WriteString(fmt.Sprintf("%s **%s**", status, result.Name))
+		fmt.Fprintf(md, "%s **%s**", status, result.Name)
 		if result.Required {
 			md.WriteString(" (required)")
 		}
 		md.WriteString("\n")
 		if result.Error != "" {
-			md.WriteString(fmt.Sprintf("   Error: %s\n", result.Error))
+			fmt.Fprintf(md, "   Error: %s\n", result.Error)
 		}
 	}
 	md.WriteString("\n")

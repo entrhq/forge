@@ -39,7 +39,7 @@ func NewHelpOverlay(title, content string) *HelpOverlay {
 			// Allow Enter to close help overlay
 			if msg.Type == tea.KeyEnter {
 				if overlay.BaseOverlay != nil {
-					return true, overlay.BaseOverlay.close(actions)
+					return true, overlay.close(actions)
 				}
 			}
 			return false, nil

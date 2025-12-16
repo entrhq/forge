@@ -82,7 +82,7 @@ func (a *GenericApprovalOverlay) Update(msg tea.Msg, state types.StateProvider, 
 			return nil, a.request.OnReject()
 		case keyEnter:
 			// Enter submits the currently selected choice
-			if a.ApprovalOverlayBase.Selected() == ApprovalChoiceAccept {
+			if a.Selected() == ApprovalChoiceAccept {
 				return nil, a.request.OnApprove()
 			}
 			return nil, a.request.OnReject()

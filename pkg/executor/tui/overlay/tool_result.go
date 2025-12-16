@@ -46,7 +46,7 @@ func NewToolResultOverlay(toolName, result string, width, height int) *ToolResul
 			// Allow 'q' and 'v' to close the overlay
 			if msg.String() == "q" || msg.String() == "v" {
 				if overlay.BaseOverlay != nil {
-					return true, overlay.BaseOverlay.close(actions)
+					return true, overlay.close(actions)
 				}
 			}
 			return false, nil
