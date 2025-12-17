@@ -148,6 +148,7 @@ jobs:
           openai_api_key: ${{ secrets.OPENAI_API_KEY }}
           openai_base_url: ${{ secrets.OPENAI_BASE_URL }}
           model: ${{ inputs.model }}
+          github_token: ${{ steps.app_token.outputs.token }}
 
       - name: Comment on PR
         if: always()
