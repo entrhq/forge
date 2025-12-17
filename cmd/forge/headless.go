@@ -13,7 +13,7 @@ import (
 	"github.com/entrhq/forge/pkg/agent/tools"
 	appconfig "github.com/entrhq/forge/pkg/config"
 	"github.com/entrhq/forge/pkg/executor/headless"
-	"github.com/entrhq/forge/pkg/llm/openai"
+
 	"github.com/entrhq/forge/pkg/security/workspace"
 	"github.com/entrhq/forge/pkg/tools/coding"
 	"github.com/entrhq/forge/pkg/tools/scratchpad"
@@ -21,6 +21,8 @@ import (
 )
 
 // runHeadless executes the headless mode
+//
+
 func runHeadless(ctx context.Context, config *Config) error {
 	// Load and validate configuration
 	execConfig, err := loadAndValidateConfig(config)
@@ -33,18 +35,10 @@ func runHeadless(ctx context.Context, config *Config) error {
 		return fmt.Errorf("failed to initialize configuration: %w", initErr)
 	}
 
-	// Create LLM provider
-	providerOpts := []openai.ProviderOption{
-		openai.WithModel(config.Model),
-	}
-
-	if config.BaseURL != "" {
-		providerOpts = append(providerOpts, openai.WithBaseURL(config.BaseURL))
-	}
-
-	provider, err := openai.NewProvider(config.APIKey, providerOpts...)
+	// Build the LLM provider, respecting config file and CLI flag precedence
+	provider, err := appconfig.BuildProvider(config.Model, config.BaseURL, config.APIKey, defaultModel)
 	if err != nil {
-		return fmt.Errorf("failed to create LLM provider: %w", err)
+		return err
 	}
 
 	// Create context manager for headless execution

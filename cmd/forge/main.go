@@ -19,7 +19,7 @@ import (
 	"github.com/entrhq/forge/pkg/agent/tools"
 	appconfig "github.com/entrhq/forge/pkg/config"
 	"github.com/entrhq/forge/pkg/executor/tui"
-	"github.com/entrhq/forge/pkg/llm/openai"
+
 	"github.com/entrhq/forge/pkg/security/workspace"
 	"github.com/entrhq/forge/pkg/tools/coding"
 	"github.com/entrhq/forge/pkg/tools/scratchpad"
@@ -158,28 +158,17 @@ func run(ctx context.Context, config *Config) error {
 }
 
 // runTUI executes the TUI mode
+//
+
 func runTUI(ctx context.Context, config *Config) error {
 	// Initialize global configuration (for auto-approval and command whitelist)
 	if err := appconfig.Initialize(""); err != nil {
 		return fmt.Errorf("failed to initialize configuration: %w", err)
 	}
 
-	// Create OpenAI provider with optional base URL
-	providerOpts := []openai.ProviderOption{
-		openai.WithModel(config.Model),
-	}
-
-	// Add base URL if provided
-	if config.BaseURL != "" {
-		providerOpts = append(providerOpts, openai.WithBaseURL(config.BaseURL))
-	}
-
-	provider, err := openai.NewProvider(
-		config.APIKey,
-		providerOpts...,
-	)
+	provider, err := appconfig.BuildProvider(config.Model, config.BaseURL, config.APIKey, defaultModel)
 	if err != nil {
-		return fmt.Errorf("failed to create LLM provider: %w", err)
+		return err
 	}
 
 	// Create context summarization strategies for long coding sessions

@@ -399,6 +399,21 @@ func (p *Provider) GetModelInfo() *types.ModelInfo {
 	return p.modelInfo
 }
 
+// GetModel returns the model name being used.
+func (p *Provider) GetModel() string {
+	return p.model
+}
+
+// GetBaseURL returns the base URL being used.
+func (p *Provider) GetBaseURL() string {
+	return p.baseURL
+}
+
+// GetAPIKey returns the API key being used.
+func (p *Provider) GetAPIKey() string {
+	return p.apiKey
+}
+
 // convertToOpenAIMessages converts our Message format to OpenAI's ChatCompletionMessageParamUnion format.
 func convertToOpenAIMessages(messages []*types.Message) []openai.ChatCompletionMessageParamUnion {
 	openaiMessages := make([]openai.ChatCompletionMessageParamUnion, 0, len(messages))

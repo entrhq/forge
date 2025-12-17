@@ -527,3 +527,22 @@ func (a *DefaultAgent) GetContextInfo() *ContextInfo {
 func (a *DefaultAgent) GetProvider() llm.Provider {
 	return a.provider
 }
+
+// SetProvider updates the LLM provider used by this agent.
+// This allows hot-reloading of provider configuration without restarting the agent.
+// The update is thread-safe and will take effect on the next agent iteration.
+func (a *DefaultAgent) SetProvider(provider llm.Provider) error {
+	if provider == nil {
+		return fmt.Errorf("provider cannot be nil")
+	}
+
+	// Update the agent's provider
+	a.provider = provider
+
+	// Also update the context manager's provider if it exists
+	if a.contextManager != nil {
+		a.contextManager.SetProvider(provider)
+	}
+
+	return nil
+}

@@ -2,7 +2,13 @@ package config
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // mockSection is a test implementation of the Section interface
@@ -68,18 +74,9 @@ func TestNewManager(t *testing.T) {
 	store := newMockStore()
 	manager := NewManager(store)
 
-	if manager == nil {
-		t.Fatal("NewManager returned nil")
-	}
-
-	if manager.Store() != store {
-		t.Error("Manager does not reference correct store")
-	}
-
-	sections := manager.GetSections()
-	if len(sections) != 0 {
-		t.Error("New manager should have no sections")
-	}
+	require.NotNil(t, manager)
+	assert.Same(t, store, manager.Store())
+	assert.Empty(t, manager.GetSections())
 }
 
 func TestManager_RegisterSection(t *testing.T) {
@@ -88,18 +85,11 @@ func TestManager_RegisterSection(t *testing.T) {
 		section := &mockSection{id: "test", title: "Test"}
 
 		err := manager.RegisterSection(section)
-		if err != nil {
-			t.Fatalf("RegisterSection failed: %v", err)
-		}
+		require.NoError(t, err)
 
 		retrieved, ok := manager.GetSection("test")
-		if !ok {
-			t.Fatal("Section not found after registration")
-		}
-
-		if retrieved.ID() != "test" {
-			t.Error("Retrieved section has wrong ID")
-		}
+		require.True(t, ok, "Section not found after registration")
+		assert.Equal(t, "test", retrieved.ID())
 	})
 
 	t.Run("prevents duplicate registration", func(t *testing.T) {
@@ -107,14 +97,11 @@ func TestManager_RegisterSection(t *testing.T) {
 		section1 := &mockSection{id: "test", title: "Test 1"}
 		section2 := &mockSection{id: "test", title: "Test 2"}
 
-		if err := manager.RegisterSection(section1); err != nil {
-			t.Fatalf("First registration failed: %v", err)
-		}
+		err := manager.RegisterSection(section1)
+		require.NoError(t, err)
 
-		err := manager.RegisterSection(section2)
-		if err == nil {
-			t.Error("Expected error for duplicate registration")
-		}
+		err = manager.RegisterSection(section2)
+		require.Error(t, err)
 	})
 
 	t.Run("maintains registration order", func(t *testing.T) {
@@ -124,18 +111,15 @@ func TestManager_RegisterSection(t *testing.T) {
 		section2 := &mockSection{id: "second", title: "Second"}
 		section3 := &mockSection{id: "third", title: "Third"}
 
-		manager.RegisterSection(section1)
-		manager.RegisterSection(section2)
-		manager.RegisterSection(section3)
+		require.NoError(t, manager.RegisterSection(section1))
+		require.NoError(t, manager.RegisterSection(section2))
+		require.NoError(t, manager.RegisterSection(section3))
 
 		sections := manager.GetSections()
-		if len(sections) != 3 {
-			t.Fatalf("Expected 3 sections, got %d", len(sections))
-		}
-
-		if sections[0].ID() != "first" || sections[1].ID() != "second" || sections[2].ID() != "third" {
-			t.Error("Sections not in registration order")
-		}
+		require.Len(t, sections, 3)
+		assert.Equal(t, "first", sections[0].ID())
+		assert.Equal(t, "second", sections[1].ID())
+		assert.Equal(t, "third", sections[2].ID())
 	})
 }
 
@@ -146,22 +130,14 @@ func TestManager_GetSection(t *testing.T) {
 		manager.RegisterSection(section)
 
 		retrieved, ok := manager.GetSection("test")
-		if !ok {
-			t.Fatal("Section not found")
-		}
-
-		if retrieved.ID() != "test" {
-			t.Error("Wrong section returned")
-		}
+		require.True(t, ok)
+		assert.Equal(t, "test", retrieved.ID())
 	})
 
 	t.Run("returns false for non-existent section", func(t *testing.T) {
 		manager := NewManager(newMockStore())
-
 		_, ok := manager.GetSection("nonexistent")
-		if ok {
-			t.Error("Should return false for non-existent section")
-		}
+		assert.False(t, ok)
 	})
 }
 
@@ -176,22 +152,15 @@ func TestManager_GetSections(t *testing.T) {
 		manager.RegisterSection(section2)
 
 		sections := manager.GetSections()
-		if len(sections) != 2 {
-			t.Fatalf("Expected 2 sections, got %d", len(sections))
-		}
-
-		if sections[0].ID() != "a" || sections[1].ID() != "b" {
-			t.Error("Sections not returned in correct order")
-		}
+		require.Len(t, sections, 2)
+		assert.Equal(t, "a", sections[0].ID())
+		assert.Equal(t, "b", sections[1].ID())
 	})
 
 	t.Run("returns empty slice for no sections", func(t *testing.T) {
 		manager := NewManager(newMockStore())
-
 		sections := manager.GetSections()
-		if len(sections) != 0 {
-			t.Error("Expected empty slice")
-		}
+		assert.Empty(t, sections)
 	})
 }
 
@@ -209,13 +178,10 @@ func TestManager_LoadAll(t *testing.T) {
 		}
 		manager.RegisterSection(section)
 
-		if err := manager.LoadAll(); err != nil {
-			t.Fatalf("LoadAll failed: %v", err)
-		}
+		err := manager.LoadAll()
+		require.NoError(t, err)
 
-		if section.data["key"] != "value" {
-			t.Error("Section data not loaded correctly")
-		}
+		assert.Equal(t, "value", section.data["key"])
 	})
 
 	t.Run("handles store load error", func(t *testing.T) {
@@ -223,11 +189,8 @@ func TestManager_LoadAll(t *testing.T) {
 		store.loadErr = fmt.Errorf("load error")
 
 		manager := NewManager(store)
-
 		err := manager.LoadAll()
-		if err == nil {
-			t.Error("Expected error from store")
-		}
+		require.Error(t, err)
 	})
 
 	t.Run("loads multiple sections", func(t *testing.T) {
@@ -242,16 +205,11 @@ func TestManager_LoadAll(t *testing.T) {
 		manager.RegisterSection(section1)
 		manager.RegisterSection(section2)
 
-		if err := manager.LoadAll(); err != nil {
-			t.Fatalf("LoadAll failed: %v", err)
-		}
+		err := manager.LoadAll()
+		require.NoError(t, err)
 
-		if section1.data["key1"] != "value1" {
-			t.Error("Section1 not loaded correctly")
-		}
-		if section2.data["key2"] != "value2" {
-			t.Error("Section2 not loaded correctly")
-		}
+		assert.Equal(t, "value1", section1.data["key1"])
+		assert.Equal(t, "value2", section2.data["key2"])
 	})
 }
 
@@ -268,14 +226,11 @@ func TestManager_SaveAll(t *testing.T) {
 		}
 		manager.RegisterSection(section)
 
-		if err := manager.SaveAll(); err != nil {
-			t.Fatalf("SaveAll failed: %v", err)
-		}
+		err := manager.SaveAll()
+		require.NoError(t, err)
 
 		savedData := store.sections["test"]
-		if savedData["key"] != "value" {
-			t.Error("Section data not saved correctly")
-		}
+		assert.Equal(t, "value", savedData["key"])
 	})
 
 	t.Run("validates sections before saving", func(t *testing.T) {
@@ -290,77 +245,52 @@ func TestManager_SaveAll(t *testing.T) {
 		manager.RegisterSection(section)
 
 		err := manager.SaveAll()
-		if err == nil {
-			t.Error("Expected validation error")
-		}
+		require.Error(t, err)
 	})
 
 	t.Run("handles store save error", func(t *testing.T) {
 		store := newMockStore()
 		store.saveErr = fmt.Errorf("save error")
-
 		manager := NewManager(store)
 		section := &mockSection{id: "test", data: make(map[string]interface{})}
 		manager.RegisterSection(section)
 
 		err := manager.SaveAll()
-		if err == nil {
-			t.Error("Expected error from store")
-		}
+		require.Error(t, err)
 	})
 
 	t.Run("saves multiple sections", func(t *testing.T) {
 		store := newMockStore()
 		manager := NewManager(store)
-
 		section1 := &mockSection{id: "section1", data: map[string]interface{}{"key1": "value1"}}
 		section2 := &mockSection{id: "section2", data: map[string]interface{}{"key2": "value2"}}
-
 		manager.RegisterSection(section1)
 		manager.RegisterSection(section2)
 
-		if err := manager.SaveAll(); err != nil {
-			t.Fatalf("SaveAll failed: %v", err)
-		}
+		err := manager.SaveAll()
+		require.NoError(t, err)
 
-		if store.sections["section1"]["key1"] != "value1" {
-			t.Error("Section1 not saved correctly")
-		}
-		if store.sections["section2"]["key2"] != "value2" {
-			t.Error("Section2 not saved correctly")
-		}
+		assert.Equal(t, "value1", store.sections["section1"]["key1"])
+		assert.Equal(t, "value2", store.sections["section2"]["key2"])
 	})
 }
 
 func TestManager_ResetAll(t *testing.T) {
 	t.Run("resets all sections", func(t *testing.T) {
 		manager := NewManager(newMockStore())
-
-		section1 := &mockSection{
-			id:   "section1",
-			data: map[string]interface{}{"key1": "value1"},
-		}
-		section2 := &mockSection{
-			id:   "section2",
-			data: map[string]interface{}{"key2": "value2"},
-		}
-
+		section1 := &mockSection{id: "section1", data: map[string]interface{}{"key1": "value1"}}
+		section2 := &mockSection{id: "section2", data: map[string]interface{}{"key2": "value2"}}
 		manager.RegisterSection(section1)
 		manager.RegisterSection(section2)
 
 		manager.ResetAll()
 
-		if len(section1.data) != 0 {
-			t.Error("Section1 not reset")
-		}
-		if len(section2.data) != 0 {
-			t.Error("Section2 not reset")
-		}
+		assert.Empty(t, section1.data)
+		assert.Empty(t, section2.data)
 	})
 
 	t.Run("handles empty manager", func(t *testing.T) {
 		manager := NewManager(newMockStore())
-
 		// Should not panic
 		manager.ResetAll()
 	})
@@ -369,10 +299,69 @@ func TestManager_ResetAll(t *testing.T) {
 func TestManager_Store(t *testing.T) {
 	store := newMockStore()
 	manager := NewManager(store)
+	assert.Same(t, store, manager.Store())
+}
 
-	if manager.Store() != store {
-		t.Error("Store() returned wrong store")
-	}
+func TestManager_LiveReload(t *testing.T) {
+	tmpFile := filepath.Join(t.TempDir(), "config.json")
+	store, err := NewFileStore(tmpFile)
+	require.NoError(t, err)
+
+	manager := NewManager(store)
+	llmSection := NewLLMSection()
+	err = manager.RegisterSection(llmSection)
+	require.NoError(t, err)
+
+	// 1. Set initial values and save
+	llmSection.SetModel("model-v1")
+	llmSection.SetBaseURL("url-v1")
+	llmSection.SetAPIKey("key-v1")
+	err = manager.SaveAll()
+	require.NoError(t, err)
+
+	assert.Equal(t, "model-v1", llmSection.GetModel())
+
+	// 2. Simulate external change by writing directly to the file
+	// Note: We are not calling manager.SaveAll() here
+	updatedConfigContent := `{
+		"version": "1.0",
+		"sections": {
+			"llm": {
+				"model": "model-v2-reloaded",
+				"base_url": "url-v2-reloaded",
+				"api_key": "key-v2-reloaded"
+			}
+		}
+	}`
+	// Add a small delay for systems where file modification time has 1s resolution
+	time.Sleep(1 * time.Second)
+	err = os.WriteFile(tmpFile, []byte(updatedConfigContent), 0600)
+	require.NoError(t, err)
+
+	// 3. Manually trigger a reload, simulating what the file watcher would do
+	err = manager.LoadAll()
+	require.NoError(t, err)
+
+	// 4. Verify the section is updated with the new values
+	assert.Equal(t, "model-v2-reloaded", llmSection.GetModel())
+	assert.Equal(t, "url-v2-reloaded", llmSection.GetBaseURL())
+	assert.Equal(t, "key-v2-reloaded", llmSection.GetAPIKey())
+
+	// 5. Verify that saving again persists the reloaded values
+	err = manager.SaveAll()
+	require.NoError(t, err)
+
+	// 6. Create a new manager and load from the same file to confirm persistence
+	newStore, err := NewFileStore(tmpFile)
+	require.NoError(t, err)
+	newManager := NewManager(newStore)
+	newLLMSection := NewLLMSection()
+	err = newManager.RegisterSection(newLLMSection)
+	require.NoError(t, err)
+	err = newManager.LoadAll()
+	require.NoError(t, err)
+
+	assert.Equal(t, "model-v2-reloaded", newLLMSection.GetModel())
 }
 
 func TestManager_Concurrency(t *testing.T) {
@@ -416,8 +405,6 @@ func TestManager_Concurrency(t *testing.T) {
 		}
 
 		sections := manager.GetSections()
-		if len(sections) != 10 {
-			t.Errorf("Expected 10 sections, got %d", len(sections))
-		}
+		assert.Len(t, sections, 10)
 	})
 }
