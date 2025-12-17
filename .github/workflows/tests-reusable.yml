@@ -84,7 +84,7 @@ jobs:
 
       - name: Extract PR Context
         id: pr_context
-        uses: ./.github/actions/pr-context
+        uses: entrhq/forge/.github/actions/pr-context@main
         with:
           pr_number: ${{ github.event.pull_request.number || github.event.issue.number }}
           github_token: ${{ steps.app_token.outputs.token }}
