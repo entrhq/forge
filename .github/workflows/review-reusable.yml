@@ -57,18 +57,19 @@ jobs:
           app-id: ${{ secrets.GH_APP_ID }}
           private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
 
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-        with:
-          token: ${{ steps.app_token.outputs.token }}
-          fetch-depth: 0
-
       - name: Extract PR Context
         id: pr_context
         uses: ./.github/actions/pr-context
         with:
           pr_number: ${{ github.event.pull_request.number || github.event.issue.number }}
           github_token: ${{ steps.app_token.outputs.token }}
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ steps.app_token.outputs.token }}
+          ref: ${{ steps.pr_context.outputs.head_ref }}
+          fetch-depth: 0
 
       - name: Generate Forge Configuration
         id: forge_config

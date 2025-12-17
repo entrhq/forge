@@ -20,6 +20,9 @@ outputs:
   pr_author:
     description: The PR author username
     value: ${{ steps.extract.outputs.pr_author }}
+  head_ref:
+    description: The PR head branch name
+    value: ${{ steps.extract.outputs.head_ref }}
   changed_files:
     description: Comma-separated list of changed file paths
     value: ${{ steps.extract.outputs.changed_files }}
@@ -72,6 +75,13 @@ runs:
         {
           echo "pr_author<<EOF"
           echo '${{ steps.pr_data.outputs.result }}' | jq -r '.user.login'
+          echo "EOF"
+        } >> $GITHUB_OUTPUT
+        
+        # Export PR head ref (branch name)
+        {
+          echo "head_ref<<EOF"
+          echo '${{ steps.pr_data.outputs.result }}' | jq -r '.head.ref'
           echo "EOF"
         } >> $GITHUB_OUTPUT
       env:
