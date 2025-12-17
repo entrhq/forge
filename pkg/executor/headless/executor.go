@@ -354,6 +354,12 @@ func (e *Executor) Run(ctx context.Context) error {
 		e.summary.Status = statusPartialSuccess
 		e.summary.Error = "Execution timeout exceeded, but changes were preserved"
 		e.logger.Warningf("! Setting status to partial_success due to timeout")
+		
+		// Create a fresh context with timeout for git operations after execution timeout
+		// This ensures git cleanup operations don't use the expired execCtx
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cleanupCancel()
+		return e.finalize(cleanupCtx)
 	}
 
 	// Finalize execution (this will commit changes even on timeout if configured)
