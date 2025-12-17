@@ -19,6 +19,7 @@ type Config struct {
 	// Quality gates
 	QualityGates          []QualityGateConfig `yaml:"quality_gates" json:"quality_gates"`
 	QualityGateMaxRetries int                 `yaml:"quality_gate_max_retries" json:"quality_gate_max_retries"` // Global max retries for quality gates (default: 3)
+	QualityGateRetryTimeout time.Duration     `yaml:"quality_gate_retry_timeout" json:"quality_gate_retry_timeout"` // Timeout for each quality gate retry attempt (default: same as main timeout)
 
 	// Git configuration
 	Git GitConfig `yaml:"git" json:"git"`

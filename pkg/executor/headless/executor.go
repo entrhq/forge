@@ -36,6 +36,7 @@ type Executor struct {
 	summary               *ExecutionSummary
 	qualityGateRetryCount int
 	sourceBranch          string // The branch we started from before creating a new one
+	retryPhaseActive      bool   // True when in quality gate retry phase with extended timeout
 }
 
 // NewExecutor creates a new headless executor with a pre-configured agent
@@ -48,6 +49,11 @@ func NewExecutor(ag agent.Agent, config *Config) (*Executor, error) {
 	// Set default max retries if not configured
 	if config.QualityGateMaxRetries == 0 {
 		config.QualityGateMaxRetries = 3
+	}
+
+	// Set default retry timeout if not configured (use main timeout for backward compatibility)
+	if config.QualityGateRetryTimeout == 0 {
+		config.QualityGateRetryTimeout = config.Constraints.Timeout
 	}
 
 	// Create constraint manager with execution mode
@@ -115,6 +121,14 @@ func (e *Executor) Run(ctx context.Context) error {
 	// Create execution context with timeout
 	execCtx, cancel := context.WithTimeout(ctx, e.config.Constraints.Timeout)
 	defer cancel()
+
+	// Track if we need to extend timeout for quality gate retries
+	var retryCancel context.CancelFunc
+	defer func() {
+		if retryCancel != nil {
+			retryCancel()
+		}
+	}()
 
 	// Get agent channels
 	channels := e.agent.GetChannels()
@@ -263,6 +277,15 @@ func (e *Executor) Run(ctx context.Context) error {
 							// Send feedback to agent for retry
 							feedbackMsg := results.FormatFeedbackMessage(e.qualityGateRetryCount, e.config.QualityGateMaxRetries)
 							e.logger.Infof("→ Sending quality gate feedback to agent for retry")
+
+							// On first retry, switch to retry timeout context
+							if e.qualityGateRetryCount == 1 && !e.retryPhaseActive {
+								e.retryPhaseActive = true
+								// Cancel the original timeout and create a new one for retries
+								cancel()
+								execCtx, retryCancel = context.WithTimeout(ctx, e.config.QualityGateRetryTimeout)
+								e.logger.Infof("→ Extended timeout for quality gate retries: %v", e.config.QualityGateRetryTimeout)
+							}
 
 							select {
 							case e.agent.GetChannels().Input <- types.NewUserInput(feedbackMsg):
