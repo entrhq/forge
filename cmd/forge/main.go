@@ -19,7 +19,7 @@ import (
 	"github.com/entrhq/forge/pkg/agent/tools"
 	appconfig "github.com/entrhq/forge/pkg/config"
 	"github.com/entrhq/forge/pkg/executor/tui"
-	"github.com/entrhq/forge/pkg/llm/openai"
+
 	"github.com/entrhq/forge/pkg/security/workspace"
 	"github.com/entrhq/forge/pkg/tools/coding"
 	"github.com/entrhq/forge/pkg/tools/scratchpad"
@@ -159,56 +159,16 @@ func run(ctx context.Context, config *Config) error {
 
 // runTUI executes the TUI mode
 //
-//nolint:gocyclo
+
 func runTUI(ctx context.Context, config *Config) error {
 	// Initialize global configuration (for auto-approval and command whitelist)
 	if err := appconfig.Initialize(""); err != nil {
 		return fmt.Errorf("failed to initialize configuration: %w", err)
 	}
 
-	// Determine final LLM configuration (CLI args override config file)
-	finalModel := config.Model
-	finalBaseURL := config.BaseURL
-	finalAPIKey := config.APIKey
-
-	// Override with config file values if CLI args are not provided
-	if llmConfig := appconfig.GetLLM(); llmConfig != nil {
-		if config.Model == defaultModel {
-			// CLI used default, check config
-			if configModel := llmConfig.GetModel(); configModel != "" {
-				finalModel = configModel
-			}
-		}
-		if config.BaseURL == "" {
-			// CLI didn't specify base URL, check config
-			if configBaseURL := llmConfig.GetBaseURL(); configBaseURL != "" {
-				finalBaseURL = configBaseURL
-			}
-		}
-		if config.APIKey == "" {
-			// CLI didn't specify API key, check config
-			if configAPIKey := llmConfig.GetAPIKey(); configAPIKey != "" {
-				finalAPIKey = configAPIKey
-			}
-		}
-	}
-
-	// Create OpenAI provider with final configuration
-	providerOpts := []openai.ProviderOption{
-		openai.WithModel(finalModel),
-	}
-
-	// Add base URL if provided
-	if finalBaseURL != "" {
-		providerOpts = append(providerOpts, openai.WithBaseURL(finalBaseURL))
-	}
-
-	provider, err := openai.NewProvider(
-		finalAPIKey,
-		providerOpts...,
-	)
+	provider, err := appconfig.BuildProvider(config.Model, config.BaseURL, config.APIKey, defaultModel)
 	if err != nil {
-		return fmt.Errorf("failed to create LLM provider: %w", err)
+		return err
 	}
 
 	// Create context summarization strategies for long coding sessions
