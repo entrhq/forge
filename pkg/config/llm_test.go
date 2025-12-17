@@ -51,46 +51,96 @@ func TestLLMSection_SetData(t *testing.T) {
 	tests := []struct {
 		name        string
 		data        map[string]any
+		initial     *LLMSection
 		expectModel string
 		expectURL   string
 		expectKey   string
 		expectError bool
 	}{
 		{
-			name: "valid data",
+			name: "valid data on empty section",
 			data: map[string]any{
 				"model":    "gpt-4-turbo",
 				"base_url": "https://custom.api.com",
 				"api_key":  "sk-custom",
 			},
+			initial:     NewLLMSection(),
 			expectModel: "gpt-4-turbo",
 			expectURL:   "https://custom.api.com",
 			expectKey:   "sk-custom",
 			expectError: false,
 		},
 		{
-			name: "partial data",
+			name: "partial data updates only specified fields",
 			data: map[string]any{
 				"model": "claude-3",
 			},
+			initial: &LLMSection{
+				Model:   "old-model",
+				BaseURL: "old-url",
+				APIKey:  "old-key",
+			},
 			expectModel: "claude-3",
-			expectURL:   "gpt-4o", // defaults retained
-			expectKey:   "gpt-4o",
+			expectURL:   "old-url", // should be preserved
+			expectKey:   "old-key", // should be preserved
 			expectError: false,
 		},
 		{
-			name:        "nil data",
-			data:        nil,
-			expectModel: "gpt-4o",
-			expectURL:   "",
-			expectKey:   "",
+			name: "nil data does not change anything",
+			data: nil,
+			initial: &LLMSection{
+				Model:   "existing-model",
+				BaseURL: "existing-url",
+				APIKey:  "existing-key",
+			},
+			expectModel: "existing-model",
+			expectURL:   "existing-url",
+			expectKey:   "existing-key",
 			expectError: false,
 		},
 		{
-			name:        "empty data",
-			data:        map[string]any{},
-			expectModel: "gpt-4o",
-			expectURL:   "",
+			name: "empty data does not change anything",
+			data: map[string]any{},
+			initial: &LLMSection{
+				Model:   "existing-model",
+				BaseURL: "existing-url",
+				APIKey:  "existing-key",
+			},
+			expectModel: "existing-model",
+			expectURL:   "existing-url",
+			expectKey:   "existing-key",
+			expectError: false,
+		},
+		{
+			name: "invalid data types are ignored",
+			data: map[string]any{
+				"model":    12345,
+				"base_url": true,
+				"api_key":  nil,
+			},
+			initial: &LLMSection{
+				Model:   "existing-model",
+				BaseURL: "existing-url",
+				APIKey:  "existing-key",
+			},
+			expectModel: "existing-model",
+			expectURL:   "existing-url",
+			expectKey:   "existing-key",
+			expectError: false,
+		},
+		{
+			name: "empty strings clear values",
+			data: map[string]any{
+				"model":   "",
+				"api_key": "",
+			},
+			initial: &LLMSection{
+				Model:   "existing-model",
+				BaseURL: "existing-url",
+				APIKey:  "existing-key",
+			},
+			expectModel: "",
+			expectURL:   "existing-url", // not in data, should be preserved
 			expectKey:   "",
 			expectError: false,
 		},
@@ -98,23 +148,16 @@ func TestLLMSection_SetData(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			section := NewLLMSection()
+			section := tt.initial
 			err := section.SetData(tt.data)
 
 			if tt.expectError {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
-				// Only check values that were set in test case
-				if _, ok := tt.data["model"]; ok {
-					assert.Equal(t, tt.expectModel, section.Model)
-				}
-				if _, ok := tt.data["base_url"]; ok {
-					assert.Equal(t, tt.expectURL, section.BaseURL)
-				}
-				if _, ok := tt.data["api_key"]; ok {
-					assert.Equal(t, tt.expectKey, section.APIKey)
-				}
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectModel, section.Model)
+				assert.Equal(t, tt.expectURL, section.BaseURL)
+				assert.Equal(t, tt.expectKey, section.APIKey)
 			}
 		})
 	}
@@ -198,41 +241,43 @@ func TestLLMSection_ThreadSafety(t *testing.T) {
 }
 
 func TestLLMSection_IntegrationWithManager(t *testing.T) {
-	// Create a temporary file store
-	tmpFile := filepath.Join(t.TempDir(), "config.json")
-	store, err := NewFileStore(tmpFile)
-	require.NoError(t, err)
+	t.Run("Save and Load", func(t *testing.T) {
+		// Create a temporary file store
+		tmpFile := filepath.Join(t.TempDir(), "config.json")
+		store, err := NewFileStore(tmpFile)
+		require.NoError(t, err)
 
-	manager := NewManager(store)
+		manager := NewManager(store)
 
-	// Register LLM section
-	section := NewLLMSection()
-	err = manager.RegisterSection(section)
-	require.NoError(t, err)
+		// Register LLM section
+		section := NewLLMSection()
+		err = manager.RegisterSection(section)
+		require.NoError(t, err)
 
-	// Update configuration
-	section.SetModel("gpt-4-turbo")
-	section.SetBaseURL("https://api.openai.com/v1")
-	section.SetAPIKey("sk-test")
+		// Update configuration
+		section.SetModel("gpt-4-turbo")
+		section.SetBaseURL("https://api.openai.com/v1")
+		section.SetAPIKey("sk-test")
 
-	// Save configuration
-	err = manager.SaveAll()
-	require.NoError(t, err)
+		// Save configuration
+		err = manager.SaveAll()
+		require.NoError(t, err)
 
-	// Create new section and manager to simulate restart
-	newSection := NewLLMSection()
-	newStore, err := NewFileStore(tmpFile)
-	require.NoError(t, err)
-	newManager := NewManager(newStore)
-	err = newManager.RegisterSection(newSection)
-	require.NoError(t, err)
+		// Create new section and manager to simulate restart
+		newSection := NewLLMSection()
+		newStore, err := NewFileStore(tmpFile)
+		require.NoError(t, err)
+		newManager := NewManager(newStore)
+		err = newManager.RegisterSection(newSection)
+		require.NoError(t, err)
 
-	// Load configuration
-	err = newManager.LoadAll()
-	require.NoError(t, err)
+		// Load configuration
+		err = newManager.LoadAll()
+		require.NoError(t, err)
 
-	// Verify loaded values
-	assert.Equal(t, "gpt-4-turbo", newSection.GetModel())
-	assert.Equal(t, "https://api.openai.com/v1", newSection.GetBaseURL())
-	assert.Equal(t, "sk-test", newSection.GetAPIKey())
+		// Verify loaded values
+		assert.Equal(t, "gpt-4-turbo", newSection.GetModel())
+		assert.Equal(t, "https://api.openai.com/v1", newSection.GetBaseURL())
+		assert.Equal(t, "sk-test", newSection.GetAPIKey())
+	})
 }
