@@ -2,6 +2,7 @@ package config
 
 import (
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -144,6 +145,22 @@ func TestLLMSection_SetData(t *testing.T) {
 			expectKey:   "",
 			expectError: false,
 		},
+		{
+			name: "unknown keys are ignored",
+			data: map[string]any{
+				"model":         "new-model",
+				"unknown_field": "some_value",
+			},
+			initial: &LLMSection{
+				Model:   "old-model",
+				BaseURL: "old-url",
+				APIKey:  "old-key",
+			},
+			expectModel: "new-model",
+			expectURL:   "old-url",
+			expectKey:   "old-key",
+			expectError: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -221,23 +238,43 @@ func TestLLMSection_GettersSetters(t *testing.T) {
 func TestLLMSection_ThreadSafety(t *testing.T) {
 	section := NewLLMSection()
 
-	// Test concurrent reads and writes
-	done := make(chan bool)
-	for i := 0; i < 10; i++ {
+	var wg sync.WaitGroup
+	const numGoroutines = 100
+
+	// Run concurrent writers
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
 		go func(n int) {
-			section.SetModel("model")
-			_ = section.GetModel()
-			section.SetBaseURL("url")
-			_ = section.GetBaseURL()
-			section.SetAPIKey("key")
-			_ = section.GetAPIKey()
-			done <- true
+			defer wg.Done()
+			model := "model"
+			url := "url"
+			key := "key"
+
+			section.SetModel(model)
+			section.SetBaseURL(url)
+			section.SetAPIKey(key)
 		}(i)
 	}
 
-	for i := 0; i < 10; i++ {
-		<-done
+	// Run concurrent readers
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_ = section.GetModel()
+			_ = section.GetBaseURL()
+			_ = section.GetAPIKey()
+			_ = section.Data()
+		}()
 	}
+
+	wg.Wait()
+
+	// The final state should be one of the written values.
+	// We don't care which one, just that it's not corrupted/a race occurred.
+	assert.Equal(t, "model", section.GetModel())
+	assert.Equal(t, "url", section.GetBaseURL())
+	assert.Equal(t, "key", section.GetAPIKey())
 }
 
 func TestLLMSection_IntegrationWithManager(t *testing.T) {
