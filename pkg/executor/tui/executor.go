@@ -68,6 +68,7 @@ func (e *Executor) Run(ctx context.Context) error {
 	m := initialModel()
 	m.agent = e.agent
 	m.channels = e.agent.GetChannels()
+	m.provider = e.provider
 	m.workspaceDir = e.workspaceDir
 	m.header = e.header
 	debugLog.Printf("Model initialized, workspace: %s", e.workspaceDir)

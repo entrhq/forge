@@ -106,4 +106,13 @@ type Provider interface {
 	// This can be used to inspect model capabilities, pricing, token limits,
 	// and other metadata.
 	GetModelInfo() *types.ModelInfo
+
+	// GetModel returns the model name being used.
+	GetModel() string
+
+	// GetBaseURL returns the base URL being used for API requests.
+	GetBaseURL() string
+
+	// GetAPIKey returns the API key being used for authentication.
+	GetAPIKey() string
 }
