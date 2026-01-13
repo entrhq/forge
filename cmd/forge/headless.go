@@ -35,8 +35,21 @@ func runHeadless(ctx context.Context, config *Config) error {
 		return fmt.Errorf("failed to initialize configuration: %w", initErr)
 	}
 
+	// Resolve LLM configuration with proper precedence:
+	// CLI flags -> Environment variables -> Config file -> Defaults
+	var cliModel, cliBaseURL, cliAPIKey string
+	if config.Model != nil {
+		cliModel = *config.Model
+	}
+	if config.BaseURL != nil {
+		cliBaseURL = *config.BaseURL
+	}
+	if config.APIKey != nil {
+		cliAPIKey = *config.APIKey
+	}
+	
 	// Build the LLM provider, respecting config file and CLI flag precedence
-	provider, err := appconfig.BuildProvider(config.Model, config.BaseURL, config.APIKey, defaultModel)
+	provider, err := appconfig.BuildProvider(cliModel, cliBaseURL, cliAPIKey, defaultModel)
 	if err != nil {
 		return err
 	}

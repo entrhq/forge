@@ -41,9 +41,9 @@ const (
 
 // Config holds the application configuration
 type Config struct {
-	APIKey         string
-	BaseURL        string
-	Model          string
+	APIKey         *string // Pointer to distinguish "not set" from "set to empty"
+	BaseURL        *string // Pointer to distinguish "not set" from "set to empty"
+	Model          *string // Pointer to distinguish "not set" from "set to default"
 	WorkspaceDir   string
 	SystemPrompt   string
 	ShowVersion    bool
@@ -89,9 +89,12 @@ func main() {
 func parseFlags() *Config {
 	config := &Config{}
 
-	flag.StringVar(&config.APIKey, "api-key", os.Getenv("OPENAI_API_KEY"), "OpenAI API key (or set OPENAI_API_KEY env var)")
-	flag.StringVar(&config.BaseURL, "base-url", os.Getenv("OPENAI_BASE_URL"), "OpenAI API base URL (or set OPENAI_BASE_URL env var)")
-	flag.StringVar(&config.Model, "model", defaultModel, "LLM model to use")
+	// Use temporary variables for flags
+	var apiKey, baseURL, model string
+	
+	flag.StringVar(&apiKey, "api-key", "", "OpenAI API key (or set OPENAI_API_KEY env var)")
+	flag.StringVar(&baseURL, "base-url", "", "OpenAI API base URL (or set OPENAI_BASE_URL env var)")
+	flag.StringVar(&model, "model", "", "LLM model to use")
 	flag.StringVar(&config.WorkspaceDir, "workspace", ".", "Workspace directory (default: current directory)")
 	flag.StringVar(&config.SystemPrompt, "prompt", "", "Custom instructions for the agent (optional, overrides default)")
 	flag.BoolVar(&config.ShowVersion, "version", false, "Show version and exit")
@@ -118,15 +121,32 @@ func parseFlags() *Config {
 	}
 
 	flag.Parse()
+	
+	// Convert flag values to pointers only if they were explicitly set
+	// Check if flag was visited (explicitly set by user)
+	flagWasSet := make(map[string]bool)
+	flag.Visit(func(f *flag.Flag) {
+		flagWasSet[f.Name] = true
+	})
+	
+	if flagWasSet["api-key"] {
+		config.APIKey = &apiKey
+	}
+	if flagWasSet["base-url"] {
+		config.BaseURL = &baseURL
+	}
+	if flagWasSet["model"] {
+		config.Model = &model
+	}
+	
 	return config
 }
 
 // validate checks that the configuration is valid
 func (c *Config) validate() error {
-	if c.APIKey == "" {
-		return fmt.Errorf("API key is required. Set OPENAI_API_KEY environment variable or use -api-key flag")
-	}
-
+	// Note: We no longer validate API key here since it will be resolved from
+	// CLI flags -> Environment variables -> Config file in BuildProvider
+	
 	// Headless mode requires config file
 	if c.Headless && c.HeadlessConfig == "" {
 		return fmt.Errorf("headless mode requires a configuration file (use -headless-config flag)")
@@ -166,7 +186,20 @@ func runTUI(ctx context.Context, config *Config) error {
 		return fmt.Errorf("failed to initialize configuration: %w", err)
 	}
 
-	provider, err := appconfig.BuildProvider(config.Model, config.BaseURL, config.APIKey, defaultModel)
+	// Resolve LLM configuration with proper precedence:
+	// CLI flags -> Environment variables -> Config file -> Defaults
+	var cliModel, cliBaseURL, cliAPIKey string
+	if config.Model != nil {
+		cliModel = *config.Model
+	}
+	if config.BaseURL != nil {
+		cliBaseURL = *config.BaseURL
+	}
+	if config.APIKey != nil {
+		cliAPIKey = *config.APIKey
+	}
+	
+	provider, err := appconfig.BuildProvider(cliModel, cliBaseURL, cliAPIKey, defaultModel)
 	if err != nil {
 		return err
 	}
@@ -258,7 +291,9 @@ func runTUI(ctx context.Context, config *Config) error {
 	// Display welcome message
 	fmt.Printf("Forge v%s - Coding Agent\n", version)
 	fmt.Printf("Workspace: %s\n", config.WorkspaceDir)
-	fmt.Printf("Model: %s\n", config.Model)
+	if config.Model != nil {
+		fmt.Printf("Model: %s\n", *config.Model)
+	}
 	fmt.Println("\nStarting TUI...")
 	fmt.Println()
 
