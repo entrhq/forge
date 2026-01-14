@@ -522,7 +522,7 @@ experimental:
 - **Architecture**: [ADR-0026: Headless Mode Architecture](../../adr/0026-headless-mode-architecture.md)
 - **Quality Gates**: [ADR-0028: Quality Gate Architecture](../../adr/0028-quality-gate-architecture.md)
 - **Settings System**: [ADR-0017: Auto-Approval and Settings System](../../adr/0017-auto-approval-and-settings-system.md)
-- **Implementation**: [To be created - ADR-0032: Headless Task Delegation]
+- **Implementation**: [ADR-0035: Headless Task Delegation](../../adr/0035-headless-task-delegation.md)
 
 ## Appendix
 
