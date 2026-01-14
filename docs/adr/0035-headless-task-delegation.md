@@ -1,8 +1,8 @@
-# ADR-0033: Headless Task Delegation
+# ADR-0035: Headless Task Delegation
 
 ## Status
 
-Proposed
+Accepted
 
 ## Context
 
@@ -259,7 +259,7 @@ I'll:
 
 ## References
 
-- ADR-0031: Pull Request Creation from Headless Mode
-- ADR-0030: Headless Mode Quality Gates with Retry Mechanism  
+- ADR-0031: Headless Git PR Creation
+- ADR-0028: Quality Gate Architecture  
 - PRD: Headless Task Delegation (`docs/product/features/headless-task-delegation.md`)
 - Existing Implementation: `pkg/executor/headless/`
