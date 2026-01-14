@@ -90,6 +90,15 @@ func NewDiffViewer(approvalID, toolName string, preview *tools.ToolPreview, widt
 }
 
 func (d *DiffViewer) Update(msg tea.Msg, state types.StateProvider, actions types.ActionHandler) (types.Overlay, tea.Cmd) {
+	// Check if this is a close key (ESC or Ctrl+C) before delegating
+	if keyMsg, ok := msg.(tea.KeyMsg); ok {
+		keyStr := keyMsg.String()
+		if keyStr == "esc" || keyStr == "ctrl+c" {
+			// Close keys should close the overlay
+			return nil, nil
+		}
+	}
+
 	updatedApproval, cmd := d.ApprovalOverlayBase.Update(msg, state, actions)
 	d.ApprovalOverlayBase = updatedApproval
 	return d, cmd

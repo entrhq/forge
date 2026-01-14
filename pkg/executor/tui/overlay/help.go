@@ -58,6 +58,13 @@ func (h *HelpOverlay) Update(msg tea.Msg, state types.StateProvider, actions typ
 	h.BaseOverlay = updatedBase
 
 	if handled {
+		// Check if this is a close key (ESC, Ctrl+C)
+		// When BaseOverlay handles a close key, we should return nil to signal overlay close
+		if keyMsg, ok := msg.(tea.KeyMsg); ok {
+			if keyMsg.String() == "esc" || keyMsg.String() == "ctrl+c" {
+				return nil, cmd
+			}
+		}
 		return h, cmd
 	}
 
