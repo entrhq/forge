@@ -14,5 +14,10 @@ func (a *DefaultAgent) buildSystemPrompt() string {
 		builder.WithCustomInstructions(a.customInstructions)
 	}
 
+	// Add repository context if provided
+	if a.repositoryContext != "" {
+		builder.WithRepositoryContext(a.repositoryContext)
+	}
+
 	return builder.Build()
 }

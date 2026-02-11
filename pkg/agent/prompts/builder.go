@@ -12,6 +12,7 @@ import (
 type PromptBuilder struct {
 	tools              []tools.Tool
 	customInstructions string
+	repositoryContext  string
 }
 
 // NewPromptBuilder creates a new prompt builder with default settings
@@ -34,6 +35,13 @@ func (pb *PromptBuilder) WithCustomInstructions(instructions string) *PromptBuil
 	return pb
 }
 
+// WithRepositoryContext adds repository-specific context from AGENTS.md
+// This provides project-specific information separate from custom instructions
+func (pb *PromptBuilder) WithRepositoryContext(context string) *PromptBuilder {
+	pb.repositoryContext = context
+	return pb
+}
+
 // Build constructs the complete system prompt by assembling all sections
 func (pb *PromptBuilder) Build() string {
 	var builder strings.Builder
@@ -43,6 +51,13 @@ func (pb *PromptBuilder) Build() string {
 		builder.WriteString("<custom_instructions>\n")
 		builder.WriteString(pb.customInstructions)
 		builder.WriteString("\n</custom_instructions>\n\n")
+	}
+
+	// Add repository context if provided (from AGENTS.md)
+	if pb.repositoryContext != "" {
+		builder.WriteString("<repository_context>\n")
+		builder.WriteString(pb.repositoryContext)
+		builder.WriteString("\n</repository_context>\n\n")
 	}
 
 	// Add system capabilities

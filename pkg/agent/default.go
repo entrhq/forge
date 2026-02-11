@@ -36,6 +36,7 @@ type DefaultAgent struct {
 	provider           llm.Provider
 	channels           *types.AgentChannels
 	customInstructions string
+	repositoryContext  string
 	maxTurns           int
 	bufferSize         int
 	metadata           map[string]interface{}
@@ -83,6 +84,14 @@ type AgentOption func(*DefaultAgent)
 func WithCustomInstructions(instructions string) AgentOption {
 	return func(a *DefaultAgent) {
 		a.customInstructions = instructions
+	}
+}
+
+// WithRepositoryContext sets repository-specific context from AGENTS.md
+// This is separate from custom instructions and represents project-specific information
+func WithRepositoryContext(context string) AgentOption {
+	return func(a *DefaultAgent) {
+		a.repositoryContext = context
 	}
 }
 
@@ -423,10 +432,16 @@ func (a *DefaultAgent) GetContextInfo() *ContextInfo {
 	a.toolsMu.RLock()
 	defer a.toolsMu.RUnlock()
 
-	// Build system prompt without tools to calculate base system tokens
+	// Build system prompt without tools and without repository context to calculate base system tokens
 	baseSystemPrompt := prompts.NewPromptBuilder().
 		WithCustomInstructions(a.customInstructions).
 		Build()
+
+	// Build just the repository context section to calculate repository tokens
+	repositorySection := ""
+	if a.repositoryContext != "" {
+		repositorySection = "<repository_context>\n" + a.repositoryContext + "\n</repository_context>\n\n"
+	}
 
 	// Build just the tools section to calculate tool tokens
 	toolsSection := ""
@@ -438,17 +453,24 @@ func (a *DefaultAgent) GetContextInfo() *ContextInfo {
 
 	// Calculate token counts for each section
 	systemPromptTokens := 0
+	repositoryTokens := 0
 	toolTokens := 0
 	if a.tokenizer != nil {
 		systemPromptTokens = a.tokenizer.CountTokens(baseSystemPrompt)
+		repositoryTokens = a.tokenizer.CountTokens(repositorySection)
 		toolTokens = a.tokenizer.CountTokens(toolsSection)
 	}
 
 	// Build full system prompt for current context calculation
-	fullSystemPrompt := prompts.NewPromptBuilder().
+	builder := prompts.NewPromptBuilder().
 		WithTools(a.getToolsList()).
-		WithCustomInstructions(a.customInstructions).
-		Build()
+		WithCustomInstructions(a.customInstructions)
+	
+	if a.repositoryContext != "" {
+		builder = builder.WithRepositoryContext(a.repositoryContext)
+	}
+	
+	fullSystemPrompt := builder.Build()
 
 	// Get tool names
 	toolNames := make([]string, 0, len(a.tools))
@@ -502,21 +524,22 @@ func (a *DefaultAgent) GetContextInfo() *ContextInfo {
 	}
 
 	return &ContextInfo{
-		SystemPromptTokens:    systemPromptTokens,
-		CustomInstructions:    a.customInstructions != "",
-		ToolCount:             len(a.tools),
-		ToolTokens:            toolTokens,
-		ToolNames:             toolNames,
-		MessageCount:          messageCount,
-		ConversationTurns:     conversationTurns,
-		ConversationTokens:    conversationTokens,
-		CurrentContextTokens:  currentTokens,
-		MaxContextTokens:      maxTokens,
-		FreeTokens:            freeTokens,
-		UsagePercent:          usagePercent,
-		TotalPromptTokens:     0, // These will be filled by the executor from its tracking
-		TotalCompletionTokens: 0,
-		TotalTokens:           0,
+		SystemPromptTokens:     systemPromptTokens,
+		CustomInstructions:     a.customInstructions != "",
+		RepositoryContextTokens: repositoryTokens,
+		ToolCount:              len(a.tools),
+		ToolTokens:             toolTokens,
+		ToolNames:              toolNames,
+		MessageCount:           messageCount,
+		ConversationTurns:      conversationTurns,
+		ConversationTokens:     conversationTokens,
+		CurrentContextTokens:   currentTokens,
+		MaxContextTokens:       maxTokens,
+		FreeTokens:             freeTokens,
+		UsagePercent:           usagePercent,
+		TotalPromptTokens:      0, // These will be filled by the executor from its tracking
+		TotalCompletionTokens:  0,
+		TotalTokens:            0,
 	}
 }
 

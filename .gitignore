@@ -57,3 +57,6 @@ config.local.json
 # Log files
 *.log
 logs/
+
+# forge
+.forge/
