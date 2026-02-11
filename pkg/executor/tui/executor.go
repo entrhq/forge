@@ -91,7 +91,6 @@ func (e *Executor) Run(ctx context.Context) error {
 	go func() {
 		// Listen for agent events and forward them to the TUI
 		for event := range m.channels.Event {
-			debugLog.Printf("Forwarding agent event to TUI: %T - %+v", event, event)
 			e.program.Send(event)
 		}
 	}()
