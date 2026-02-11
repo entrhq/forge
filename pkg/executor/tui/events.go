@@ -313,7 +313,7 @@ func (m *model) handleToolApprovalRequest(event *pkgtypes.AgentEvent) {
 				m.height,
 				responseFunc,
 			)
-			m.overlay.activate(types.OverlayModeDiffViewer, diffViewer)
+			m.overlay.pushOverlay(types.OverlayModeDiffViewer, diffViewer)
 		}
 	}
 }
@@ -376,7 +376,7 @@ func (m *model) handleCommandExecutionStart(event *pkgtypes.AgentEvent) {
 			event.CommandExecution.ExecutionID,
 			m.channels.Cancel,
 		)
-		m.overlay.activate(types.OverlayModeCommandOutput, overlay)
+		m.overlay.pushOverlay(types.OverlayModeCommandOutput, overlay)
 	}
 }
 
@@ -466,5 +466,5 @@ func (m *model) handleNotesData(event *pkgtypes.AgentEvent) {
 
 	// Create and activate notes overlay
 	notesOverlay := overlay.NewNotesOverlay(event.NotesData.Notes, m.width, m.height)
-	m.overlay.activate(types.OverlayModeNotes, notesOverlay)
+	m.overlay.pushOverlay(types.OverlayModeNotes, notesOverlay)
 }

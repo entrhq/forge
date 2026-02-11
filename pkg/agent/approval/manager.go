@@ -15,10 +15,10 @@ type EventEmitter func(event *types.AgentEvent)
 
 // Manager handles tool approval requests and responses
 type Manager struct {
-	timeout         time.Duration
-	pendingApproval *pendingApproval
-	mu              sync.Mutex
-	emitEvent       EventEmitter
+	timeout          time.Duration
+	pendingApprovals map[string]*pendingApproval
+	mu               sync.Mutex
+	emitEvent        EventEmitter
 }
 
 // pendingApproval tracks an approval request that is waiting for user response
@@ -33,8 +33,9 @@ type pendingApproval struct {
 // NewManager creates a new approval manager
 func NewManager(timeout time.Duration, emitEvent EventEmitter) *Manager {
 	return &Manager{
-		timeout:   timeout,
-		emitEvent: emitEvent,
+		timeout:          timeout,
+		pendingApprovals: make(map[string]*pendingApproval),
+		emitEvent:        emitEvent,
 	}
 }
 
@@ -53,7 +54,7 @@ func (m *Manager) RequestApproval(ctx context.Context, toolCall tools.ToolCall, 
 	m.setupPendingApproval(approvalID, toolCall, responseChannel)
 
 	// Clean up pending approval when done
-	defer m.cleanupPendingApproval(responseChannel)
+	defer m.cleanupPendingApproval(approvalID)
 
 	// Parse tool input for event
 	argsMap := parseToolArguments(toolCall)
@@ -76,7 +77,8 @@ func (m *Manager) HandleResponse(response *types.ApprovalResponse) {
 	defer m.mu.Unlock()
 
 	// Check if we have a pending approval matching this response
-	if m.pendingApproval == nil || m.pendingApproval.approvalID != response.ApprovalID {
+	pa, ok := m.pendingApprovals[response.ApprovalID]
+	if !ok {
 		// No matching pending approval - ignore this response
 		return
 	}
@@ -84,7 +86,7 @@ func (m *Manager) HandleResponse(response *types.ApprovalResponse) {
 	// Send the response to the waiting goroutine
 	// Use non-blocking send to prevent deadlock if channel is full or being cleaned up
 	select {
-	case m.pendingApproval.response <- response:
+	case pa.response <- response:
 		// Response delivered successfully
 	default:
 		// Channel full, closed, or no receiver - this is safe to ignore
@@ -97,7 +99,7 @@ func (m *Manager) setupPendingApproval(approvalID string, toolCall tools.ToolCal
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	m.pendingApproval = &pendingApproval{
+	m.pendingApprovals[approvalID] = &pendingApproval{
 		approvalID: approvalID,
 		toolName:   toolCall.ToolName,
 		toolCall:   toolCall,
@@ -107,17 +109,19 @@ func (m *Manager) setupPendingApproval(approvalID string, toolCall tools.ToolCal
 
 // cleanupPendingApproval cleans up the pending approval
 // This method is safe to call multiple times due to sync.Once
-func (m *Manager) cleanupPendingApproval(responseChannel chan *types.ApprovalResponse) {
+func (m *Manager) cleanupPendingApproval(approvalID string) {
 	m.mu.Lock()
-	pa := m.pendingApproval
-	m.pendingApproval = nil
+	pa, ok := m.pendingApprovals[approvalID]
+	if ok {
+		delete(m.pendingApprovals, approvalID)
+	}
 	m.mu.Unlock()
 
 	// Close the channel exactly once using sync.Once
 	// This prevents race conditions between cleanup and HandleResponse
-	if pa != nil {
+	if ok && pa != nil {
 		pa.closeOnce.Do(func() {
-			close(responseChannel)
+			close(pa.response)
 		})
 	}
 }

@@ -42,8 +42,8 @@ func TestNewManager(t *testing.T) {
 		t.Errorf("timeout = %v, want %v", manager.timeout, timeout)
 	}
 
-	if manager.pendingApproval != nil {
-		t.Error("expected no pending approval initially")
+	if len(manager.pendingApprovals) != 0 {
+		t.Error("expected no pending approvals initially")
 	}
 }
 
@@ -63,22 +63,23 @@ func TestManager_SetupAndCleanupPendingApproval(t *testing.T) {
 	// Test setup
 	manager.setupPendingApproval(approvalID, toolCall, responseChannel)
 
-	if manager.pendingApproval == nil {
+	pa, ok := manager.pendingApprovals[approvalID]
+	if !ok {
 		t.Fatal("expected pending approval to be set")
 	}
 
-	if manager.pendingApproval.approvalID != approvalID {
-		t.Errorf("approvalID = %v, want %v", manager.pendingApproval.approvalID, approvalID)
+	if pa.approvalID != approvalID {
+		t.Errorf("approvalID = %v, want %v", pa.approvalID, approvalID)
 	}
 
-	if manager.pendingApproval.toolName != "test_tool" {
-		t.Errorf("toolName = %v, want test_tool", manager.pendingApproval.toolName)
+	if pa.toolName != "test_tool" {
+		t.Errorf("toolName = %v, want test_tool", pa.toolName)
 	}
 
 	// Test cleanup
-	manager.cleanupPendingApproval(responseChannel)
+	manager.cleanupPendingApproval(approvalID)
 
-	if manager.pendingApproval != nil {
+	if _, ok := manager.pendingApprovals[approvalID]; ok {
 		t.Error("expected pending approval to be cleared")
 	}
 
@@ -114,7 +115,7 @@ func TestManager_CleanupPendingApproval_MultipleCallsSafe(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			manager.cleanupPendingApproval(responseChannel)
+			manager.cleanupPendingApproval(approvalID)
 		}()
 	}
 

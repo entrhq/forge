@@ -62,17 +62,35 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// If overlay returns nil, it wants to close
 		if updatedOverlay == nil {
 			m.ClearOverlay()
+			// Ensure any command returned by the closing overlay is executed
+			if overlayCmd != nil {
+				spinnerCmd = tea.Batch(spinnerCmd, overlayCmd)
+			}
 			// Continue processing the message in the main model
 		} else {
 			m.overlay.overlay = updatedOverlay
 
 			// For KeyMsg and MouseMsg, we still need to handle them in the main model too
 			// For other message types, the overlay handling is sufficient
-			if _, isKeyMsg := msg.(tea.KeyMsg); !isKeyMsg {
-				if _, isMouseMsg := msg.(tea.MouseMsg); !isMouseMsg {
-					// Not a key or mouse message, overlay has fully handled it
-					return m, tea.Batch(overlayCmd, spinnerCmd)
-				}
+			shouldFallThrough := false
+			switch msg.(type) {
+			case tea.KeyMsg, tea.MouseMsg:
+				shouldFallThrough = true
+			case *types.AgentEvent:
+				shouldFallThrough = true
+			case approvalRequestMsg:
+				shouldFallThrough = true
+			case agentErrMsg:
+				shouldFallThrough = true
+			case operationCompleteMsg, tuitypes.OperationCompleteMsg:
+				shouldFallThrough = true
+			case toastMsg, tuitypes.ToastMsg:
+				shouldFallThrough = true
+			}
+
+			if !shouldFallThrough {
+				// Not a message type that needs global handling, overlay has fully handled it
+				return m, tea.Batch(overlayCmd, spinnerCmd)
 			}
 
 			// Key/Mouse messages continue to be processed by main model
@@ -158,11 +176,13 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tuitypes.ViewResultMsg:
 		debugLog.Printf("Received viewResultMsg")
-		return m.handleViewResult(msg)
+		m.handleViewResult(msg)
+		return m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
 
 	case tuitypes.ViewNoteMsg:
 		debugLog.Printf("Received viewNoteMsg")
-		return m.handleViewNote(msg)
+		m.handleViewNote(msg)
+		return m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
 
 	case tea.WindowSizeMsg:
 		debugLog.Printf("Received tea.WindowSizeMsg: width=%d, height=%d", msg.Width, msg.Height)
@@ -255,22 +275,21 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // handleViewResult processes result selection from the result list
-func (m *model) handleViewResult(msg tuitypes.ViewResultMsg) (tea.Model, tea.Cmd) {
+func (m *model) handleViewResult(msg tuitypes.ViewResultMsg) {
 	if result, ok := m.resultCache.get(msg.ResultID); ok {
 		// Close the result list
 		m.resultList.Deactivate()
 		// Open the result in an overlay
 		overlay := overlay.NewToolResultOverlay(result.ToolName, result.Result, m.width, m.height)
 		m.overlay.activate(tuitypes.OverlayModeToolResult, overlay)
-		return m, nil
+		return
 	}
 	// If result not found, just close the list
 	m.resultList.Deactivate()
-	return m, nil
 }
 
 // handleViewNote processes note selection from the notes list
-func (m *model) handleViewNote(msg tuitypes.ViewNoteMsg) (tea.Model, tea.Cmd) {
+func (m *model) handleViewNote(msg tuitypes.ViewNoteMsg) {
 	if msg.Note != nil {
 		// Build note detail content
 		content := fmt.Sprintf("Note ID: %s\n", msg.Note.ID)
@@ -282,9 +301,7 @@ func (m *model) handleViewNote(msg tuitypes.ViewNoteMsg) (tea.Model, tea.Cmd) {
 		// Push note detail overlay on top of notes list (allows back navigation)
 		overlay := overlay.NewToolResultOverlay("Note Detail", content, m.width, m.height)
 		m.overlay.pushOverlay(tuitypes.OverlayModeToolResult, overlay)
-		return m, nil
 	}
-	return m, nil
 }
 
 // handleWindowResize processes window size change events
@@ -411,7 +428,8 @@ func (m *model) handleBashCommandResult(msg bashCommandResultMsg) (tea.Model, te
 func (m *model) handleApprovalRequest(msg approvalRequestMsg) (tea.Model, tea.Cmd) {
 	// Create and activate generic approval overlay
 	overlay := overlay.NewGenericApprovalOverlay(msg.request, m.width, m.height)
-	m.overlay.activate(tuitypes.OverlayModeApproval, overlay)
+	// We use pushOverlay to handle concurrent approval requests (stacking them)
+	m.overlay.pushOverlay(tuitypes.OverlayModeApproval, overlay)
 	return m, nil
 }
 
