@@ -18,8 +18,8 @@ func init() {
 	var err error
 	debugLog, err = logging.NewLogger("context")
 	if err != nil {
-		// Logger handles fallback to stderr internally
-		debugLog.Warnf("Failed to initialize context logger: %v", err)
+		// Logger fell back to stderr due to initialization failure
+		debugLog.Warnf("Failed to initialize context logger, using stderr fallback: %v", err)
 	}
 }
 

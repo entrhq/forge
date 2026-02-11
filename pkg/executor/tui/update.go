@@ -23,8 +23,8 @@ func initDebugLog() {
 	var err error
 	debugLog, err = logging.NewLogger("tui")
 	if err != nil {
-		// Logger handles fallback to stderr internally
-		debugLog.Warnf("Failed to initialize TUI logger: %v", err)
+		// Logger fell back to stderr due to initialization failure
+		debugLog.Warnf("Failed to initialize TUI logger, using stderr fallback: %v", err)
 	}
 	debugLog.Printf("Debug logging initialized")
 }

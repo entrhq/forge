@@ -14,6 +14,9 @@ import (
 
 // Logger provides structured debug logging for Forge components.
 // All logs are written to a session-specific file in ~/.forge/logs/
+//
+// All log methods (Debugf, Infof, Warnf, Errorf) write unconditionally.
+// There is currently no log level filtering.
 type Logger struct {
 	sessionID  string
 	component  string
@@ -34,6 +37,9 @@ var (
 
 	// initOnce ensures directory initialization happens once
 	initOnce sync.Once
+	
+	// initErr stores any error from directory initialization
+	initErr error
 )
 
 // getSessionID returns or creates the session ID for this execution
@@ -46,7 +52,6 @@ func getSessionID() string {
 
 // initLogDirectory ensures the log directory exists
 func initLogDirectory() error {
-	var initErr error
 	initOnce.Do(func() {
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
@@ -55,7 +60,7 @@ func initLogDirectory() error {
 		}
 
 		logDir = filepath.Join(homeDir, ".forge", "logs")
-		if err := os.MkdirAll(logDir, 0755); err != nil {
+		if err := os.MkdirAll(logDir, 0750); err != nil {
 			initErr = fmt.Errorf("failed to create log directory: %w", err)
 			return
 		}
@@ -65,10 +70,14 @@ func initLogDirectory() error {
 
 // NewLogger creates a new logger for a specific component.
 // The logger writes to ~/.forge/logs/<session-id>-forge.log
+// 
+// If the log directory cannot be created or the log file cannot be opened,
+// it returns a fallback logger that writes to stderr along with the error.
+// Callers can check the error to detect fallback mode and log warnings.
 func NewLogger(component string) (*Logger, error) {
 	if err := initLogDirectory(); err != nil {
 		// Fallback to stderr if we can't create the log directory
-		return newFallbackLogger(component, err), nil
+		return newFallbackLogger(component, err), err
 	}
 
 	sessID := getSessionID()
@@ -76,9 +85,9 @@ func NewLogger(component string) (*Logger, error) {
 	logPath := filepath.Join(logDir, logFileName)
 
 	// Open log file in append mode (multiple components may write to same file)
-	file, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	file, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
 	if err != nil {
-		return newFallbackLogger(component, fmt.Errorf("failed to open log file: %w", err)), nil
+		return newFallbackLogger(component, fmt.Errorf("failed to open log file: %w", err)), err
 	}
 
 	logger := log.New(file, "", 0) // We'll format timestamps ourselves

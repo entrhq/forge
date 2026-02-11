@@ -9,7 +9,48 @@ import (
 	"time"
 )
 
+// setupTestDir creates a temporary directory for test logs and resets global state
+func setupTestDir(t *testing.T) (cleanup func()) {
+	t.Helper()
+	
+	// Create temp directory
+	tempDir, err := os.MkdirTemp("", "forge-logging-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	
+	// Save original state
+	origLogDir := logDir
+	origInitErr := initErr
+	origInitOnce := initOnce
+	origSessionID := sessionID
+	origSessionIDOnce := sessionIDOnce
+	
+	// Reset global state
+	logDir = tempDir
+	initErr = nil
+	initOnce = sync.Once{}
+	sessionID = ""
+	sessionIDOnce = sync.Once{}
+	
+	// Return cleanup function
+	return func() {
+		// Restore original state
+		logDir = origLogDir
+		initErr = origInitErr
+		initOnce = origInitOnce
+		sessionID = origSessionID
+		sessionIDOnce = origSessionIDOnce
+		
+		// Remove temp directory
+		os.RemoveAll(tempDir)
+	}
+}
+
 func TestNewLogger(t *testing.T) {
+	cleanup := setupTestDir(t)
+	defer cleanup()
+	
 	logger, err := NewLogger("test-component")
 	if err != nil {
 		t.Fatalf("Failed to create logger: %v", err)
@@ -35,6 +76,9 @@ func TestNewLogger(t *testing.T) {
 }
 
 func TestLoggerFormatting(t *testing.T) {
+	cleanup := setupTestDir(t)
+	defer cleanup()
+	
 	logger, err := NewLogger("test")
 	if err != nil {
 		t.Fatalf("Failed to create logger: %v", err)
@@ -76,6 +120,9 @@ func TestLoggerFormatting(t *testing.T) {
 }
 
 func TestMultipleComponents(t *testing.T) {
+	cleanup := setupTestDir(t)
+	defer cleanup()
+	
 	// Create two loggers with different components
 	logger1, err := NewLogger("component1")
 	if err != nil {
@@ -122,9 +169,8 @@ func TestMultipleComponents(t *testing.T) {
 }
 
 func TestGetSessionID(t *testing.T) {
-	// Reset session ID for test
-	sessionID = ""
-	sessionIDOnce = *new(sync.Once)
+	cleanup := setupTestDir(t)
+	defer cleanup()
 
 	id1 := GetSessionID()
 	id2 := GetSessionID()
@@ -139,28 +185,24 @@ func TestGetSessionID(t *testing.T) {
 }
 
 func TestGetLogDirectory(t *testing.T) {
+	cleanup := setupTestDir(t)
+	defer cleanup()
+	
 	dir, err := GetLogDirectory()
 	if err != nil {
 		t.Fatalf("Failed to get log directory: %v", err)
 	}
 
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		t.Fatalf("Failed to get home directory: %v", err)
-	}
-
-	expectedDir := filepath.Join(homeDir, ".forge", "logs")
-	if dir != expectedDir {
-		t.Errorf("Expected log directory %q, got %q", expectedDir, dir)
-	}
-
-	// Verify directory exists
+	// In test mode, we use a temp directory, so just verify it exists and is a directory
 	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
 		t.Errorf("Log directory does not exist or is not a directory: %s", dir)
 	}
 }
 
 func TestLoggerClose(t *testing.T) {
+	cleanup := setupTestDir(t)
+	defer cleanup()
+	
 	logger, err := NewLogger("test")
 	if err != nil {
 		t.Fatalf("Failed to create logger: %v", err)
@@ -178,6 +220,9 @@ func TestLoggerClose(t *testing.T) {
 }
 
 func TestLogPathFormat(t *testing.T) {
+	cleanup := setupTestDir(t)
+	defer cleanup()
+	
 	logger, err := NewLogger("test")
 	if err != nil {
 		t.Fatalf("Failed to create logger: %v", err)

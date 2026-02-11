@@ -24,8 +24,8 @@ func init() {
 	var err error
 	agentDebugLog, err = logging.NewLogger("agent")
 	if err != nil {
-		// Logger handles fallback to stderr internally
-		agentDebugLog.Warnf("Failed to initialize agent logger: %v", err)
+		// Logger fell back to stderr due to initialization failure
+		agentDebugLog.Warnf("Failed to initialize agent logger, using stderr fallback: %v", err)
 	}
 }
 
