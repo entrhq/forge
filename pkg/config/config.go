@@ -38,6 +38,10 @@ func Initialize(configPath string) error {
 		return err
 	}
 
+	if err := manager.RegisterSection(NewUISection()); err != nil {
+		return err
+	}
+
 	// Load configuration
 	if err := manager.LoadAll(); err != nil {
 		return err
@@ -145,4 +149,24 @@ func IsCommandWhitelisted(command string) bool {
 		return false
 	}
 	return whitelist.IsCommandWhitelisted(command)
+}
+
+// GetUI returns the UI settings section from global config.
+// Returns nil if config is not initialized.
+func GetUI() *UISection {
+	if !IsInitialized() {
+		return nil
+	}
+
+	section, ok := Global().GetSection("ui")
+	if !ok {
+		return nil
+	}
+
+	ui, ok := section.(*UISection)
+	if !ok {
+		return nil
+	}
+
+	return ui
 }
