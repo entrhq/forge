@@ -1,48 +1,74 @@
-# Repository Context for Forge AI Agent
-
-This file provides repository-specific context for the Forge AI coding assistant.
+# AGENTS.md
 
 ## Project Overview
 
-Forge is an AI-powered coding assistant that uses LLM providers to help with software development tasks. It operates in both interactive and headless modes, providing tools for file manipulation, code editing, command execution, and more.
+Forge is an open-source AI coding agent framework in Go with LLM provider abstraction, tool system, memory management, and multiple execution modes (CLI, TUI, headless).
+
+## Quick Commands
+
+```bash
+# Development
+make test            # Run tests with coverage
+make lint            # Run golangci-lint
+make fmt             # Format code
+make all             # Run all checks
+
+# Building
+make build           # Build to .bin/forge
+make install         # Install to GOPATH/bin
+make run             # Run in dev mode
+
+# Tools
+make install-tools   # Install golangci-lint
+```
+
+## Code Standards
+
+- **Go 1.24.0+** with interface-first design
+- **Small, focused files** - prefer modular decomposition
+- **Table-driven tests** - comprehensive coverage (>80% for new code)
+- **Security-first** - workspace guard, input validation, tool approval
 
 ## Architecture
 
-- **Agent System**: Core agent loop in `pkg/agent/` handles LLM interactions, tool execution, and memory management
-- **Tools**: Modular tool system in `pkg/agent/tools/` provides capabilities like file operations, search, and execution
-- **Prompts**: Dynamic prompt building in `pkg/agent/prompts/` constructs context-aware system prompts
-- **Context Management**: Automatic context summarization to handle large conversations
-- **Memory System**: Scratchpad notes for persistent working memory across agent iterations
+```
+pkg/
+├── agent/       # Core loop, prompts, memory, git, slash commands
+├── executor/    # CLI and TUI execution environments
+├── llm/         # Provider abstraction, XML parser, tokenizer
+├── tools/       # File ops, search, diff, command execution
+├── config/      # Configuration management
+├── security/    # Workspace isolation
+└── types/       # Shared types and events
+```
 
-## Key Components
+**Key Concepts:**
+- XML tool calls with CDATA (ADR 0019)
+- Context management with summarization (ADR 0014)
+- Scratchpad notes for working memory (ADR 0032)
+- Git integration with /commit and /pr (ADR 0030, 0031)
+- Headless mode for automation (ADR 0026)
 
-### Agent Loop
-The agent operates in an iterative loop:
-1. Analyze events and user input
-2. Think through the problem
-3. Select and execute tools
-4. Present results or ask questions
+## Common Tasks
 
-### Tool System
-Tools are the primary way the agent interacts with the codebase:
-- **File Operations**: read_file, write_file, list_files
-- **Code Editing**: apply_diff for surgical edits
-- **Search**: search_files for pattern matching
-- **Execution**: execute_command for running shell commands
-- **Memory**: Scratchpad notes for working memory
+**Add Tool:** Implement `tools.Tool` interface → Add to pkg/tools/ → Write tests → Register
+**Run Tests:** `make test` (all), `go test -v ./pkg/agent/...` (package), `go test -run TestName` (single)
+**Pre-commit:** `make fmt && make lint && make test` - don't introduce new linter violations
 
-### Modes
-- **Interactive**: Full conversational mode with user interaction
-- **Headless**: Automated execution mode with disabled interactive tools
+## Feature Development
 
-## Development Guidelines
+Documentation-first workflow:
+1. **Scratch** (docs/product/scratch/) - Rough concept with problem/solution
+2. **PRD** (docs/product/features/) - Full requirements, users, metrics
+3. **ADR** (docs/adr/) - Technical design following template
+4. **Implementation** - Code with tests, link to ADR/PRD in PR
 
-1. **Modularity**: Keep files focused and single-responsibility
-2. **Testing**: Maintain comprehensive test coverage
-3. **Error Handling**: Use robust error handling with clear messages
-4. **Security**: Workspace guard prevents path traversal attacks
-5. **Performance**: Efficient context management and token usage
+PRDs define "what" and "why", ADRs define "how". See existing files for examples.
 
-## Current Focus
+## Documentation Structure
 
-This repository context feature itself - allowing agents to understand project-specific information from this file.
+- `docs/adr/` - Architecture decisions (numbered, immutable)
+- `docs/product/features/` - Product requirements (PRDs)
+- `docs/product/scratch/` - Feature ideas (brainstorming)
+- `docs/how-to/` - How-to guides
+- `examples/` - Example code
