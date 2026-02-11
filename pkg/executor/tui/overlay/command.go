@@ -22,15 +22,14 @@ var (
 // CommandExecutionOverlay displays streaming command output with cancellation support
 type CommandExecutionOverlay struct {
 	*BaseOverlay
-	command        string
-	workingDir     string
-	executionID    string
-	output         *strings.Builder
-	status         string
-	exitCode       int
-	isRunning      bool
-	cancelChannel  chan<- *pkgtypes.CancellationRequest
-	autoCloseTimer *time.Timer
+	command       string
+	workingDir    string
+	executionID   string
+	output        *strings.Builder
+	status        string
+	exitCode      int
+	isRunning     bool
+	cancelChannel chan<- *pkgtypes.CancellationRequest
 }
 
 // NewCommandExecutionOverlay creates a new command execution overlay
@@ -257,9 +256,8 @@ func (c *CommandExecutionOverlay) showExitCodeToast(exitCode int, duration strin
 		return nil
 	}
 
-	// Only show toast if auto-close is enabled (otherwise overlay stays open)
-	autoClose, _, _ := uiConfig.GetAutoCloseSettings()
-	if !autoClose {
+	// Only show toast when the overlay will auto-close for this exit code
+	if !uiConfig.ShouldAutoClose(exitCode) {
 		return nil
 	}
 
@@ -268,7 +266,7 @@ func (c *CommandExecutionOverlay) showExitCodeToast(exitCode int, duration strin
 	isError := exitCode != 0
 
 	if exitCode == 0 {
-		message = fmt.Sprintf("Command completed successfully in %s", duration)
+		message = fmt.Sprintf("Command completed (exit code 0) in %s", duration)
 		icon = "✓"
 	} else {
 		message = fmt.Sprintf("Command failed with exit code %d in %s", exitCode, duration)

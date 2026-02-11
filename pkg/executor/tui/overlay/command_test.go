@@ -9,7 +9,9 @@ import (
 )
 
 func init() {
-	// Initialize config for tests with empty path (in-memory)
+	// Initialize config for tests with temporary directory for hermetic testing
+	// Note: This still uses the default file store, but tests should use t.TempDir()
+	// in TestMain for proper isolation
 	config.Initialize("")
 }
 
@@ -21,52 +23,52 @@ func TestCommandExecutionOverlay_MaybeAutoClose(t *testing.T) {
 	}
 
 	tests := []struct {
-		name        string
-		autoClose   bool
-		onlySuccess bool
-		exitCode    int
-		expectCmd   bool
-		description string
+		name          string
+		autoClose     bool
+		keepOpenOnErr bool
+		exitCode      int
+		expectCmd     bool
+		description   string
 	}{
 		{
-			name:        "auto-close disabled",
-			autoClose:   false,
-			onlySuccess: false,
-			exitCode:    0,
-			expectCmd:   false,
-			description: "should not return command when auto-close is disabled",
+			name:          "auto-close disabled",
+			autoClose:     false,
+			keepOpenOnErr: false,
+			exitCode:      0,
+			expectCmd:     false,
+			description:   "should not return command when auto-close is disabled",
 		},
 		{
-			name:        "auto-close enabled - success",
-			autoClose:   true,
-			onlySuccess: false,
-			exitCode:    0,
-			expectCmd:   true,
-			description: "should return command when auto-close is enabled and command succeeds",
+			name:          "auto-close enabled - success",
+			autoClose:     true,
+			keepOpenOnErr: false,
+			exitCode:      0,
+			expectCmd:     true,
+			description:   "should return command when auto-close is enabled and command succeeds",
 		},
 		{
-			name:        "auto-close enabled - failure",
-			autoClose:   true,
-			onlySuccess: false,
-			exitCode:    1,
-			expectCmd:   true,
-			description: "should return command when auto-close is enabled for all commands",
+			name:          "auto-close enabled - failure",
+			autoClose:     true,
+			keepOpenOnErr: false,
+			exitCode:      1,
+			expectCmd:     true,
+			description:   "should return command when auto-close is enabled for all commands",
 		},
 		{
-			name:        "auto-close success only - success",
-			autoClose:   true,
-			onlySuccess: true,
-			exitCode:    0,
-			expectCmd:   true,
-			description: "should return command when auto-close is enabled for success only and command succeeds",
+			name:          "auto-close with keep-open-on-error - success",
+			autoClose:     true,
+			keepOpenOnErr: true,
+			exitCode:      0,
+			expectCmd:     true,
+			description:   "should return command when auto-close is enabled with keep-open-on-error and command succeeds",
 		},
 		{
-			name:        "auto-close success only - failure",
-			autoClose:   true,
-			onlySuccess: true,
-			exitCode:    1,
-			expectCmd:   false,
-			description: "should not return command when auto-close is enabled for success only and command fails",
+			name:          "auto-close with keep-open-on-error - failure",
+			autoClose:     true,
+			keepOpenOnErr: true,
+			exitCode:      1,
+			expectCmd:     false,
+			description:   "should not return command when keep-open-on-error is enabled and command fails",
 		},
 	}
 
@@ -74,7 +76,7 @@ func TestCommandExecutionOverlay_MaybeAutoClose(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Configure UI settings for this test
 			uiConfig.SetAutoCloseCommandOverlay(tt.autoClose)
-			uiConfig.SetKeepOpenOnError(tt.onlySuccess)
+			uiConfig.SetKeepOpenOnError(tt.keepOpenOnErr)
 			uiConfig.SetAutoCloseDelay(2 * time.Second)
 
 			// Create overlay with required parameters

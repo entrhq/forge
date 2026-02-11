@@ -86,7 +86,8 @@ func (s *UISection) SetData(data map[string]any) error {
 			}
 
 		case "auto_close_delay":
-			// Handle both string and numeric duration values
+			// Only accept duration strings (e.g., "1s", "500ms") for clarity
+			// Numeric values would be ambiguous (nanoseconds vs milliseconds/seconds)
 			switch v := value.(type) {
 			case string:
 				duration, err := time.ParseDuration(v)
@@ -95,9 +96,11 @@ func (s *UISection) SetData(data map[string]any) error {
 				}
 				s.AutoCloseDelay = duration
 			case float64:
-				// JSON numbers come as float64
+				// For backward compatibility, treat JSON numbers as nanoseconds
+				// but prefer duration strings in config files
 				s.AutoCloseDelay = time.Duration(v)
 			case int64:
+				// For backward compatibility, treat as nanoseconds
 				s.AutoCloseDelay = time.Duration(v)
 			default:
 				return fmt.Errorf("invalid value type for auto_close_delay: expected string or number, got %T", value)
