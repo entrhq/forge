@@ -72,11 +72,25 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			// For KeyMsg and MouseMsg, we still need to handle them in the main model too
 			// For other message types, the overlay handling is sufficient
-			if _, isKeyMsg := msg.(tea.KeyMsg); !isKeyMsg {
-				if _, isMouseMsg := msg.(tea.MouseMsg); !isMouseMsg {
-					// Not a key or mouse message, overlay has fully handled it
-					return m, tea.Batch(overlayCmd, spinnerCmd)
-				}
+			shouldFallThrough := false
+			switch msg.(type) {
+			case tea.KeyMsg, tea.MouseMsg:
+				shouldFallThrough = true
+			case *types.AgentEvent:
+				shouldFallThrough = true
+			case approvalRequestMsg:
+				shouldFallThrough = true
+			case agentErrMsg:
+				shouldFallThrough = true
+			case operationCompleteMsg, tuitypes.OperationCompleteMsg:
+				shouldFallThrough = true
+			case toastMsg, tuitypes.ToastMsg:
+				shouldFallThrough = true
+			}
+
+			if !shouldFallThrough {
+				// Not a message type that needs global handling, overlay has fully handled it
+				return m, tea.Batch(overlayCmd, spinnerCmd)
 			}
 
 			// Key/Mouse messages continue to be processed by main model
