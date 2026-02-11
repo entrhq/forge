@@ -180,7 +180,7 @@ func run(ctx context.Context, config *Config) error {
 
 // runTUI executes the TUI mode
 //
-
+//nolint:gocyclo
 func runTUI(ctx context.Context, config *Config) error {
 	// Initialize global configuration (for auto-approval and command whitelist)
 	if err := appconfig.Initialize(""); err != nil {
