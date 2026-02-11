@@ -3,9 +3,11 @@ package overlay
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/entrhq/forge/pkg/config"
 	"github.com/entrhq/forge/pkg/executor/tui/types"
 	pkgtypes "github.com/entrhq/forge/pkg/types"
 )
@@ -20,14 +22,15 @@ var (
 // CommandExecutionOverlay displays streaming command output with cancellation support
 type CommandExecutionOverlay struct {
 	*BaseOverlay
-	command       string
-	workingDir    string
-	executionID   string
-	output        *strings.Builder
-	status        string
-	exitCode      int
-	isRunning     bool
-	cancelChannel chan<- *pkgtypes.CancellationRequest
+	command        string
+	workingDir     string
+	executionID    string
+	output         *strings.Builder
+	status         string
+	exitCode       int
+	isRunning      bool
+	cancelChannel  chan<- *pkgtypes.CancellationRequest
+	autoCloseTimer *time.Timer
 }
 
 // NewCommandExecutionOverlay creates a new command execution overlay
@@ -71,6 +74,11 @@ func NewCommandExecutionOverlay(command, workingDir, executionID string, cancelC
 
 // Update handles messages for the command overlay
 func (c *CommandExecutionOverlay) Update(msg tea.Msg, state types.StateProvider, actions types.ActionHandler) (types.Overlay, tea.Cmd) {
+	// Handle auto-close message
+	if autoClose, ok := msg.(autoCloseMsg); ok {
+		return c.handleAutoClose(autoClose)
+	}
+
 	// Handle command execution events first
 	if event, ok := msg.(*pkgtypes.AgentEvent); ok {
 		if event.IsCommandExecutionEvent() {
@@ -135,11 +143,19 @@ func (c *CommandExecutionOverlay) handleCommandEvent(event *pkgtypes.AgentEvent)
 		c.isRunning = false
 		c.exitCode = data.ExitCode
 		c.status = fmt.Sprintf("Completed in %s (exit code: %d)", data.Duration, data.ExitCode)
+		return c, tea.Batch(
+			c.maybeAutoClose(),
+			c.showExitCodeToast(data.ExitCode, data.Duration),
+		)
 
 	case pkgtypes.EventTypeCommandExecutionFailed:
 		c.isRunning = false
 		c.exitCode = data.ExitCode
 		c.status = fmt.Sprintf("Failed in %s (exit code: %d)", data.Duration, data.ExitCode)
+		return c, tea.Batch(
+			c.maybeAutoClose(),
+			c.showExitCodeToast(data.ExitCode, data.Duration),
+		)
 
 	case pkgtypes.EventTypeCommandExecutionCanceled:
 		c.isRunning = false
@@ -195,4 +211,77 @@ func (c *CommandExecutionOverlay) renderFooter() string {
 // View renders the overlay
 func (c *CommandExecutionOverlay) View() string {
 	return c.BaseOverlay.View(c.Width())
+}
+
+// maybeAutoClose checks configuration and returns a command to auto-close the overlay if enabled.
+func (c *CommandExecutionOverlay) maybeAutoClose() tea.Cmd {
+	// Get UI configuration
+	uiConfig := config.GetUI()
+	if uiConfig == nil {
+		return nil
+	}
+
+	// Check if we should auto-close based on exit code
+	if !uiConfig.ShouldAutoClose(c.exitCode) {
+		return nil
+	}
+
+	// Get the configured delay
+	_, _, delay := uiConfig.GetAutoCloseSettings()
+
+	// Schedule auto-close after delay
+	return tea.Tick(delay, func(t time.Time) tea.Msg {
+		return autoCloseMsg{executionID: c.executionID}
+	})
+}
+
+// autoCloseMsg is sent after the auto-close delay to trigger overlay closure.
+type autoCloseMsg struct {
+	executionID string
+}
+
+// Update handles the auto-close message
+func (c *CommandExecutionOverlay) handleAutoClose(msg autoCloseMsg) (types.Overlay, tea.Cmd) {
+	// Only auto-close if this is our execution and we're not running
+	if msg.executionID == c.executionID && !c.isRunning {
+		return nil, nil
+	}
+	return c, nil
+}
+
+// showExitCodeToast returns a command to show a toast notification with the exit code.
+func (c *CommandExecutionOverlay) showExitCodeToast(exitCode int, duration string) tea.Cmd {
+	// Get UI configuration to check if auto-close is enabled
+	uiConfig := config.GetUI()
+	if uiConfig == nil {
+		return nil
+	}
+
+	// Only show toast if auto-close is enabled (otherwise overlay stays open)
+	autoClose, _, _ := uiConfig.GetAutoCloseSettings()
+	if !autoClose {
+		return nil
+	}
+
+	// Format toast message based on exit code
+	var message, icon string
+	isError := exitCode != 0
+
+	if exitCode == 0 {
+		message = fmt.Sprintf("Command completed successfully in %s", duration)
+		icon = "✓"
+	} else {
+		message = fmt.Sprintf("Command failed with exit code %d in %s", exitCode, duration)
+		icon = "✗"
+	}
+
+	// Return a command that sends a ToastMsg
+	return func() tea.Msg {
+		return types.ToastMsg{
+			Message: message,
+			Details: fmt.Sprintf("Command: %s", c.command),
+			Icon:    icon,
+			IsError: isError,
+		}
+	}
 }

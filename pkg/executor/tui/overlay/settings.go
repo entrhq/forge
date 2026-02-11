@@ -267,6 +267,30 @@ func (s *SettingsOverlay) loadSettings() {
 				}
 				section.items = append(section.items, item)
 			}
+
+		case "ui":
+			// Create toggle and text items for UI configuration
+			uiFields := []struct {
+				key         string
+				displayName string
+				itemType    itemType
+			}{
+				{"auto_close_command_overlay", "Auto-close Command Overlay", itemTypeToggle},
+				{"keep_open_on_error", "Keep Open On Error", itemTypeToggle},
+				{"auto_close_delay", "Auto-close Delay", itemTypeText},
+			}
+
+			for _, field := range uiFields {
+				value := data[field.key]
+				item := settingsItem{
+					key:         field.key,
+					displayName: field.displayName,
+					value:       value,
+					itemType:    field.itemType,
+					modified:    false,
+				}
+				section.items = append(section.items, item)
+			}
 		}
 
 		s.sections = append(s.sections, section)
@@ -540,6 +564,12 @@ func (s *SettingsOverlay) saveSettings() error {
 				if item.itemType == itemTypeText {
 					data[item.key] = item.value
 				}
+			}
+
+		case "ui":
+			// Save UI settings (toggles and text fields)
+			for _, item := range section.items {
+				data[item.key] = item.value
 			}
 		}
 
