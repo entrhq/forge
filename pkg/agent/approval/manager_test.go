@@ -77,7 +77,7 @@ func TestManager_SetupAndCleanupPendingApproval(t *testing.T) {
 	}
 
 	// Test cleanup
-	manager.cleanupPendingApproval(approvalID, responseChannel)
+	manager.cleanupPendingApproval(approvalID)
 
 	if _, ok := manager.pendingApprovals[approvalID]; ok {
 		t.Error("expected pending approval to be cleared")
@@ -115,7 +115,7 @@ func TestManager_CleanupPendingApproval_MultipleCallsSafe(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			manager.cleanupPendingApproval(approvalID, responseChannel)
+			manager.cleanupPendingApproval(approvalID)
 		}()
 	}
 

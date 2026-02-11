@@ -176,11 +176,13 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tuitypes.ViewResultMsg:
 		debugLog.Printf("Received viewResultMsg")
-		return m.handleViewResult(msg)
+		viewCmd := m.handleViewResult(msg)
+		return m, tea.Batch(tiCmd, vpCmd, spinnerCmd, viewCmd)
 
 	case tuitypes.ViewNoteMsg:
 		debugLog.Printf("Received viewNoteMsg")
-		return m.handleViewNote(msg)
+		viewCmd := m.handleViewNote(msg)
+		return m, tea.Batch(tiCmd, vpCmd, spinnerCmd, viewCmd)
 
 	case tea.WindowSizeMsg:
 		debugLog.Printf("Received tea.WindowSizeMsg: width=%d, height=%d", msg.Width, msg.Height)
@@ -273,22 +275,22 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // handleViewResult processes result selection from the result list
-func (m *model) handleViewResult(msg tuitypes.ViewResultMsg) (tea.Model, tea.Cmd) {
+func (m *model) handleViewResult(msg tuitypes.ViewResultMsg) tea.Cmd {
 	if result, ok := m.resultCache.get(msg.ResultID); ok {
 		// Close the result list
 		m.resultList.Deactivate()
 		// Open the result in an overlay
 		overlay := overlay.NewToolResultOverlay(result.ToolName, result.Result, m.width, m.height)
 		m.overlay.activate(tuitypes.OverlayModeToolResult, overlay)
-		return m, nil
+		return nil
 	}
 	// If result not found, just close the list
 	m.resultList.Deactivate()
-	return m, nil
+	return nil
 }
 
 // handleViewNote processes note selection from the notes list
-func (m *model) handleViewNote(msg tuitypes.ViewNoteMsg) (tea.Model, tea.Cmd) {
+func (m *model) handleViewNote(msg tuitypes.ViewNoteMsg) tea.Cmd {
 	if msg.Note != nil {
 		// Build note detail content
 		content := fmt.Sprintf("Note ID: %s\n", msg.Note.ID)
@@ -300,9 +302,9 @@ func (m *model) handleViewNote(msg tuitypes.ViewNoteMsg) (tea.Model, tea.Cmd) {
 		// Push note detail overlay on top of notes list (allows back navigation)
 		overlay := overlay.NewToolResultOverlay("Note Detail", content, m.width, m.height)
 		m.overlay.pushOverlay(tuitypes.OverlayModeToolResult, overlay)
-		return m, nil
+		return nil
 	}
-	return m, nil
+	return nil
 }
 
 // handleWindowResize processes window size change events

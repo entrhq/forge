@@ -54,7 +54,7 @@ func (m *Manager) RequestApproval(ctx context.Context, toolCall tools.ToolCall, 
 	m.setupPendingApproval(approvalID, toolCall, responseChannel)
 
 	// Clean up pending approval when done
-	defer m.cleanupPendingApproval(approvalID, responseChannel)
+	defer m.cleanupPendingApproval(approvalID)
 
 	// Parse tool input for event
 	argsMap := parseToolArguments(toolCall)
@@ -109,7 +109,7 @@ func (m *Manager) setupPendingApproval(approvalID string, toolCall tools.ToolCal
 
 // cleanupPendingApproval cleans up the pending approval
 // This method is safe to call multiple times due to sync.Once
-func (m *Manager) cleanupPendingApproval(approvalID string, responseChannel chan *types.ApprovalResponse) {
+func (m *Manager) cleanupPendingApproval(approvalID string) {
 	m.mu.Lock()
 	pa, ok := m.pendingApprovals[approvalID]
 	if ok {
@@ -121,7 +121,7 @@ func (m *Manager) cleanupPendingApproval(approvalID string, responseChannel chan
 	// This prevents race conditions between cleanup and HandleResponse
 	if ok && pa != nil {
 		pa.closeOnce.Do(func() {
-			close(responseChannel)
+			close(pa.response)
 		})
 	}
 }
