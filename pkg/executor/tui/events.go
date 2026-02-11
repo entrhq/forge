@@ -73,7 +73,7 @@ func (m *model) handleAgentEvent(event *pkgtypes.AgentEvent) {
 	case pkgtypes.EventTypeToolApprovalTimeout:
 		m.handleToolApprovalTimeout()
 
-	case pkgtypes.EventTypeApiCallStart:
+	case pkgtypes.EventTypeAPICallStart:
 		m.handleApiCallStart(event)
 
 	case pkgtypes.EventTypeTokenUsage:
@@ -329,9 +329,9 @@ func (m *model) handleToolApprovalTimeout() {
 
 func (m *model) handleApiCallStart(event *pkgtypes.AgentEvent) {
 	// Update context token information
-	if event.ApiCallInfo != nil {
-		m.currentContextTokens = event.ApiCallInfo.ContextTokens
-		m.maxContextTokens = event.ApiCallInfo.MaxContextTokens
+	if event.APICallInfo != nil {
+		m.currentContextTokens = event.APICallInfo.ContextTokens
+		m.maxContextTokens = event.APICallInfo.MaxContextTokens
 	}
 }
 

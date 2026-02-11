@@ -156,11 +156,11 @@ func (s *FileStore) GetSection(sectionID string) (map[string]interface{}, error)
 
 	if data, exists := s.data[sectionID]; exists {
 		// Return a copy to prevent external modification
-		copy := make(map[string]interface{}, len(data))
+		dataCopy := make(map[string]interface{}, len(data))
 		for k, v := range data {
-			copy[k] = v
+			dataCopy[k] = v
 		}
-		return copy, nil
+		return dataCopy, nil
 	}
 
 	// Return empty map if section doesn't exist
@@ -173,12 +173,12 @@ func (s *FileStore) SetSection(sectionID string, data map[string]interface{}) er
 	defer s.mu.Unlock()
 
 	// Store a copy to prevent external modification
-	copy := make(map[string]interface{}, len(data))
+	dataCopy := make(map[string]interface{}, len(data))
 	for k, v := range data {
-		copy[k] = v
+		dataCopy[k] = v
 	}
 
-	s.data[sectionID] = copy
+	s.data[sectionID] = dataCopy
 	s.modified = true
 	return nil
 }
@@ -189,16 +189,16 @@ func (s *FileStore) GetAll() (map[string]map[string]interface{}, error) {
 	defer s.mu.RUnlock()
 
 	// Return a deep copy
-	copy := make(map[string]map[string]interface{}, len(s.data))
+	dataCopy := make(map[string]map[string]interface{}, len(s.data))
 	for sectionID, sectionData := range s.data {
 		sectionCopy := make(map[string]interface{}, len(sectionData))
 		for k, v := range sectionData {
 			sectionCopy[k] = v
 		}
-		copy[sectionID] = sectionCopy
+		dataCopy[sectionID] = sectionCopy
 	}
 
-	return copy, nil
+	return dataCopy, nil
 }
 
 // SetAll stores all configuration data.
@@ -207,16 +207,16 @@ func (s *FileStore) SetAll(data map[string]map[string]interface{}) error {
 	defer s.mu.Unlock()
 
 	// Store a deep copy
-	copy := make(map[string]map[string]interface{}, len(data))
+	dataCopy := make(map[string]map[string]interface{}, len(data))
 	for sectionID, sectionData := range data {
 		sectionCopy := make(map[string]interface{}, len(sectionData))
 		for k, v := range sectionData {
 			sectionCopy[k] = v
 		}
-		copy[sectionID] = sectionCopy
+		dataCopy[sectionID] = sectionCopy
 	}
 
-	s.data = copy
+	s.data = dataCopy
 	s.modified = true
 	return nil
 }

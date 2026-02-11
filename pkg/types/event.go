@@ -17,8 +17,8 @@ const (
 	EventTypeToolResult                   AgentEventType = "tool_result"                    // EventTypeToolResult indicates a successful tool call result.
 	EventTypeToolResultError              AgentEventType = "tool_result_error"              // EventTypeToolResultError indicates a tool call resulted in an error.
 	EventTypeNoToolCall                   AgentEventType = "no_tool_call"                   // EventTypeNoToolCall indicates the agent decided not to call any tools.
-	EventTypeApiCallStart                 AgentEventType = "api_call_start"                 // EventTypeApiCallStart indicates the agent is making an API call.
-	EventTypeApiCallEnd                   AgentEventType = "api_call_end"                   // EventTypeApiCallEnd indicates an API call has completed.
+	EventTypeAPICallStart                 AgentEventType = "api_call_start"                 // EventTypeAPICallStart indicates the agent is making an API call.
+	EventTypeAPICallEnd                   AgentEventType = "api_call_end"                   // EventTypeAPICallEnd indicates an API call has completed.
 	EventTypeToolsUpdate                  AgentEventType = "tools_update"                   // EventTypeToolsUpdate indicates the agent's available tools have been updated.
 	EventTypeUpdateBusy                   AgentEventType = "update_busy"                    // EventTypeUpdateBusy indicates a change in the agent's busy status.
 	EventTypeTurnEnd                      AgentEventType = "turn_end"                       // EventTypeTurnEnd indicates the agent has finished processing the current turn.
@@ -82,8 +82,8 @@ type AgentEvent struct {
 	// ContextSummarization contains context summarization information (for context summarization events).
 	ContextSummarization *ContextSummarization
 
-	// ApiCallInfo contains API call information (for API call events).
-	ApiCallInfo *ApiCallInfo
+	// APICallInfo contains API call information (for API call events).
+	APICallInfo *APICallInfo
 
 	// NotesData contains notes data (for notes data events).
 	NotesData *NotesData
@@ -155,8 +155,8 @@ type CommandExecution struct {
 	ExecutionID string
 }
 
-// ApiCallInfo contains information about an API call.
-type ApiCallInfo struct {
+// APICallInfo contains information about an API call.
+type APICallInfo struct {
 	// ContextTokens is the current conversation context size in tokens.
 	ContextTokens int
 
@@ -277,22 +277,22 @@ func NewNoToolCallEvent() *AgentEvent {
 	}
 }
 
-// NewApiCallStartEvent creates an API call start event with context token information.
-func NewApiCallStartEvent(apiName string, contextTokens, maxContextTokens int) *AgentEvent {
+// NewAPICallStartEvent creates an API call start event with context token information.
+func NewAPICallStartEvent(apiName string, contextTokens, maxContextTokens int) *AgentEvent {
 	return &AgentEvent{
-		Type:     EventTypeApiCallStart,
+		Type:     EventTypeAPICallStart,
 		Metadata: map[string]interface{}{"api_name": apiName},
-		ApiCallInfo: &ApiCallInfo{
+		APICallInfo: &APICallInfo{
 			ContextTokens:    contextTokens,
 			MaxContextTokens: maxContextTokens,
 		},
 	}
 }
 
-// NewApiCallEndEvent creates an API call end event.
-func NewApiCallEndEvent(apiName string) *AgentEvent {
+// NewAPICallEndEvent creates an API call end event.
+func NewAPICallEndEvent(apiName string) *AgentEvent {
 	return &AgentEvent{
-		Type:     EventTypeApiCallEnd,
+		Type:     EventTypeAPICallEnd,
 		Metadata: map[string]interface{}{"api_name": apiName},
 	}
 }
@@ -483,10 +483,10 @@ func (e *AgentEvent) IsToolEvent() bool {
 		e.Type == EventTypeNoToolCall
 }
 
-// IsApiEvent returns true if this is any API-related event.
-func (e *AgentEvent) IsApiEvent() bool {
-	return e.Type == EventTypeApiCallStart ||
-		e.Type == EventTypeApiCallEnd
+// IsAPIEvent returns true if this is any API-related event.
+func (e *AgentEvent) IsAPIEvent() bool {
+	return e.Type == EventTypeAPICallStart ||
+		e.Type == EventTypeAPICallEnd
 }
 
 // IsContentEvent returns true if this event contains text content.

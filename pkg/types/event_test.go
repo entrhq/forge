@@ -63,12 +63,12 @@ func TestAgentEventType(t *testing.T) {
 		},
 		{
 			name:      "api_call_start",
-			eventType: EventTypeApiCallStart,
+			eventType: EventTypeAPICallStart,
 			expected:  "api_call_start",
 		},
 		{
 			name:      "api_call_end",
-			eventType: EventTypeApiCallEnd,
+			eventType: EventTypeAPICallEnd,
 			expected:  "api_call_end",
 		},
 		{
@@ -184,27 +184,27 @@ func TestNewToolEvents(t *testing.T) {
 	}
 }
 
-func TestNewApiEvents(t *testing.T) {
-	start := NewApiCallStartEvent("openai", 50000, 100000)
-	if start.Type != EventTypeApiCallStart {
-		t.Errorf("ApiCallStart type = %v, want %v", start.Type, EventTypeApiCallStart)
+func TestNewAPIEvents(t *testing.T) {
+	start := NewAPICallStartEvent("openai", 50000, 100000)
+	if start.Type != EventTypeAPICallStart {
+		t.Errorf("APICallStart type = %v, want %v", start.Type, EventTypeAPICallStart)
 	}
 	if start.Metadata["api_name"] != "openai" {
-		t.Error("ApiCallStart api_name metadata not set")
+		t.Error("APICallStart api_name metadata not set")
 	}
-	if start.ApiCallInfo == nil {
-		t.Error("ApiCallInfo not set")
+	if start.APICallInfo == nil {
+		t.Error("APICallInfo not set")
 	}
-	if start.ApiCallInfo.ContextTokens != 50000 {
-		t.Errorf("ContextTokens = %v, want %v", start.ApiCallInfo.ContextTokens, 50000)
+	if start.APICallInfo.ContextTokens != 50000 {
+		t.Errorf("ContextTokens = %v, want %v", start.APICallInfo.ContextTokens, 50000)
 	}
-	if start.ApiCallInfo.MaxContextTokens != 100000 {
-		t.Errorf("MaxContextTokens = %v, want %v", start.ApiCallInfo.MaxContextTokens, 100000)
+	if start.APICallInfo.MaxContextTokens != 100000 {
+		t.Errorf("MaxContextTokens = %v, want %v", start.APICallInfo.MaxContextTokens, 100000)
 	}
 
-	end := NewApiCallEndEvent("openai")
-	if end.Type != EventTypeApiCallEnd {
-		t.Errorf("ApiCallEnd type = %v, want %v", end.Type, EventTypeApiCallEnd)
+	end := NewAPICallEndEvent("openai")
+	if end.Type != EventTypeAPICallEnd {
+		t.Errorf("APICallEnd type = %v, want %v", end.Type, EventTypeAPICallEnd)
 	}
 	if end.Metadata["api_name"] != "openai" {
 		t.Error("ApiCallEnd api_name metadata not set")
@@ -314,7 +314,7 @@ func TestAgentEventHelpers(t *testing.T) {
 		},
 		{
 			name:       "api_call_start",
-			event:      NewApiCallStartEvent("test", 1000, 2000),
+			event:      NewAPICallStartEvent("test", 1000, 2000),
 			isThinking: false,
 			isMessage:  false,
 			isTool:     false,
@@ -345,8 +345,8 @@ func TestAgentEventHelpers(t *testing.T) {
 			if tt.event.IsToolEvent() != tt.isTool {
 				t.Errorf("IsToolEvent() = %v, want %v", tt.event.IsToolEvent(), tt.isTool)
 			}
-			if tt.event.IsApiEvent() != tt.isApi {
-				t.Errorf("IsApiEvent() = %v, want %v", tt.event.IsApiEvent(), tt.isApi)
+			if tt.event.IsAPIEvent() != tt.isApi {
+				t.Errorf("IsAPIEvent() = %v, want %v", tt.event.IsAPIEvent(), tt.isApi)
 			}
 			if tt.event.IsContentEvent() != tt.isContent {
 				t.Errorf("IsContentEvent() = %v, want %v", tt.event.IsContentEvent(), tt.isContent)

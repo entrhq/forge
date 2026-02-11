@@ -124,7 +124,7 @@ func (s *AutoApprovalSection) GetTools() map[string]bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	// Return a copy to prevent external modification
-	copy := make(map[string]bool, len(s.tools))
-	maps.Copy(copy, s.tools)
-	return copy
+	toolsCopy := make(map[string]bool, len(s.tools))
+	maps.Copy(toolsCopy, s.tools)
+	return toolsCopy
 }

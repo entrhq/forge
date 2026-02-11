@@ -268,15 +268,15 @@ func (s *CommandWhitelistSection) RemovePattern(index int) error {
 
 // GetPatterns returns a copy of all patterns.
 func (s *CommandWhitelistSection) GetPatterns() []WhitelistPattern {
-	copy := make([]WhitelistPattern, len(s.patterns))
+	patternsCopy := make([]WhitelistPattern, len(s.patterns))
 	for i, p := range s.patterns {
-		copy[i] = WhitelistPattern{
+		patternsCopy[i] = WhitelistPattern{
 			Pattern:     p.Pattern,
 			Description: p.Description,
 			Type:        p.Type,
 		}
 	}
-	return copy
+	return patternsCopy
 }
 
 // UpdatePattern updates a pattern at the specified index.

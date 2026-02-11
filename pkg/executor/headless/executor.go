@@ -147,7 +147,7 @@ func (e *Executor) Run(ctx context.Context) error {
 			switch event.Type {
 			case types.EventTypeThinkingStart:
 				e.logger.Infof("● Thinking...")
-			case types.EventTypeApiCallStart:
+			case types.EventTypeAPICallStart:
 				e.logger.Infof("~ API call...")
 			case types.EventTypeToolCall:
 				e.logger.Infof("> tool: %s", e.formatToolCall(event))
