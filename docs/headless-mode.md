@@ -7,6 +7,7 @@ Forge headless mode enables autonomous code execution in non-interactive environ
 - [Overview](#overview)
 - [Quick Start](#quick-start)
 - [Configuration](#configuration)
+- [Headless Task Delegation](#headless-task-delegation)
 - [Safety Constraints](#safety-constraints)
 - [Quality Gates](#quality-gates)
 - [Git Integration](#git-integration)
@@ -66,6 +67,23 @@ workspace_dir: .
 ```
 
 Everything else will use defaults.
+
+## Headless Task Delegation
+
+A powerful feature of Forge is the ability for the interactive agent to delegate tasks to a headless instance. This is useful for complex tasks that can be broken down into smaller, independent sub-tasks. This keeps the main interactive session clean and focused on high-level strategy, while the sub-tasks are executed autonomously with their own context and quality gates.
+
+### How It Works
+
+1.  **The user gives a complex task to the interactive agent.**
+2.  **The agent decides to delegate a sub-task.** It writes a temporary headless configuration file to the `.forge/` directory in your workspace.
+3.  **The agent executes Forge in headless mode**, pointing to the newly created configuration file.
+4.  **A new headless Forge instance starts**, runs the sub-task, and applies any quality gates.
+5.  **The interactive agent waits for the headless run to complete**, then reads the results from the output artifacts.
+6.  **The agent integrates the results** and continues with the main task, cleaning up the temporary configuration and artifacts.
+
+This all happens automatically. The primary benefit is that long-running, complex tasks become more efficient and reliable.
+
+You can learn more in the [Headless Task Delegation feature documentation](./product/features/headless-task-delegation.md).
 
 ## Configuration
 
