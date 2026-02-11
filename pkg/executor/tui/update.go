@@ -62,6 +62,10 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// If overlay returns nil, it wants to close
 		if updatedOverlay == nil {
 			m.ClearOverlay()
+			// Ensure any command returned by the closing overlay is executed
+			if overlayCmd != nil {
+				spinnerCmd = tea.Batch(spinnerCmd, overlayCmd)
+			}
 			// Continue processing the message in the main model
 		} else {
 			m.overlay.overlay = updatedOverlay
