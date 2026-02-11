@@ -12,27 +12,27 @@ import (
 // setupTestDir creates a temporary directory for test logs and resets global state
 func setupTestDir(t *testing.T) (cleanup func()) {
 	t.Helper()
-	
+
 	// Create temp directory
 	tempDir, err := os.MkdirTemp("", "forge-logging-test-*")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	
+
 	// Save original state
 	origLogDir := logDir
 	origInitErr := initErr
 	origInitOnce := initOnce
 	origSessionID := sessionID
 	origSessionIDOnce := sessionIDOnce
-	
+
 	// Reset global state
 	logDir = tempDir
 	initErr = nil
 	initOnce = sync.Once{}
 	sessionID = ""
 	sessionIDOnce = sync.Once{}
-	
+
 	// Return cleanup function
 	return func() {
 		// Restore original state
@@ -41,7 +41,7 @@ func setupTestDir(t *testing.T) (cleanup func()) {
 		initOnce = origInitOnce
 		sessionID = origSessionID
 		sessionIDOnce = origSessionIDOnce
-		
+
 		// Remove temp directory
 		os.RemoveAll(tempDir)
 	}
@@ -50,7 +50,7 @@ func setupTestDir(t *testing.T) (cleanup func()) {
 func TestNewLogger(t *testing.T) {
 	cleanup := setupTestDir(t)
 	defer cleanup()
-	
+
 	logger, err := NewLogger("test-component")
 	if err != nil {
 		t.Fatalf("Failed to create logger: %v", err)
@@ -78,7 +78,7 @@ func TestNewLogger(t *testing.T) {
 func TestLoggerFormatting(t *testing.T) {
 	cleanup := setupTestDir(t)
 	defer cleanup()
-	
+
 	logger, err := NewLogger("test")
 	if err != nil {
 		t.Fatalf("Failed to create logger: %v", err)
@@ -122,7 +122,7 @@ func TestLoggerFormatting(t *testing.T) {
 func TestMultipleComponents(t *testing.T) {
 	cleanup := setupTestDir(t)
 	defer cleanup()
-	
+
 	// Create two loggers with different components
 	logger1, err := NewLogger("component1")
 	if err != nil {
@@ -187,7 +187,7 @@ func TestGetSessionID(t *testing.T) {
 func TestGetLogDirectory(t *testing.T) {
 	cleanup := setupTestDir(t)
 	defer cleanup()
-	
+
 	dir, err := GetLogDirectory()
 	if err != nil {
 		t.Fatalf("Failed to get log directory: %v", err)
@@ -202,7 +202,7 @@ func TestGetLogDirectory(t *testing.T) {
 func TestLoggerClose(t *testing.T) {
 	cleanup := setupTestDir(t)
 	defer cleanup()
-	
+
 	logger, err := NewLogger("test")
 	if err != nil {
 		t.Fatalf("Failed to create logger: %v", err)
@@ -222,7 +222,7 @@ func TestLoggerClose(t *testing.T) {
 func TestLogPathFormat(t *testing.T) {
 	cleanup := setupTestDir(t)
 	defer cleanup()
-	
+
 	logger, err := NewLogger("test")
 	if err != nil {
 		t.Fatalf("Failed to create logger: %v", err)

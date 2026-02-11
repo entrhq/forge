@@ -509,22 +509,22 @@ func handleContextCommand(m *model, args []string) interface{} {
 
 	// Build overlay info structure
 	overlayInfo := &overlay.ContextInfo{
-		SystemPromptTokens:     contextInfo.SystemPromptTokens,
-		CustomInstructions:     contextInfo.CustomInstructions,
+		SystemPromptTokens:      contextInfo.SystemPromptTokens,
+		CustomInstructions:      contextInfo.CustomInstructions,
 		RepositoryContextTokens: contextInfo.RepositoryContextTokens,
-		ToolCount:              contextInfo.ToolCount,
-		ToolTokens:             contextInfo.ToolTokens,
-		ToolNames:              contextInfo.ToolNames,
-		MessageCount:           contextInfo.MessageCount,
-		ConversationTurns:      contextInfo.ConversationTurns,
-		ConversationTokens:     contextInfo.ConversationTokens,
-		CurrentContextTokens:   contextInfo.CurrentContextTokens,
-		MaxContextTokens:       contextInfo.MaxContextTokens,
-		FreeTokens:             freeTokens,
-		UsagePercent:           usagePercent,
-		TotalPromptTokens:      m.totalPromptTokens,
-		TotalCompletionTokens:  m.totalCompletionTokens,
-		TotalTokens:            m.totalTokens,
+		ToolCount:               contextInfo.ToolCount,
+		ToolTokens:              contextInfo.ToolTokens,
+		ToolNames:               contextInfo.ToolNames,
+		MessageCount:            contextInfo.MessageCount,
+		ConversationTurns:       contextInfo.ConversationTurns,
+		ConversationTokens:      contextInfo.ConversationTokens,
+		CurrentContextTokens:    contextInfo.CurrentContextTokens,
+		MaxContextTokens:        contextInfo.MaxContextTokens,
+		FreeTokens:              freeTokens,
+		UsagePercent:            usagePercent,
+		TotalPromptTokens:       m.totalPromptTokens,
+		TotalCompletionTokens:   m.totalCompletionTokens,
+		TotalTokens:             m.totalTokens,
 	}
 
 	// Create and activate context overlay

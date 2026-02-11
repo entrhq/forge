@@ -20,11 +20,11 @@ func TestGetContextInfo_RepositoryContext(t *testing.T) {
 	// Create a test agent using the constructor
 	provider := &mockProvider{}
 	agent := NewDefaultAgent(provider)
-	
+
 	// Set test-specific values
 	agent.customInstructions = "Test custom instructions"
 	agent.repositoryContext = "This is test repository context that should be counted"
-	
+
 	if agent.tokenizer == nil {
 		t.Skip("Tokenizer initialization failed, skipping test")
 	}
@@ -50,11 +50,11 @@ func TestGetContextInfo_NoRepositoryContext(t *testing.T) {
 	// Create a test agent using the constructor
 	provider := &mockProvider{}
 	agent := NewDefaultAgent(provider)
-	
+
 	// Set test-specific values
 	agent.customInstructions = "Test custom instructions"
 	agent.repositoryContext = "" // Empty repository context
-	
+
 	if agent.tokenizer == nil {
 		t.Skip("Tokenizer initialization failed, skipping test")
 	}
