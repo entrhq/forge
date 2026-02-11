@@ -60,12 +60,12 @@ func TestUISection_ShouldAutoClose(t *testing.T) {
 	ui := NewUISection()
 
 	tests := []struct {
-		name         string
-		autoClose    bool
-		onlySuccess  bool
-		exitCode     int
-		shouldClose  bool
-		description  string
+		name        string
+		autoClose   bool
+		onlySuccess bool
+		exitCode    int
+		shouldClose bool
+		description string
 	}{
 		{
 			name:        "disabled - success",
@@ -222,7 +222,7 @@ func TestUISection_ThreadSafety(t *testing.T) {
 
 	// Run concurrent reads and writes
 	done := make(chan bool)
-	
+
 	// Writer goroutine
 	go func() {
 		for i := 0; i < 100; i++ {

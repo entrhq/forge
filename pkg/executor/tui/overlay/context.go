@@ -18,8 +18,9 @@ type ContextOverlay struct {
 // ContextInfo contains all context statistics to display
 type ContextInfo struct {
 	// System prompt
-	SystemPromptTokens int
-	CustomInstructions bool
+	SystemPromptTokens      int
+	CustomInstructions      bool
+	RepositoryContextTokens int
 
 	// Tool system
 	ToolCount          int
@@ -99,6 +100,9 @@ func buildContextContent(info *ContextInfo) string {
 		b.WriteString("  Custom Instructions: Yes\n")
 	} else {
 		b.WriteString("  Custom Instructions: No\n")
+	}
+	if info.RepositoryContextTokens > 0 {
+		b.WriteString(fmt.Sprintf("  Repository Context (AGENTS.md): %s tokens\n", formatTokenCount(info.RepositoryContextTokens)))
 	}
 	b.WriteString("\n")
 

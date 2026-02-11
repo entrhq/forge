@@ -18,13 +18,13 @@ import (
 // All log methods (Debugf, Infof, Warnf, Errorf) write unconditionally.
 // There is currently no log level filtering.
 type Logger struct {
-	sessionID  string
-	component  string
-	file       *os.File
-	logger     *log.Logger
-	mu         sync.Mutex
-	logPath    string
-	closeOnce  sync.Once
+	sessionID string
+	component string
+	file      *os.File
+	logger    *log.Logger
+	mu        sync.Mutex
+	logPath   string
+	closeOnce sync.Once
 }
 
 var (
@@ -37,7 +37,7 @@ var (
 
 	// initOnce ensures directory initialization happens once
 	initOnce sync.Once
-	
+
 	// initErr stores any error from directory initialization
 	initErr error
 )
@@ -70,7 +70,7 @@ func initLogDirectory() error {
 
 // NewLogger creates a new logger for a specific component.
 // The logger writes to ~/.forge/logs/<session-id>-forge.log
-// 
+//
 // If the log directory cannot be created or the log file cannot be opened,
 // it returns a fallback logger that writes to stderr along with the error.
 // Callers can check the error to detect fallback mode and log warnings.
@@ -126,7 +126,7 @@ func (l *Logger) formatLogEntry(level, message string) string {
 func (l *Logger) Printf(format string, v ...interface{}) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	
+
 	message := fmt.Sprintf(format, v...)
 	entry := l.formatLogEntry("INFO", message)
 	l.logger.Println(entry)
@@ -136,7 +136,7 @@ func (l *Logger) Printf(format string, v ...interface{}) {
 func (l *Logger) Debugf(format string, v ...interface{}) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	
+
 	message := fmt.Sprintf(format, v...)
 	entry := l.formatLogEntry("DEBUG", message)
 	l.logger.Println(entry)
@@ -146,7 +146,7 @@ func (l *Logger) Debugf(format string, v ...interface{}) {
 func (l *Logger) Infof(format string, v ...interface{}) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	
+
 	message := fmt.Sprintf(format, v...)
 	entry := l.formatLogEntry("INFO", message)
 	l.logger.Println(entry)
@@ -156,7 +156,7 @@ func (l *Logger) Infof(format string, v ...interface{}) {
 func (l *Logger) Warnf(format string, v ...interface{}) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	
+
 	message := fmt.Sprintf(format, v...)
 	entry := l.formatLogEntry("WARN", message)
 	l.logger.Println(entry)
@@ -166,7 +166,7 @@ func (l *Logger) Warnf(format string, v ...interface{}) {
 func (l *Logger) Errorf(format string, v ...interface{}) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	
+
 	message := fmt.Sprintf(format, v...)
 	entry := l.formatLogEntry("ERROR", message)
 	l.logger.Println(entry)

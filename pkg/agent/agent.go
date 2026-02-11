@@ -70,8 +70,9 @@ type Agent interface {
 // ContextInfo contains detailed agent context statistics
 type ContextInfo struct {
 	// System prompt
-	SystemPromptTokens int
-	CustomInstructions bool
+	SystemPromptTokens      int
+	CustomInstructions      bool
+	RepositoryContextTokens int
 
 	// Tool system
 	ToolCount  int

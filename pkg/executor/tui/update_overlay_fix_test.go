@@ -4,12 +4,12 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
-	"github.com/entrhq/forge/pkg/executor/tui/types"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/entrhq/forge/pkg/executor/tui/overlay"
+	"github.com/entrhq/forge/pkg/executor/tui/types"
 )
 
 // mockMsg is a custom message type that only the mock overlay handles
@@ -30,12 +30,12 @@ func (m *mockOverlay) Update(msg tea.Msg, state types.StateProvider, actions typ
 	return m, nil
 }
 
-func (m *mockOverlay) View() string { return "" }
-func (m *mockOverlay) Width() int { return 0 }
-func (m *mockOverlay) Height() int { return 0 }
+func (m *mockOverlay) View() string           { return "" }
+func (m *mockOverlay) Width() int             { return 0 }
+func (m *mockOverlay) Height() int            { return 0 }
 func (m *mockOverlay) SetDimensions(w, h int) {}
-func (m *mockOverlay) Focused() bool { return true }
-func (m *mockOverlay) SetFocused(f bool) {}
+func (m *mockOverlay) Focused() bool          { return true }
+func (m *mockOverlay) SetFocused(f bool)      {}
 
 // TestUpdate_OverlayClosingWithCommand verifies that when an overlay closes and returns a command,
 // that command is not dropped by the main Update loop.

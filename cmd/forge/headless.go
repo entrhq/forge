@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/entrhq/forge/pkg/agent"
@@ -13,7 +14,6 @@ import (
 	"github.com/entrhq/forge/pkg/agent/tools"
 	appconfig "github.com/entrhq/forge/pkg/config"
 	"github.com/entrhq/forge/pkg/executor/headless"
-
 	"github.com/entrhq/forge/pkg/security/workspace"
 	"github.com/entrhq/forge/pkg/tools/coding"
 	"github.com/entrhq/forge/pkg/tools/scratchpad"
@@ -22,7 +22,7 @@ import (
 
 // runHeadless executes the headless mode
 //
-
+//nolint:gocyclo
 func runHeadless(ctx context.Context, config *Config) error {
 	// Load and validate configuration
 	execConfig, err := loadAndValidateConfig(config)
@@ -47,7 +47,7 @@ func runHeadless(ctx context.Context, config *Config) error {
 	if config.APIKey != nil {
 		cliAPIKey = *config.APIKey
 	}
-	
+
 	// Build the LLM provider, respecting config file and CLI flag precedence
 	provider, err := appconfig.BuildProvider(cliModel, cliBaseURL, cliAPIKey, defaultModel)
 	if err != nil {
@@ -90,16 +90,29 @@ func runHeadless(ctx context.Context, config *Config) error {
 		systemPrompt = config.SystemPrompt
 	}
 
+	// Load repository context from AGENTS.md if it exists
+	var repositoryContext string
+	agentsMdPath := filepath.Join(execConfig.WorkspaceDir, "AGENTS.md")
+	if agentsMdData, readErr := os.ReadFile(agentsMdPath); readErr == nil {
+		repositoryContext = string(agentsMdData)
+	}
+
 	// Create notes manager for scratchpad
 	notesManager := notes.NewManager()
 
 	// Create agent with headless system prompt, disabled interactive tools, and context management
-	ag := agent.NewDefaultAgent(
-		provider,
+	agentOpts := []agent.AgentOption{
 		agent.WithCustomInstructions(systemPrompt),
 		agent.WithDisabledTools("ask_question", "converse"),
 		agent.WithContextManager(contextManager),
-	)
+	}
+
+	// Add repository context if available
+	if repositoryContext != "" {
+		agentOpts = append(agentOpts, agent.WithRepositoryContext(repositoryContext))
+	}
+
+	ag := agent.NewDefaultAgent(provider, agentOpts...)
 
 	// Register coding tools with workspace guard
 	codingTools := []tools.Tool{

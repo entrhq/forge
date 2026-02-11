@@ -11,6 +11,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 
 	"github.com/entrhq/forge/pkg/agent"
@@ -91,7 +92,7 @@ func parseFlags() *Config {
 
 	// Use temporary variables for flags
 	var apiKey, baseURL, model string
-	
+
 	flag.StringVar(&apiKey, "api-key", "", "OpenAI API key (or set OPENAI_API_KEY env var)")
 	flag.StringVar(&baseURL, "base-url", "", "OpenAI API base URL (or set OPENAI_BASE_URL env var)")
 	flag.StringVar(&model, "model", "", "LLM model to use")
@@ -121,14 +122,14 @@ func parseFlags() *Config {
 	}
 
 	flag.Parse()
-	
+
 	// Convert flag values to pointers only if they were explicitly set
 	// Check if flag was visited (explicitly set by user)
 	flagWasSet := make(map[string]bool)
 	flag.Visit(func(f *flag.Flag) {
 		flagWasSet[f.Name] = true
 	})
-	
+
 	if flagWasSet["api-key"] {
 		config.APIKey = &apiKey
 	}
@@ -138,7 +139,7 @@ func parseFlags() *Config {
 	if flagWasSet["model"] {
 		config.Model = &model
 	}
-	
+
 	return config
 }
 
@@ -146,7 +147,7 @@ func parseFlags() *Config {
 func (c *Config) validate() error {
 	// Note: We no longer validate API key here since it will be resolved from
 	// CLI flags -> Environment variables -> Config file in BuildProvider
-	
+
 	// Headless mode requires config file
 	if c.Headless && c.HeadlessConfig == "" {
 		return fmt.Errorf("headless mode requires a configuration file (use -headless-config flag)")
@@ -179,7 +180,7 @@ func run(ctx context.Context, config *Config) error {
 
 // runTUI executes the TUI mode
 //
-
+//nolint:gocyclo
 func runTUI(ctx context.Context, config *Config) error {
 	// Initialize global configuration (for auto-approval and command whitelist)
 	if err := appconfig.Initialize(""); err != nil {
@@ -198,7 +199,7 @@ func runTUI(ctx context.Context, config *Config) error {
 	if config.APIKey != nil {
 		cliAPIKey = *config.APIKey
 	}
-	
+
 	provider, err := appconfig.BuildProvider(cliModel, cliBaseURL, cliAPIKey, defaultModel)
 	if err != nil {
 		return err
@@ -230,28 +231,42 @@ func runTUI(ctx context.Context, config *Config) error {
 		return fmt.Errorf("failed to create context manager: %w", err)
 	}
 
-	// Compose the system prompt
-	systemPrompt := composeSystemPrompt()
-	if config.SystemPrompt != "" {
-		systemPrompt = config.SystemPrompt // Override with user-provided prompt
-	}
-
 	// Create workspace security guard
 	guard, err := workspace.NewGuard(config.WorkspaceDir)
 	if err != nil {
 		return fmt.Errorf("failed to create workspace guard: %w", err)
 	}
 
+	// Check for AGENTS.md in workspace root
+	agentsMdPath := filepath.Join(config.WorkspaceDir, "AGENTS.md")
+	var repositoryContext string
+	if content, err := os.ReadFile(agentsMdPath); err == nil {
+		repositoryContext = string(content)
+		fmt.Printf("Loaded repository context from AGENTS.md\n")
+	}
+
+	// Compose the system prompt
+	systemPrompt := composeSystemPrompt()
+	if config.SystemPrompt != "" {
+		systemPrompt = config.SystemPrompt // Override with user-provided prompt
+	}
+
 	// Create notes manager for scratchpad
 	notesManager := notes.NewManager()
 
-	// Create agent with custom system prompt, context manager, and shared notes manager
-	ag := agent.NewDefaultAgent(
-		provider,
+	// Create agent with custom system prompt, repository context, context manager, and shared notes manager
+	agentOptions := []agent.AgentOption{
 		agent.WithCustomInstructions(systemPrompt),
 		agent.WithContextManager(contextManager),
 		agent.WithNotesManager(notesManager),
-	)
+	}
+
+	// Add repository context if AGENTS.md was loaded
+	if repositoryContext != "" {
+		agentOptions = append(agentOptions, agent.WithRepositoryContext(repositoryContext))
+	}
+
+	ag := agent.NewDefaultAgent(provider, agentOptions...)
 
 	// Register coding tools
 	codingTools := []tools.Tool{

@@ -2,8 +2,8 @@ package config
 
 import (
 	"fmt"
-	"os"
 	"github.com/entrhq/forge/pkg/llm/openai"
+	"os"
 )
 
 // BuildProvider creates an LLM provider based on configuration precedence:
@@ -46,12 +46,12 @@ func BuildProvider(cliModel, cliBaseURL, cliAPIKey, defaultModel string) (*opena
 			}
 		}
 	}
-	
+
 	// Use default model if still not set
 	if finalModel == "" {
 		finalModel = defaultModel
 	}
-	
+
 	// Validate that API key was resolved
 	if finalAPIKey == "" {
 		return nil, fmt.Errorf("API key is required. Set OPENAI_API_KEY environment variable, use -api-key flag, or configure in ~/.config/forge/config.yaml")
