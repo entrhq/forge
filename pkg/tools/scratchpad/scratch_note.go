@@ -45,7 +45,7 @@ func (t *ScratchNoteTool) Schema() map[string]interface{} {
 }
 
 // Execute marks a note as scratched.
-func (t *ScratchNoteTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
+func (t *ScratchNoteTool) Execute(_ context.Context, argsXML []byte) (string, map[string]interface{}, error) {
 	var input struct {
 		XMLName xml.Name `xml:"arguments"`
 		ID      string   `xml:"id"`

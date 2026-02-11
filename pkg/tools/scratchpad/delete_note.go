@@ -45,7 +45,7 @@ func (t *DeleteNoteTool) Schema() map[string]interface{} {
 }
 
 // Execute deletes a note.
-func (t *DeleteNoteTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
+func (t *DeleteNoteTool) Execute(_ context.Context, argsXML []byte) (string, map[string]interface{}, error) {
 	var input struct {
 		XMLName xml.Name `xml:"arguments"`
 		ID      string   `xml:"id"`

@@ -3,26 +3,23 @@ package context
 import (
 	"context"
 	"fmt"
-	"log"
-	"os"
 	"time"
 
 	"github.com/entrhq/forge/pkg/agent/memory"
 	"github.com/entrhq/forge/pkg/llm"
 	"github.com/entrhq/forge/pkg/llm/tokenizer"
+	"github.com/entrhq/forge/pkg/logging"
 	"github.com/entrhq/forge/pkg/types"
 )
 
-var debugLog *log.Logger
+var debugLog *logging.Logger
 
 func init() {
-	// Create debug log file in /tmp
-	f, err := os.OpenFile("/tmp/forge-context-debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	var err error
+	debugLog, err = logging.NewLogger("context")
 	if err != nil {
-		log.Printf("Failed to open debug log: %v", err)
-		debugLog = log.New(os.Stderr, "[CONTEXT-DEBUG] ", log.LstdFlags|log.Lshortfile)
-	} else {
-		debugLog = log.New(f, "[CONTEXT-DEBUG] ", log.LstdFlags|log.Lshortfile)
+		// Logger fell back to stderr due to initialization failure
+		debugLog.Warnf("Failed to initialize context logger, using stderr fallback: %v", err)
 	}
 }
 

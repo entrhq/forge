@@ -100,7 +100,7 @@ func (a *DefaultAgent) callLLM(ctx context.Context, pctx *promptContext) (*llmRe
 	if a.contextManager != nil {
 		maxTokens = a.contextManager.GetMaxTokens()
 	}
-	a.emitEvent(types.NewApiCallStartEvent("llm", pctx.promptTokens, maxTokens))
+	a.emitEvent(types.NewAPICallStartEvent("llm", pctx.promptTokens, maxTokens))
 
 	// Get response from LLM
 	stream, err := a.provider.StreamCompletion(ctx, pctx.messages)

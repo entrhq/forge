@@ -2,32 +2,30 @@ package tui
 
 import (
 	"fmt"
-	"log"
-	"os"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/cursor"
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/entrhq/forge/pkg/executor/tui/overlay"
 	tuitypes "github.com/entrhq/forge/pkg/executor/tui/types"
+	"github.com/entrhq/forge/pkg/logging"
 	"github.com/entrhq/forge/pkg/types"
 )
 
-var debugLog *log.Logger
+var debugLog *logging.Logger
 
 func initDebugLog() {
 	if debugLog != nil {
 		return // Already initialized
 	}
 
-	// Create debug log file
-	f, err := os.OpenFile("forge-tui-debug.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	var err error
+	debugLog, err = logging.NewLogger("tui")
 	if err != nil {
-		log.Printf("Warning: error opening debug log file: %v", err)
-		// Create a no-op logger to avoid nil pointer panics
-		debugLog = log.New(os.Stderr, "[DEBUG] ", log.LstdFlags|log.Lshortfile)
-		return
+		// Logger fell back to stderr due to initialization failure
+		debugLog.Warnf("Failed to initialize TUI logger, using stderr fallback: %v", err)
 	}
-	debugLog = log.New(f, "", log.LstdFlags|log.Lshortfile)
 	debugLog.Printf("Debug logging initialized")
 }
 
@@ -175,12 +173,10 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tuitypes.ViewResultMsg:
-		debugLog.Printf("Received viewResultMsg")
 		m.handleViewResult(msg)
 		return m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
 
 	case tuitypes.ViewNoteMsg:
-		debugLog.Printf("Received viewNoteMsg")
 		m.handleViewNote(msg)
 		return m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
 
@@ -189,24 +185,19 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleWindowResize(msg)
 
 	case slashCommandCompleteMsg:
-		debugLog.Printf("Received slashCommandCompleteMsg")
 		return m.handleSlashCommandComplete()
 
 	case operationStartMsg:
-		debugLog.Printf("Received operationStartMsg: %s", msg.message)
 		return m.handleOperationStart(msg)
 
 	case tuitypes.OperationStartMsg:
-		debugLog.Printf("Received types.OperationStartMsg: %s", msg.Message)
 		// Convert to internal type
 		return m.handleOperationStart(operationStartMsg{message: msg.Message})
 
 	case operationCompleteMsg:
-		debugLog.Printf("Received operationCompleteMsg: result=%s, err=%v", msg.result, msg.err)
 		return m.handleOperationComplete(msg)
 
 	case tuitypes.OperationCompleteMsg:
-		debugLog.Printf("Received types.OperationCompleteMsg: result=%s, err=%v", msg.Result, msg.Err)
 		// Convert to internal type
 		return m.handleOperationComplete(operationCompleteMsg{
 			result:       msg.Result,
@@ -218,11 +209,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		})
 
 	case toastMsg:
-		debugLog.Printf("Received toastMsg: %s", msg.message)
 		return m.handleToast(msg)
 
 	case tuitypes.ToastMsg:
-		debugLog.Printf("Received types.ToastMsg: %s", msg.Message)
 		// Convert to internal type
 		return m.handleToast(toastMsg{
 			message: msg.Message,
@@ -243,7 +232,19 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleApprovalRequest(msg)
 
 	case *types.AgentEvent:
-		debugLog.Printf("Received *types.AgentEvent: %s", msg.Type)
+		// Log only significant events (not streaming content or routine outputs)
+		switch msg.Type {
+		case types.EventTypeError,
+			types.EventTypeToolApprovalRequest,
+			types.EventTypeToolApprovalGranted,
+			types.EventTypeToolApprovalRejected,
+			types.EventTypeToolApprovalTimeout,
+			types.EventTypeCommandExecutionStart,
+			types.EventTypeCommandExecutionComplete,
+			types.EventTypeCommandExecutionFailed,
+			types.EventTypeTurnEnd:
+			debugLog.Printf("Received *types.AgentEvent: %s", msg.Type)
+		}
 
 		// Note: AgentEvent forwarding to overlay is now handled in the early message forwarding section
 		// Update viewport BEFORE handling event (important for streaming)
@@ -252,7 +253,6 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
 
 	case tea.MouseMsg:
-		debugLog.Printf("Received tea.MouseMsg")
 		// Note: Mouse event forwarding to overlay is now handled in the early message forwarding section
 		// Route mouse events to viewport for scrolling (only if no overlay is active)
 		if !m.overlay.isActive() {
@@ -261,11 +261,21 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
 
 	case tea.KeyMsg:
-		debugLog.Printf("Received tea.KeyMsg: %s", msg.String())
+		// Only log significant key events (not every character typed)
+		switch msg.String() {
+		case "ctrl+c", "ctrl+d", "esc", "enter", "tab", "up", "down", "pgup", "pgdown":
+			debugLog.Printf("Received tea.KeyMsg: %s", msg.String())
+		}
 		return m.handleKeyPress(msg, vpCmd, tiCmd, spinnerCmd)
 
 	default:
-		debugLog.Printf("Received unknown message type: %T", msg)
+		// Filter out high-frequency framework messages before passing to viewport
+		// to prevent excessive "unknown message type" logging from bubbles/viewport
+		switch msg.(type) {
+		case spinner.TickMsg, cursor.BlinkMsg:
+			// Don't pass framework noise to viewport
+			return m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
+		}
 	}
 
 	// Update viewport with current message handling
@@ -652,7 +662,6 @@ func (m *model) handleAgentMessage(input string, tiCmd, vpCmd, spinnerCmd tea.Cm
 
 	// Send message to agent
 	userInput := types.NewUserInput(input)
-	debugLog.Printf("Sending user input to agent: %+v", userInput)
 	m.channels.Input <- userInput
 
 	return m, tea.Batch(tiCmd, vpCmd, spinnerCmd)

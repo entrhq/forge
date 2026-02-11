@@ -17,46 +17,35 @@ import (
 //
 //nolint:gocyclo
 func (m *model) handleAgentEvent(event *pkgtypes.AgentEvent) {
-	debugLog.Printf("handleAgentEvent called with event type: %s", event.Type)
-
 	switch event.Type {
 	case pkgtypes.EventTypeThinkingStart:
-		debugLog.Printf("Processing EventTypeThinkingStart")
 		m.handleThinkingStart()
 
 	case pkgtypes.EventTypeThinkingContent:
-		debugLog.Printf("Processing EventTypeThinkingContent: %s", event.Content)
 		m.handleThinkingContent(event)
 		return // Exit early to preserve streaming viewport update
 
 	case pkgtypes.EventTypeThinkingEnd:
-		debugLog.Printf("Processing EventTypeThinkingEnd")
 		m.handleThinkingEnd()
 
 	case pkgtypes.EventTypeToolCallStart:
-		debugLog.Printf("Processing EventTypeToolCallStart")
 		m.handleToolCallStart(event)
 
 	case pkgtypes.EventTypeToolCall:
-		debugLog.Printf("Processing EventTypeToolCall")
 		m.handleToolCall(event)
 
 	case pkgtypes.EventTypeToolResult:
-		debugLog.Printf("Processing EventTypeToolResult")
 		m.handleToolResult(event)
 
 	case pkgtypes.EventTypeMessageStart:
-		debugLog.Printf("Processing EventTypeMessageStart")
 		m.handleMessageStart()
 
 	case pkgtypes.EventTypeMessageContent:
-		debugLog.Printf("Processing EventTypeMessageContent: %s", event.Content)
 		if m.handleMessageContent(event.Content) {
 			return // Exit early to preserve streaming viewport update
 		}
 
 	case pkgtypes.EventTypeMessageEnd:
-		debugLog.Printf("Processing EventTypeMessageEnd")
 		m.handleMessageEnd()
 
 	case pkgtypes.EventTypeError:
@@ -64,11 +53,9 @@ func (m *model) handleAgentEvent(event *pkgtypes.AgentEvent) {
 		m.handleError(event)
 
 	case pkgtypes.EventTypeTurnEnd:
-		debugLog.Printf("Processing EventTypeTurnEnd")
 		m.handleTurnEnd()
 
 	case pkgtypes.EventTypeUpdateBusy:
-		debugLog.Printf("Processing EventTypeUpdateBusy")
 		m.handleUpdateBusy(event)
 
 	case pkgtypes.EventTypeToolApprovalRequest:
@@ -86,7 +73,7 @@ func (m *model) handleAgentEvent(event *pkgtypes.AgentEvent) {
 	case pkgtypes.EventTypeToolApprovalTimeout:
 		m.handleToolApprovalTimeout()
 
-	case pkgtypes.EventTypeApiCallStart:
+	case pkgtypes.EventTypeAPICallStart:
 		m.handleApiCallStart(event)
 
 	case pkgtypes.EventTypeTokenUsage:
@@ -111,7 +98,6 @@ func (m *model) handleAgentEvent(event *pkgtypes.AgentEvent) {
 		m.handleContextSummarizationComplete(event)
 
 	case pkgtypes.EventTypeNotesData:
-		debugLog.Printf("Processing EventTypeNotesData")
 		m.handleNotesData(event)
 	}
 
@@ -343,9 +329,9 @@ func (m *model) handleToolApprovalTimeout() {
 
 func (m *model) handleApiCallStart(event *pkgtypes.AgentEvent) {
 	// Update context token information
-	if event.ApiCallInfo != nil {
-		m.currentContextTokens = event.ApiCallInfo.ContextTokens
-		m.maxContextTokens = event.ApiCallInfo.MaxContextTokens
+	if event.APICallInfo != nil {
+		m.currentContextTokens = event.APICallInfo.ContextTokens
+		m.maxContextTokens = event.APICallInfo.MaxContextTokens
 	}
 }
 

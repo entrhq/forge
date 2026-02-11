@@ -3,8 +3,6 @@ package agent
 import (
 	"context"
 	"fmt"
-	"log"
-	"os"
 	"sync"
 	"time"
 
@@ -16,19 +14,18 @@ import (
 	"github.com/entrhq/forge/pkg/agent/tools"
 	"github.com/entrhq/forge/pkg/llm"
 	"github.com/entrhq/forge/pkg/llm/tokenizer"
+	"github.com/entrhq/forge/pkg/logging"
 	"github.com/entrhq/forge/pkg/types"
 )
 
-var agentDebugLog *log.Logger
+var agentDebugLog *logging.Logger
 
 func init() {
-	// Create debug log file in /tmp
-	f, err := os.OpenFile("/tmp/forge-agent-debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	var err error
+	agentDebugLog, err = logging.NewLogger("agent")
 	if err != nil {
-		log.Printf("Failed to open agent debug log: %v", err)
-		agentDebugLog = log.New(os.Stderr, "[AGENT-DEBUG] ", log.LstdFlags|log.Lshortfile)
-	} else {
-		agentDebugLog = log.New(f, "[AGENT-DEBUG] ", log.LstdFlags|log.Lshortfile)
+		// Logger fell back to stderr due to initialization failure
+		agentDebugLog.Warnf("Failed to initialize agent logger, using stderr fallback: %v", err)
 	}
 }
 
