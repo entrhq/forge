@@ -415,7 +415,8 @@ func (m *model) handleBashCommandResult(msg bashCommandResultMsg) (tea.Model, te
 func (m *model) handleApprovalRequest(msg approvalRequestMsg) (tea.Model, tea.Cmd) {
 	// Create and activate generic approval overlay
 	overlay := overlay.NewGenericApprovalOverlay(msg.request, m.width, m.height)
-	m.overlay.activate(tuitypes.OverlayModeApproval, overlay)
+	// We use pushOverlay to handle concurrent approval requests (stacking them)
+	m.overlay.pushOverlay(tuitypes.OverlayModeApproval, overlay)
 	return m, nil
 }
 
