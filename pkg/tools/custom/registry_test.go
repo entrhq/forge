@@ -1,6 +1,7 @@
 package custom
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -9,13 +10,6 @@ import (
 func TestRegistry_RefreshAndGet(t *testing.T) {
 	// Create temporary tools directory
 	tmpDir := t.TempDir()
-	
-	// Override GetToolsDir for testing
-	originalGetToolsDir := GetToolsDir
-	GetToolsDir = func() (string, error) {
-		return tmpDir, nil
-	}
-	defer func() { GetToolsDir = originalGetToolsDir }()
 
 	// Create a test tool
 	toolDir := filepath.Join(tmpDir, "test-tool")
@@ -50,8 +44,8 @@ func TestRegistry_RefreshAndGet(t *testing.T) {
 		t.Fatalf("Failed to create binary: %v", err)
 	}
 
-	// Test registry
-	registry := NewRegistry()
+	// Test registry with custom directory
+	registry := NewRegistryWithDir(tmpDir)
 
 	// Initially empty
 	if registry.Count() != 0 {
@@ -85,13 +79,6 @@ func TestRegistry_RefreshAndGet(t *testing.T) {
 func TestRegistry_List(t *testing.T) {
 	// Create temporary tools directory
 	tmpDir := t.TempDir()
-	
-	// Override GetToolsDir for testing
-	originalGetToolsDir := GetToolsDir
-	GetToolsDir = func() (string, error) {
-		return tmpDir, nil
-	}
-	defer func() { GetToolsDir = originalGetToolsDir }()
 
 	// Create multiple test tools
 	for i := 1; i <= 3; i++ {
@@ -119,7 +106,7 @@ func TestRegistry_List(t *testing.T) {
 		}
 	}
 
-	registry := NewRegistry()
+	registry := NewRegistryWithDir(tmpDir)
 	if err := registry.Refresh(); err != nil {
 		t.Fatalf("Refresh() error = %v", err)
 	}
@@ -150,15 +137,8 @@ func TestRegistry_Has(t *testing.T) {
 func TestRegistry_GetBinaryPath(t *testing.T) {
 	// Create temporary tools directory
 	tmpDir := t.TempDir()
-	
-	// Override GetToolsDir for testing
-	originalGetToolsDir := GetToolsDir
-	GetToolsDir = func() (string, error) {
-		return tmpDir, nil
-	}
-	defer func() { GetToolsDir = originalGetToolsDir }()
 
-	registry := NewRegistry()
+	registry := NewRegistryWithDir(tmpDir)
 
 	// Add a tool manually
 	registry.tools["test-tool"] = &ToolMetadata{
@@ -185,12 +165,6 @@ func TestRegistry_GetBinaryPath(t *testing.T) {
 
 func TestRegistry_RefreshSkipsInvalidTools(t *testing.T) {
 	tmpDir := t.TempDir()
-	
-	originalGetToolsDir := GetToolsDir
-	GetToolsDir = func() (string, error) {
-		return tmpDir, nil
-	}
-	defer func() { GetToolsDir = originalGetToolsDir }()
 
 	// Create tool with missing binary
 	toolDir := filepath.Join(tmpDir, "no-binary")

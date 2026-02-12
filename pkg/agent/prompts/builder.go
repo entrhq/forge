@@ -89,6 +89,10 @@ func (pb *PromptBuilder) Build() string {
 
 	// Add scratchpad guidance
 	builder.WriteString(ScratchpadGuidancePrompt)
+	builder.WriteString("\n\n")
+
+	// Add custom tools guidance
+	builder.WriteString(CustomToolsGuidancePrompt)
 
 	return builder.String()
 }

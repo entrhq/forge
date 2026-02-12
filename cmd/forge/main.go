@@ -23,6 +23,7 @@ import (
 
 	"github.com/entrhq/forge/pkg/security/workspace"
 	"github.com/entrhq/forge/pkg/tools/coding"
+	"github.com/entrhq/forge/pkg/tools/custom"
 	"github.com/entrhq/forge/pkg/tools/scratchpad"
 )
 
@@ -237,6 +238,16 @@ func runTUI(ctx context.Context, config *Config) error {
 		return fmt.Errorf("failed to create workspace guard: %w", err)
 	}
 
+	// Whitelist custom tools directory for custom tool operations
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("failed to get home directory: %w", err)
+	}
+	customToolsDir := filepath.Join(homeDir, ".forge", "tools")
+	if err := guard.AddWhitelist(customToolsDir); err != nil {
+		return fmt.Errorf("failed to whitelist custom tools directory: %w", err)
+	}
+
 	// Check for AGENTS.md in workspace root
 	agentsMdPath := filepath.Join(config.WorkspaceDir, "AGENTS.md")
 	var repositoryContext string
@@ -297,6 +308,18 @@ func runTUI(ctx context.Context, config *Config) error {
 	for _, tool := range scratchpadTools {
 		if err := ag.RegisterTool(tool); err != nil {
 			return fmt.Errorf("failed to register scratchpad tool: %w", err)
+		}
+	}
+
+	// Register custom tool management tools
+	customTools := []tools.Tool{
+		custom.NewCreateCustomToolTool(),
+		custom.NewRunCustomToolTool(guard),
+	}
+
+	for _, tool := range customTools {
+		if err := ag.RegisterTool(tool); err != nil {
+			return fmt.Errorf("failed to register custom tool: %w", err)
 		}
 	}
 

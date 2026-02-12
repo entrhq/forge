@@ -9,8 +9,9 @@ import (
 
 // Registry manages the discovery and loading of custom tools
 type Registry struct {
-	mu    sync.RWMutex
-	tools map[string]*ToolMetadata // tool name -> metadata
+	mu       sync.RWMutex
+	tools    map[string]*ToolMetadata // tool name -> metadata
+	toolsDir string                   // Override for testing, empty means use default
 }
 
 // NewRegistry creates a new custom tool registry
@@ -20,10 +21,26 @@ func NewRegistry() *Registry {
 	}
 }
 
+// NewRegistryWithDir creates a registry with a custom tools directory (for testing)
+func NewRegistryWithDir(toolsDir string) *Registry {
+	return &Registry{
+		tools:    make(map[string]*ToolMetadata),
+		toolsDir: toolsDir,
+	}
+}
+
+// getToolsDir returns the tools directory for this registry
+func (r *Registry) getToolsDir() (string, error) {
+	if r.toolsDir != "" {
+		return r.toolsDir, nil
+	}
+	return GetToolsDir()
+}
+
 // Refresh scans the tools directory and reloads all tool metadata
 // This should be called at the start of each agent turn
 func (r *Registry) Refresh() error {
-	toolsDir, err := GetToolsDir()
+	toolsDir, err := r.getToolsDir()
 	if err != nil {
 		return fmt.Errorf("failed to get tools directory: %w", err)
 	}
@@ -129,7 +146,7 @@ func (r *Registry) GetBinaryPath(toolName string) (string, error) {
 		return "", fmt.Errorf("tool %s not found", toolName)
 	}
 
-	toolsDir, err := GetToolsDir()
+	toolsDir, err := r.getToolsDir()
 	if err != nil {
 		return "", err
 	}
