@@ -178,6 +178,43 @@ func TestGuard_ResolvePath(t *testing.T) {
 			path:    "",
 			wantErr: true,
 		},
+		{
+			name:    "tilde expansion with trailing path",
+			path:    "~/.forge/tools/test.yaml",
+			wantErr: false,
+			check: func(resolved string) bool {
+				homeDir, err := os.UserHomeDir()
+				if err != nil {
+					return false
+				}
+				expected := filepath.Join(homeDir, ".forge/tools/test.yaml")
+				return resolved == expected
+			},
+		},
+		{
+			name:    "tilde expansion alone",
+			path:    "~",
+			wantErr: false,
+			check: func(resolved string) bool {
+				homeDir, err := os.UserHomeDir()
+				if err != nil {
+					return false
+				}
+				return resolved == homeDir
+			},
+		},
+		{
+			name:    "tilde with slash only",
+			path:    "~/",
+			wantErr: false,
+			check: func(resolved string) bool {
+				homeDir, err := os.UserHomeDir()
+				if err != nil {
+					return false
+				}
+				return resolved == homeDir
+			},
+		},
 	}
 
 	for _, tt := range tests {

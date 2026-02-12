@@ -14,8 +14,9 @@ import (
 // It validates that all file operations remain within the workspace directory,
 // preventing path traversal attacks and unauthorized file access.
 type Guard struct {
-	workspaceDir  string         // Absolute path to workspace root
-	ignoreMatcher *IgnoreMatcher // Pattern matcher for ignore rules
+	workspaceDir    string         // Absolute path to workspace root
+	ignoreMatcher   *IgnoreMatcher // Pattern matcher for ignore rules
+	whitelistedDirs []string       // Additional allowed directories outside workspace
 }
 
 // NewGuard creates a new workspace guard for the given directory.
@@ -45,8 +46,9 @@ func NewGuard(workspaceDir string) (*Guard, error) {
 	}
 
 	return &Guard{
-		workspaceDir:  evalPath,
-		ignoreMatcher: ignoreMatcher,
+		workspaceDir:    evalPath,
+		ignoreMatcher:   ignoreMatcher,
+		whitelistedDirs: make([]string, 0),
 	}, nil
 }
 
@@ -79,14 +81,30 @@ func (g *Guard) ValidatePath(path string) error {
 
 // ResolvePath converts a relative or absolute path to an absolute path
 // within the workspace context. It cleans the path and resolves any
-// symbolic links.
+// symbolic links. Supports tilde expansion for paths starting with ~/.
 func (g *Guard) ResolvePath(path string) (string, error) {
 	if path == "" {
 		return "", fmt.Errorf("path cannot be empty")
 	}
 
+	// Expand tilde to home directory if present
+	expandedPath := path
+	if strings.HasPrefix(path, "~/") {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("failed to expand ~: %w", err)
+		}
+		expandedPath = filepath.Join(homeDir, path[2:])
+	} else if path == "~" {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("failed to expand ~: %w", err)
+		}
+		expandedPath = homeDir
+	}
+
 	// Clean the path to remove any .. or . components
-	cleanPath := filepath.Clean(path)
+	cleanPath := filepath.Clean(expandedPath)
 
 	// If path is already absolute, use it directly
 	// Otherwise, join with workspace directory
@@ -134,22 +152,63 @@ func (g *Guard) ResolvePath(path string) (string, error) {
 	return evalPath, nil
 }
 
-// IsWithinWorkspace checks if an absolute path is within the workspace boundaries.
-// This is done by ensuring the path starts with the workspace directory path.
+// IsWithinWorkspace checks if an absolute path is within the workspace boundaries
+// or within any whitelisted directory. This is the core security check - it ensures
+// a path is either the workspace itself, a child directory of the workspace, or
+// within an explicitly whitelisted directory.
 func (g *Guard) IsWithinWorkspace(absPath string) bool {
-	// Ensure both paths end with separator for accurate comparison
-	workspacePrefix := g.workspaceDir
-	if !strings.HasSuffix(workspacePrefix, string(filepath.Separator)) {
-		workspacePrefix += string(filepath.Separator)
-	}
-
-	testPath := absPath
-	if !strings.HasSuffix(testPath, string(filepath.Separator)) && absPath != g.workspaceDir {
-		testPath += string(filepath.Separator)
-	}
+	// Evaluate symlinks to ensure consistent path comparison
+	// This is important on systems like macOS where /var -> /private/var
+	evalPath := g.resolveSymlinks(absPath)
 
 	// Check if path is exactly the workspace or a child of it
-	return absPath == g.workspaceDir || strings.HasPrefix(testPath, workspacePrefix)
+	if evalPath == g.workspaceDir || strings.HasPrefix(evalPath+string(filepath.Separator), g.workspaceDir+string(filepath.Separator)) {
+		return true
+	}
+
+	// Check whitelisted directories
+	for _, whitelisted := range g.whitelistedDirs {
+		if evalPath == whitelisted || strings.HasPrefix(evalPath+string(filepath.Separator), whitelisted+string(filepath.Separator)) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// resolveSymlinks resolves symlinks in a path, handling non-existent paths
+// by recursively resolving parent directories until an existing one is found.
+func (g *Guard) resolveSymlinks(path string) string {
+	// Try direct resolution first
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		return resolved
+	}
+
+	// For non-existent paths, collect path components and resolve from root
+	var components []string
+	currentPath := path
+
+	// Walk up the directory tree collecting components until we find something that exists
+	for {
+		if resolved, err := filepath.EvalSymlinks(currentPath); err == nil {
+			// Found an existing path, now reconstruct with collected components
+			result := resolved
+			for i := len(components) - 1; i >= 0; i-- {
+				result = filepath.Join(result, components[i])
+			}
+			return result
+		}
+
+		// Path doesn't exist, move up one level
+		dir := filepath.Dir(currentPath)
+		if dir == currentPath || dir == "." || dir == "/" {
+			// Reached root without finding existing path, return original
+			return path
+		}
+
+		components = append(components, filepath.Base(currentPath))
+		currentPath = dir
+	}
 }
 
 // WorkspaceDir returns the absolute path of the workspace directory.
@@ -175,7 +234,26 @@ func (g *Guard) MakeRelative(absPath string) (string, error) {
 // ShouldIgnore checks if a path should be ignored based on loaded ignore patterns.
 // The path can be either absolute or relative - it will be converted to relative for matching.
 // Returns true if the path matches any ignore pattern (considering precedence and negation).
+// Whitelisted paths are never ignored, regardless of ignore patterns.
 func (g *Guard) ShouldIgnore(path string) bool {
+	// Get absolute path for whitelist checking
+	var absPath string
+	if filepath.IsAbs(path) {
+		absPath = path
+	} else {
+		absPath = filepath.Join(g.workspaceDir, path)
+	}
+
+	// Resolve symlinks for consistent comparison
+	evalPath := g.resolveSymlinks(absPath)
+
+	// Check if path is in a whitelisted directory - never ignore whitelisted paths
+	for _, whitelisted := range g.whitelistedDirs {
+		if evalPath == whitelisted || strings.HasPrefix(evalPath+string(filepath.Separator), whitelisted+string(filepath.Separator)) {
+			return false
+		}
+	}
+
 	// Convert to relative path for pattern matching
 	var relPath string
 	if filepath.IsAbs(path) {
@@ -191,11 +269,6 @@ func (g *Guard) ShouldIgnore(path string) bool {
 	}
 
 	// Check if path is a directory by attempting to stat it
-	absPath := path
-	if !filepath.IsAbs(path) {
-		absPath = filepath.Join(g.workspaceDir, path)
-	}
-
 	isDir := false
 	if info, err := os.Lstat(absPath); err == nil {
 		isDir = info.IsDir()

@@ -13,6 +13,7 @@ type PromptBuilder struct {
 	tools              []tools.Tool
 	customInstructions string
 	repositoryContext  string
+	customToolsList    string
 }
 
 // NewPromptBuilder creates a new prompt builder with default settings
@@ -39,6 +40,12 @@ func (pb *PromptBuilder) WithCustomInstructions(instructions string) *PromptBuil
 // This provides project-specific information separate from custom instructions
 func (pb *PromptBuilder) WithRepositoryContext(context string) *PromptBuilder {
 	pb.repositoryContext = context
+	return pb
+}
+
+// WithCustomToolsList adds the formatted list of available custom tools
+func (pb *PromptBuilder) WithCustomToolsList(customTools string) *PromptBuilder {
+	pb.customToolsList = customTools
 	return pb
 }
 
@@ -89,6 +96,16 @@ func (pb *PromptBuilder) Build() string {
 
 	// Add scratchpad guidance
 	builder.WriteString(ScratchpadGuidancePrompt)
+	builder.WriteString("\n\n")
+
+	// Add custom tools guidance
+	builder.WriteString(CustomToolsGuidancePrompt)
+
+	// Add available custom tools list if provided
+	if pb.customToolsList != "" {
+		builder.WriteString("\n\n")
+		builder.WriteString(pb.customToolsList)
+	}
 
 	return builder.String()
 }

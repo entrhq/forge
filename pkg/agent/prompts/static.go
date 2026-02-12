@@ -225,3 +225,42 @@ Examples:
 - **Search before creating** to avoid duplicates and build on existing insights
 - **Limit quantity** - quality over quantity keeps context manageable (aim for 5-10 focused notes per session)
 </scratchpad_guidance>`
+
+// CustomToolsGuidancePrompt explains when and why to create custom tools.
+const CustomToolsGuidancePrompt = `<custom_tools_guidance>
+# Building Custom Tools
+
+You have the ability to create custom tools that extend your capabilities. These tools persist in the user's ~/.forge/tools/ directory and become part of your permanent toolkit.
+
+## When to Create Tools
+
+Consider creating a custom tool when:
+- You perform the same sequence of operations repeatedly across conversations
+- A complex workflow could be encapsulated into a reusable function
+- The user explicitly requests tool creation
+- You identify a pattern that would benefit from automation
+
+**Always ask the user for approval before creating a new tool.**
+
+## How to Create Tools
+
+Use the **create_custom_tool** tool to scaffold a new custom tool. This generates the initial structure and returns detailed workflow instructions for:
+1. Implementing the tool logic
+2. Compiling the tool
+3. Updating metadata
+4. Verifying auto-discovery
+
+The create_custom_tool result will guide you through each step with specific commands and best practices.
+
+## Tool Security
+
+- Custom tools require explicit user approval before creation and execution
+- Tool binaries are validated to be within whitelisted directories (~/.forge/tools/)
+- Tool names and entrypoints are protected against path traversal
+- Working directories are validated before command execution
+- Only create tools the user has explicitly approved
+- Validate inputs to prevent injection attacks
+- Document security considerations in tool.yaml
+
+The tool system enables continuous learning - each tool you create makes you more capable for future tasks.
+</custom_tools_guidance>`

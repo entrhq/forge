@@ -16,6 +16,7 @@ import (
 	"github.com/entrhq/forge/pkg/executor/headless"
 	"github.com/entrhq/forge/pkg/security/workspace"
 	"github.com/entrhq/forge/pkg/tools/coding"
+	"github.com/entrhq/forge/pkg/tools/custom"
 	"github.com/entrhq/forge/pkg/tools/scratchpad"
 	"gopkg.in/yaml.v3"
 )
@@ -82,6 +83,16 @@ func runHeadless(ctx context.Context, config *Config) error {
 		return fmt.Errorf("failed to create workspace guard: %w", err)
 	}
 
+	// Whitelist custom tools directory for custom tool operations
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("failed to get home directory: %w", err)
+	}
+	customToolsDir := filepath.Join(homeDir, ".forge", "tools")
+	if err := guard.AddWhitelist(customToolsDir); err != nil {
+		return fmt.Errorf("failed to whitelist custom tools directory: %w", err)
+	}
+
 	// Compose the headless system prompt with mode-specific guidance
 	systemPrompt := composeHeadlessSystemPrompt(execConfig.Mode)
 
@@ -143,6 +154,18 @@ func runHeadless(ctx context.Context, config *Config) error {
 	for _, tool := range scratchpadTools {
 		if regErr := ag.RegisterTool(tool); regErr != nil {
 			return fmt.Errorf("failed to register scratchpad tool: %w", regErr)
+		}
+	}
+
+	// Register custom tool management tools
+	customTools := []tools.Tool{
+		custom.NewCreateCustomToolTool(),
+		custom.NewRunCustomToolTool(guard),
+	}
+
+	for _, tool := range customTools {
+		if regErr := ag.RegisterTool(tool); regErr != nil {
+			return fmt.Errorf("failed to register custom tool: %w", regErr)
 		}
 	}
 

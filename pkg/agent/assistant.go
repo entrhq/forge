@@ -40,10 +40,13 @@ func (a *DefaultAgent) runAgentLoop(ctx context.Context) {
 //   - shouldContinue: false means loop should break (loop-breaking tool used or circuit breaker)
 //   - errorContext: message to inject as user context for error recovery (empty if no error)
 func (a *DefaultAgent) executeIteration(ctx context.Context, errorContext string) (bool, string) {
-	// Step 1: Prepare prompt with summarization if needed
+	// Step 1: Refresh custom tool registry to discover newly created tools
+	a.refreshCustomToolRegistry()
+
+	// Step 2: Prepare prompt with summarization if needed
 	pctx := a.preparePrompt(ctx, errorContext)
 
-	// Step 2: Call LLM and get streaming response
+	// Step 3: Call LLM and get streaming response
 	resp, err := a.callLLM(ctx, pctx)
 	if err != nil {
 		// Context cancellation - stop silently
@@ -54,11 +57,34 @@ func (a *DefaultAgent) executeIteration(ctx context.Context, errorContext string
 		return false, ""
 	}
 
-	// Step 3: Record response (emit tokens, add to memory)
+	// Step 4: Record response (emit tokens, add to memory)
 	a.recordResponse(pctx, resp)
 
-	// Step 4: Process the tool call (parse, validate, execute)
+	// Step 5: Process the tool call (parse, validate, execute)
 	return a.processToolCall(ctx, resp.toolCallContent)
+}
+
+// refreshCustomToolRegistry refreshes the custom tool registry to discover newly created tools
+// This is called at the start of each agent iteration to ensure tools created during
+// the conversation are immediately available
+func (a *DefaultAgent) refreshCustomToolRegistry() {
+	a.toolsMu.RLock()
+	tool, exists := a.tools["run_custom_tool"]
+	a.toolsMu.RUnlock()
+
+	if !exists {
+		return // run_custom_tool not registered, nothing to refresh
+	}
+
+	// Type assert to check if the tool has a Refresh method
+	type refreshable interface {
+		Refresh() error
+	}
+
+	if refresher, ok := tool.(refreshable); ok {
+		// Silently ignore refresh errors - registry will continue with existing tools
+		_ = refresher.Refresh()
+	}
 }
 
 // emitEvent sends an event on the event channel.
