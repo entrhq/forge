@@ -51,7 +51,7 @@ func (t *RunCustomToolTool) Schema() map[string]interface{} {
 			},
 			"arguments": map[string]interface{}{
 				"type":        "object",
-				"description": "Key-value pairs of arguments to pass to the tool (converted to CLI flags)",
+				"description": "Tool-specific arguments as direct XML elements (not nested). Each becomes a CLI flag (e.g., <count>20</count> → --count=20)",
 			},
 			"timeout": map[string]interface{}{
 				"type":        "number",
@@ -129,6 +129,19 @@ func (t *RunCustomToolTool) Execute(ctx context.Context, argsXML []byte) (string
 
 func (t *RunCustomToolTool) IsLoopBreaking() bool {
 	return false
+}
+
+// XMLExample provides a concrete XML usage example for this tool.
+func (t *RunCustomToolTool) XMLExample() string {
+	return `<tool>
+<server_name>local</server_name>
+<tool_name>run_custom_tool</tool_name>
+<arguments>
+  <tool_name>recent-commits</tool_name>
+  <count>20</count>
+  <format>oneline</format>
+</arguments>
+</tool>`
 }
 
 // Refresh reloads the tool registry from disk
