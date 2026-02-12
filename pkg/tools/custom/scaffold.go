@@ -22,12 +22,12 @@ func Scaffold(opts ScaffoldOptions) error {
 	if opts.Name == "" {
 		return fmt.Errorf("tool name cannot be empty")
 	}
-	
+
 	// Validate tool name to prevent path traversal
 	if err := validateToolName(opts.Name); err != nil {
 		return err
 	}
-	
+
 	if opts.Description == "" {
 		return fmt.Errorf("tool description cannot be empty")
 	}
@@ -87,23 +87,23 @@ func validateToolName(name string) error {
 	if name == "" {
 		return fmt.Errorf("tool name cannot be empty")
 	}
-	
+
 	// Reject . and .. explicitly
 	if name == "." || name == ".." {
 		return fmt.Errorf("tool name cannot be '.' or '..'")
 	}
-	
+
 	// Ensure the name doesn't contain path separators
 	if filepath.Base(name) != name {
 		return fmt.Errorf("tool name cannot contain path separators")
 	}
-	
+
 	// Enforce alphanumeric, underscore, and hyphen only
 	validName := regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 	if !validName.MatchString(name) {
 		return fmt.Errorf("tool name must contain only alphanumeric characters, underscores, and hyphens")
 	}
-	
+
 	return nil
 }
 

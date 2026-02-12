@@ -77,7 +77,7 @@ func (t *CreateCustomToolTool) Execute(ctx context.Context, argsXML []byte) (str
 	opts := ScaffoldOptions{
 		Name:        input.Name,
 		Description: input.Description,
-		Version:     "1.0.0", // Always use 1.0.0 as default
+		Version:     "1.0.0",    // Always use 1.0.0 as default
 		ToolsDir:    t.toolsDir, // Use override if set (for testing)
 	}
 

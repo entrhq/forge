@@ -117,7 +117,7 @@ func (t *RunCustomToolTool) Execute(ctx context.Context, argsXML []byte) (string
 	defer cancel()
 
 	// Validate binary path is within workspace before execution
-	if err := t.guard.ValidatePath(binaryPath); err != nil {
+	if err = t.guard.ValidatePath(binaryPath); err != nil {
 		return "", nil, fmt.Errorf("tool binary path validation failed: %w", err)
 	}
 
@@ -125,7 +125,7 @@ func (t *RunCustomToolTool) Execute(ctx context.Context, argsXML []byte) (string
 
 	// Set working directory to workspace (so tools can access workspace files)
 	workspaceDir := t.guard.WorkspaceDir()
-	if err := t.guard.ValidatePath(workspaceDir); err != nil {
+	if err = t.guard.ValidatePath(workspaceDir); err != nil {
 		return "", nil, fmt.Errorf("workspace directory validation failed: %w", err)
 	}
 	cmd.Dir = workspaceDir
