@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 )
 
@@ -78,6 +79,12 @@ func (r *Registry) Refresh() error {
 			continue
 		}
 
+		// Validate entrypoint to prevent path traversal
+		if filepath.Base(metadata.Entrypoint) != metadata.Entrypoint {
+			// Entrypoint contains path separators, skip this tool
+			continue
+		}
+
 		// Verify binary exists and is executable
 		binaryPath := filepath.Join(toolsDir, toolName, metadata.Entrypoint)
 		info, err := os.Stat(binaryPath)
@@ -86,10 +93,12 @@ func (r *Registry) Refresh() error {
 			continue
 		}
 
-		// Check if file is executable (on Unix-like systems)
-		if info.Mode()&0111 == 0 {
-			// Not executable, skip this tool
-			continue
+		// Check if file is executable (skip on Windows where permission bits don't work)
+		if runtime.GOOS != "windows" {
+			if info.Mode()&0111 == 0 {
+				// Not executable, skip this tool
+				continue
+			}
 		}
 
 		newTools[toolName] = metadata

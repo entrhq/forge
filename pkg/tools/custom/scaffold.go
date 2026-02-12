@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"text/template"
 )
 
@@ -21,6 +22,12 @@ func Scaffold(opts ScaffoldOptions) error {
 	if opts.Name == "" {
 		return fmt.Errorf("tool name cannot be empty")
 	}
+	
+	// Validate tool name to prevent path traversal
+	if err := validateToolName(opts.Name); err != nil {
+		return err
+	}
+	
 	if opts.Description == "" {
 		return fmt.Errorf("tool description cannot be empty")
 	}
@@ -55,7 +62,7 @@ func Scaffold(opts ScaffoldOptions) error {
 		Name:        opts.Name,
 		Description: opts.Description,
 		Version:     opts.Version,
-		Entrypoint:  opts.Name + ".go", // Will be updated to binary name after compilation
+		Entrypoint:  opts.Name, // Binary name; Go source is opts.Name + ".go"
 		Usage:       fmt.Sprintf("Usage instructions for %s", opts.Name),
 		Parameters:  []Parameter{}, // Empty initially, agent will add parameters
 	}
@@ -71,6 +78,32 @@ func Scaffold(opts ScaffoldOptions) error {
 		return fmt.Errorf("failed to write Go boilerplate: %w", err)
 	}
 
+	return nil
+}
+
+// validateToolName ensures the tool name is safe and cannot be used for path traversal
+func validateToolName(name string) error {
+	// Check for empty or just whitespace
+	if name == "" {
+		return fmt.Errorf("tool name cannot be empty")
+	}
+	
+	// Reject . and .. explicitly
+	if name == "." || name == ".." {
+		return fmt.Errorf("tool name cannot be '.' or '..'")
+	}
+	
+	// Ensure the name doesn't contain path separators
+	if filepath.Base(name) != name {
+		return fmt.Errorf("tool name cannot contain path separators")
+	}
+	
+	// Enforce alphanumeric, underscore, and hyphen only
+	validName := regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+	if !validName.MatchString(name) {
+		return fmt.Errorf("tool name must contain only alphanumeric characters, underscores, and hyphens")
+	}
+	
 	return nil
 }
 

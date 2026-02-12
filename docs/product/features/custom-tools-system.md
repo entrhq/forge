@@ -191,13 +191,17 @@ func writeOutput(result string) {
 
 **Workspace Isolation:**
 - `~/.forge/tools/` is whitelisted for agent writes (exception to workspace guard)
-- Custom tools run in user's environment with full system access
-- Agent must request user approval before creating tools
+- Custom tool binaries are validated to be within whitelisted directories before execution
+- Tool execution working directory is validated before running commands
+- Agent must request user approval before creating or running tools
 
 **Safety Mechanisms:**
-- Tool creation requires explicit user approval
+- Tool creation requires explicit user approval (via Previewable interface)
+- Tool execution requires explicit user approval (via Previewable interface)
 - Tools are visible and inspectable in `~/.forge/tools/`
 - Users can delete or modify tools manually
+- Path traversal protection on tool names and entrypoints
+- Binary path validation before execution
 - Compilation errors prevent broken tools from being available
 
 ### Tool Discovery and Loading

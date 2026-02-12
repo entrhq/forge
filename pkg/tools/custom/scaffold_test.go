@@ -55,8 +55,8 @@ func TestScaffold(t *testing.T) {
 	if metadata.Version != opts.Version {
 		t.Errorf("Version = %v, want %v", metadata.Version, opts.Version)
 	}
-	if metadata.Entrypoint != "test-tool.go" {
-		t.Errorf("Entrypoint = %v, want test-tool.go", metadata.Entrypoint)
+	if metadata.Entrypoint != "test-tool" {
+		t.Errorf("Entrypoint = %v, want test-tool", metadata.Entrypoint)
 	}
 
 	// Verify Go file contains expected content

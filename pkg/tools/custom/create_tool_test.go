@@ -16,11 +16,10 @@ func TestCreateCustomToolTool_Execute(t *testing.T) {
 		validate    func(t *testing.T, toolsDir string)
 	}{
 		{
-			name: "creates tool with all parameters",
+			name: "creates tool with required parameters",
 			argsXML: `<arguments>
 				<name>test_tool</name>
 				<description>A test tool</description>
-				<version>2.0.0</version>
 			</arguments>`,
 			wantErr: false,
 			validate: func(t *testing.T, toolsDir string) {
@@ -55,8 +54,8 @@ func TestCreateCustomToolTool_Execute(t *testing.T) {
 				if metadata.Description != "A test tool" {
 					t.Errorf("expected description 'A test tool', got '%s'", metadata.Description)
 				}
-				if metadata.Version != "2.0.0" {
-					t.Errorf("expected version '2.0.0', got '%s'", metadata.Version)
+				if metadata.Version != "1.0.0" {
+					t.Errorf("expected version '1.0.0', got '%s'", metadata.Version)
 				}
 			},
 		},
@@ -179,7 +178,7 @@ func TestCreateCustomToolTool_Schema(t *testing.T) {
 	}
 
 	// Check properties exist
-	expectedProps := []string{"name", "description", "version"}
+	expectedProps := []string{"name", "description"}
 	for _, prop := range expectedProps {
 		if _, exists := properties[prop]; !exists {
 			t.Errorf("expected property '%s' not found in schema", prop)

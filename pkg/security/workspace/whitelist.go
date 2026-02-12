@@ -23,13 +23,9 @@ func (g *Guard) AddWhitelist(dir string) error {
 		return fmt.Errorf("failed to resolve whitelist directory: %w", err)
 	}
 
-	// Evaluate any symlinks to get the real path
-	evalPath, err := filepath.EvalSymlinks(absPath)
-	if err != nil {
-		// If path doesn't exist yet, use the cleaned absolute path
-		// This allows whitelisting directories that will be created later
-		evalPath = filepath.Clean(absPath)
-	}
+	// Evaluate any symlinks to get the real path, handling non-existent paths
+	// by resolving parent directories recursively (same approach as Guard.resolveSymlinks)
+	evalPath := resolveWhitelistPath(absPath)
 
 	// Check if already whitelisted
 	for _, existing := range g.whitelistedDirs {
@@ -45,6 +41,43 @@ func (g *Guard) AddWhitelist(dir string) error {
 // ClearWhitelist removes all whitelisted directories
 func (g *Guard) ClearWhitelist() {
 	g.whitelistedDirs = make([]string, 0)
+}
+
+// resolveWhitelistPath resolves symlinks in a path, handling non-existent paths
+// by recursively resolving parent directories until an existing one is found.
+// This ensures consistent path comparison even when whitelisting directories
+// that will be created later.
+func resolveWhitelistPath(path string) string {
+	// Try direct resolution first
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		return resolved
+	}
+
+	// For non-existent paths, collect path components and resolve from root
+	var components []string
+	currentPath := path
+
+	// Walk up the directory tree collecting components until we find something that exists
+	for {
+		if resolved, err := filepath.EvalSymlinks(currentPath); err == nil {
+			// Found an existing path, now reconstruct with collected components
+			result := resolved
+			for i := len(components) - 1; i >= 0; i-- {
+				result = filepath.Join(result, components[i])
+			}
+			return result
+		}
+
+		// Path doesn't exist, move up one level
+		dir := filepath.Dir(currentPath)
+		if dir == currentPath || dir == "." || dir == "/" {
+			// Reached root without finding existing path, return cleaned original
+			return filepath.Clean(path)
+		}
+
+		components = append(components, filepath.Base(currentPath))
+		currentPath = dir
+	}
 }
 
 // GetWhitelist returns a copy of the whitelisted directories

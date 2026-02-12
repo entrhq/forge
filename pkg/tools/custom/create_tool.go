@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/xml"
 	"fmt"
+	"path/filepath"
 
 	"github.com/entrhq/forge/pkg/agent/tools"
 )
@@ -47,10 +48,6 @@ func (t *CreateCustomToolTool) Schema() map[string]interface{} {
 				"type":        "string",
 				"description": "Tool description (what the tool does)",
 			},
-			"version": map[string]interface{}{
-				"type":        "string",
-				"description": "Tool version (optional, defaults to 1.0.0)",
-			},
 		},
 		[]string{"name", "description"},
 	)
@@ -62,7 +59,6 @@ func (t *CreateCustomToolTool) Execute(ctx context.Context, argsXML []byte) (str
 		XMLName     xml.Name `xml:"arguments"`
 		Name        string   `xml:"name"`
 		Description string   `xml:"description"`
-		Version     string   `xml:"version"`
 	}
 
 	if err := tools.UnmarshalXMLWithFallback(argsXML, &input); err != nil {
@@ -77,16 +73,11 @@ func (t *CreateCustomToolTool) Execute(ctx context.Context, argsXML []byte) (str
 		return "", nil, fmt.Errorf("missing required parameter: description")
 	}
 
-	// Use default version if not provided
-	if input.Version == "" {
-		input.Version = "1.0.0"
-	}
-
-	// Create scaffold options
+	// Create scaffold options with default version
 	opts := ScaffoldOptions{
 		Name:        input.Name,
 		Description: input.Description,
-		Version:     input.Version,
+		Version:     "1.0.0", // Always use 1.0.0 as default
 		ToolsDir:    t.toolsDir, // Use override if set (for testing)
 	}
 
@@ -95,10 +86,17 @@ func (t *CreateCustomToolTool) Execute(ctx context.Context, argsXML []byte) (str
 		return "", nil, fmt.Errorf("failed to scaffold tool: %w", err)
 	}
 
-	// Get tool directory for metadata
-	toolDir, err := GetToolDir(input.Name)
-	if err != nil {
-		return "", nil, fmt.Errorf("failed to get tool directory: %w", err)
+	// Get tool directory for metadata - use the toolsDir from opts if it was set
+	toolDir := opts.ToolsDir
+	if toolDir == "" {
+		var err error
+		toolDir, err = GetToolDir(input.Name)
+		if err != nil {
+			return "", nil, fmt.Errorf("failed to get tool directory: %w", err)
+		}
+	} else {
+		// When toolsDir override is set, the tool is at toolsDir/toolName
+		toolDir = filepath.Join(toolDir, input.Name)
 	}
 
 	message := buildToolCreationGuide(input.Name, toolDir)
@@ -106,7 +104,7 @@ func (t *CreateCustomToolTool) Execute(ctx context.Context, argsXML []byte) (str
 	metadata := map[string]interface{}{
 		"tool_name":   input.Name,
 		"tool_dir":    toolDir,
-		"version":     input.Version,
+		"version":     "1.0.0",
 		"source_file": input.Name + ".go",
 	}
 
@@ -116,6 +114,48 @@ func (t *CreateCustomToolTool) Execute(ctx context.Context, argsXML []byte) (str
 // IsLoopBreaking returns false as this tool doesn't break the agent loop.
 func (t *CreateCustomToolTool) IsLoopBreaking() bool {
 	return false
+}
+
+// GeneratePreview generates a preview of the tool creation for approval
+func (t *CreateCustomToolTool) GeneratePreview(ctx context.Context, argsXML []byte) (*tools.ToolPreview, error) {
+	var input struct {
+		XMLName     xml.Name `xml:"arguments"`
+		Name        string   `xml:"name"`
+		Description string   `xml:"description"`
+	}
+
+	if err := tools.UnmarshalXMLWithFallback(argsXML, &input); err != nil {
+		return nil, fmt.Errorf("invalid arguments: %w", err)
+	}
+
+	// Get tool directory to show where files will be created
+	toolDir := t.toolsDir
+	if toolDir == "" {
+		var err error
+		toolDir, err = GetToolsDir()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get tools directory: %w", err)
+		}
+	}
+
+	content := fmt.Sprintf(`Files to be created:
+  - %s/%s/tool.yaml (metadata)
+  - %s/%s/%s.go (source template)`,
+		toolDir, input.Name,
+		toolDir, input.Name, input.Name)
+
+	return &tools.ToolPreview{
+		Type:        tools.PreviewTypeFileWrite,
+		Title:       fmt.Sprintf("Create custom tool: %s", input.Name),
+		Description: input.Description,
+		Content:     content,
+		Metadata: map[string]interface{}{
+			"tool_name":   input.Name,
+			"tool_dir":    filepath.Join(toolDir, input.Name),
+			"version":     "1.0.0",
+			"source_file": input.Name + ".go",
+		},
+	}, nil
 }
 
 // buildToolCreationGuide returns the complete workflow guide for creating a custom tool.

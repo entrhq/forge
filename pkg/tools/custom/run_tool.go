@@ -116,10 +116,19 @@ func (t *RunCustomToolTool) Execute(ctx context.Context, argsXML []byte) (string
 	execCtx, cancel := context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
 	defer cancel()
 
+	// Validate binary path is within workspace before execution
+	if err := t.guard.ValidatePath(binaryPath); err != nil {
+		return "", nil, fmt.Errorf("tool binary path validation failed: %w", err)
+	}
+
 	cmd := exec.CommandContext(execCtx, binaryPath, flags...)
 
 	// Set working directory to workspace (so tools can access workspace files)
-	cmd.Dir = t.guard.WorkspaceDir()
+	workspaceDir := t.guard.WorkspaceDir()
+	if err := t.guard.ValidatePath(workspaceDir); err != nil {
+		return "", nil, fmt.Errorf("workspace directory validation failed: %w", err)
+	}
+	cmd.Dir = workspaceDir
 
 	// Capture output
 	output, err := cmd.CombinedOutput()
@@ -136,6 +145,55 @@ func (t *RunCustomToolTool) Execute(ctx context.Context, argsXML []byte) (string
 
 func (t *RunCustomToolTool) IsLoopBreaking() bool {
 	return false
+}
+
+// GeneratePreview generates a preview of the tool execution for approval
+func (t *RunCustomToolTool) GeneratePreview(ctx context.Context, argsXML []byte) (*tools.ToolPreview, error) {
+	var input runCustomToolInput
+	if err := tools.UnmarshalXMLWithFallback(argsXML, &input); err != nil {
+		return nil, fmt.Errorf("invalid arguments: %w", err)
+	}
+
+	// Get binary path
+	binaryPath, err := t.registry.GetBinaryPath(input.ToolName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tool binary path: %w", err)
+	}
+
+	// Parse arguments
+	args, err := parseCustomToolArguments(input.InnerXML)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse tool arguments: %w", err)
+	}
+
+	// Build preview content
+	var content strings.Builder
+	content.WriteString(fmt.Sprintf("Binary: %s\n", binaryPath))
+	if len(args) > 0 {
+		content.WriteString("Arguments:\n")
+		for key, value := range args {
+			content.WriteString(fmt.Sprintf("  --%s=%v\n", key, value))
+		}
+	}
+	timeout := 30.0
+	if input.Timeout > 0 {
+		timeout = input.Timeout
+	}
+	content.WriteString(fmt.Sprintf("Timeout: %.0f seconds\n", timeout))
+	content.WriteString(fmt.Sprintf("Working directory: %s", t.guard.WorkspaceDir()))
+
+	return &tools.ToolPreview{
+		Type:        tools.PreviewTypeCommand,
+		Title:       fmt.Sprintf("Execute custom tool: %s", input.ToolName),
+		Description: fmt.Sprintf("Run custom tool binary from ~/.forge/tools/%s/", input.ToolName),
+		Content:     content.String(),
+		Metadata: map[string]interface{}{
+			"tool_name":   input.ToolName,
+			"binary_path": binaryPath,
+			"timeout":     timeout,
+			"working_dir": t.guard.WorkspaceDir(),
+		},
+	}, nil
 }
 
 // XMLExample provides a concrete XML usage example for this tool.

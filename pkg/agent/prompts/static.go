@@ -254,7 +254,10 @@ The create_custom_tool result will guide you through each step with specific com
 
 ## Tool Security
 
-- Tools run with the same security constraints as built-in tools
+- Custom tools require explicit user approval before creation and execution
+- Tool binaries are validated to be within whitelisted directories (~/.forge/tools/)
+- Tool names and entrypoints are protected against path traversal
+- Working directories are validated before command execution
 - Only create tools the user has explicitly approved
 - Validate inputs to prevent injection attacks
 - Document security considerations in tool.yaml
