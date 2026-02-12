@@ -18,6 +18,11 @@ type RunCustomToolTool struct{
 	guard    *workspace.Guard
 }
 
+// GetRegistry returns the custom tools registry for prompt building
+func (t *RunCustomToolTool) GetRegistry() *Registry {
+	return t.registry
+}
+
 // NewRunCustomToolTool creates a new run_custom_tool tool instance
 func NewRunCustomToolTool(guard *workspace.Guard) *RunCustomToolTool {
 	registry := NewRegistry()

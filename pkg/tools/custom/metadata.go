@@ -18,6 +18,16 @@ type ToolMetadata struct {
 	Parameters  []Parameter `yaml:"parameters"`  // List of parameters
 }
 
+// GetName returns the tool name (implements prompts.ToolMetadata interface)
+func (m *ToolMetadata) GetName() string {
+	return m.Name
+}
+
+// GetDescription returns the tool description (implements prompts.ToolMetadata interface)
+func (m *ToolMetadata) GetDescription() string {
+	return m.Description
+}
+
 // Parameter represents a tool parameter definition
 type Parameter struct {
 	Name        string `yaml:"name"`        // Parameter identifier
@@ -46,8 +56,10 @@ func (m *ToolMetadata) Validate() error {
 		if param.Name == "" {
 			return fmt.Errorf("parameter %d: name cannot be empty", i)
 		}
-		if param.Type != "string" && param.Type != "number" && param.Type != "boolean" {
-			return fmt.Errorf("parameter %s: type must be string, number, or boolean", param.Name)
+		// Accept both "number" and "integer" as valid numeric types
+		validType := param.Type == "string" || param.Type == "number" || param.Type == "integer" || param.Type == "boolean"
+		if !validType {
+			return fmt.Errorf("parameter %s: type must be string, number, integer, or boolean", param.Name)
 		}
 		if param.Description == "" {
 			return fmt.Errorf("parameter %s: description cannot be empty", param.Name)

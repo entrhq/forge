@@ -2,6 +2,7 @@ package agent
 
 import (
 	"github.com/entrhq/forge/pkg/agent/prompts"
+	customtools "github.com/entrhq/forge/pkg/tools/custom"
 )
 
 // buildSystemPrompt constructs the system prompt with tool schemas and custom instructions
@@ -19,5 +20,45 @@ func (a *DefaultAgent) buildSystemPrompt() string {
 		builder.WithRepositoryContext(a.repositoryContext)
 	}
 
+	// Add available custom tools list
+	customToolsList := a.getCustomToolsList()
+	if customToolsList != "" {
+		builder.WithCustomToolsList(customToolsList)
+	}
+
 	return builder.Build()
+}
+
+// getCustomToolsList builds a formatted list of available custom tools
+func (a *DefaultAgent) getCustomToolsList() string {
+	// Get the run_custom_tool instance
+	a.toolsMu.RLock()
+	tool, exists := a.tools["run_custom_tool"]
+	a.toolsMu.RUnlock()
+
+	if !exists {
+		return ""
+	}
+
+	// Type assert to access the registry
+	type registryProvider interface {
+		GetRegistry() *customtools.Registry
+	}
+
+	provider, ok := tool.(registryProvider)
+	if !ok {
+		return ""
+	}
+
+	// Get the list of custom tools
+	registry := provider.GetRegistry()
+	toolsList := registry.List()
+
+	// Convert to prompts.ToolMetadata interface
+	metadataList := make([]prompts.ToolMetadata, len(toolsList))
+	for i, t := range toolsList {
+		metadataList[i] = t
+	}
+
+	return prompts.FormatCustomToolsList(metadataList)
 }
