@@ -5,6 +5,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
@@ -99,9 +100,15 @@ func (t *RunCustomToolTool) Execute(ctx context.Context, argsXML []byte) (string
 		return "", nil, fmt.Errorf("failed to get tool binary path: %w", err)
 	}
 
+	// Parse the inner XML to extract custom tool arguments
+	args, err := parseCustomToolArguments(input.InnerXML)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to parse tool arguments: %w", err)
+	}
+
 	// Convert arguments to CLI flags
 	var flags []string
-	for key, value := range input.Arguments {
+	for key, value := range args {
 		flags = append(flags, fmt.Sprintf("--%s=%v", key, value))
 	}
 
@@ -152,8 +159,80 @@ func (t *RunCustomToolTool) Refresh() error {
 
 // runCustomToolInput represents the XML input structure
 type runCustomToolInput struct {
-	XMLName   xml.Name               `xml:"arguments"`
-	ToolName  string                 `xml:"tool_name"`
-	Arguments map[string]interface{} `xml:"arguments,omitempty"`
-	Timeout   float64                `xml:"timeout,omitempty"`
+	XMLName  xml.Name `xml:"arguments"`
+	ToolName string   `xml:"tool_name"`
+	Timeout  float64  `xml:"timeout,omitempty"`
+	InnerXML []byte   `xml:",innerxml"`
+}
+
+// parseCustomToolArguments extracts custom tool parameters from the inner XML
+// It looks for elements that are not tool_name or timeout and converts them to a map
+func parseCustomToolArguments(innerXML []byte) (map[string]interface{}, error) {
+	if len(innerXML) == 0 {
+		return make(map[string]interface{}), nil
+	}
+
+	// Parse the inner XML as a generic structure
+	type xmlElement struct {
+		XMLName xml.Name
+		Content string `xml:",chardata"`
+	}
+
+	// Wrap in a container for parsing
+	wrapped := fmt.Sprintf("<container>%s</container>", string(innerXML))
+
+	decoder := xml.NewDecoder(strings.NewReader(wrapped))
+	args := make(map[string]interface{})
+
+	var current xmlElement
+	for {
+		token, err := decoder.Token()
+		if err != nil {
+			break
+		}
+
+		t, ok := token.(xml.StartElement)
+		if ok {
+			// Skip container, tool_name, and timeout elements
+			if t.Name.Local == "container" || t.Name.Local == "tool_name" || t.Name.Local == "timeout" {
+				continue
+			}
+
+			current = xmlElement{XMLName: t.Name}
+
+			// Decode this element
+			if err := decoder.DecodeElement(&current, &t); err != nil {
+				return nil, fmt.Errorf("failed to decode element %s: %w", t.Name.Local, err)
+			}
+
+			// Try to parse as different types
+			value := strings.TrimSpace(current.Content)
+			if value == "" {
+				continue
+			}
+
+			// Try integer
+			if intVal, err := strconv.ParseInt(value, 10, 64); err == nil {
+				args[current.XMLName.Local] = intVal
+				continue
+			}
+
+			// Try float
+			if floatVal, err := strconv.ParseFloat(value, 64); err == nil {
+				args[current.XMLName.Local] = floatVal
+				continue
+			}
+
+			// Try boolean
+			if boolVal, err := strconv.ParseBool(value); err == nil {
+				args[current.XMLName.Local] = boolVal
+				continue
+			}
+
+			// Default to string
+			args[current.XMLName.Local] = value
+		}
+	}
+
+	return args, nil
 }
