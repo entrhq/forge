@@ -94,7 +94,7 @@ func TestRegistry_List(t *testing.T) {
 			Version:     "1.0.0",
 			Entrypoint:  toolName,
 		}
-		
+
 		metadataPath := filepath.Join(toolDir, "tool.yaml")
 		if err := SaveMetadata(metadataPath, metadata); err != nil {
 			t.Fatalf("Failed to save metadata: %v", err)

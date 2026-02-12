@@ -50,7 +50,7 @@ func (m *ToolMetadata) Validate() error {
 	if m.Entrypoint == "" {
 		return fmt.Errorf("tool entrypoint cannot be empty")
 	}
-	
+
 	// Validate parameter types
 	for i, param := range m.Parameters {
 		if param.Name == "" {
@@ -65,7 +65,7 @@ func (m *ToolMetadata) Validate() error {
 			return fmt.Errorf("parameter %s: description cannot be empty", param.Name)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -75,16 +75,16 @@ func LoadMetadata(path string) (*ToolMetadata, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read metadata file: %w", err)
 	}
-	
+
 	var metadata ToolMetadata
 	if err := yaml.Unmarshal(data, &metadata); err != nil {
 		return nil, fmt.Errorf("failed to parse YAML: %w", err)
 	}
-	
+
 	if err := metadata.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid metadata: %w", err)
 	}
-	
+
 	return &metadata, nil
 }
 
@@ -93,21 +93,21 @@ func SaveMetadata(path string, metadata *ToolMetadata) error {
 	if err := metadata.Validate(); err != nil {
 		return fmt.Errorf("invalid metadata: %w", err)
 	}
-	
+
 	data, err := yaml.Marshal(metadata)
 	if err != nil {
 		return fmt.Errorf("failed to marshal YAML: %w", err)
 	}
-	
+
 	// Ensure directory exists
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0750); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
-	
-	if err := os.WriteFile(path, data, 0644); err != nil {
+
+	if err := os.WriteFile(path, data, 0600); err != nil {
 		return fmt.Errorf("failed to write metadata file: %w", err)
 	}
-	
+
 	return nil
 }
 

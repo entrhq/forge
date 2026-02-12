@@ -13,7 +13,7 @@ import (
 )
 
 // RunCustomToolTool executes custom tools from ~/.forge/tools/
-type RunCustomToolTool struct{
+type RunCustomToolTool struct {
 	registry *Registry
 	guard    *workspace.Guard
 }
@@ -110,13 +110,13 @@ func (t *RunCustomToolTool) Execute(ctx context.Context, argsXML []byte) (string
 	defer cancel()
 
 	cmd := exec.CommandContext(execCtx, binaryPath, flags...)
-	
+
 	// Set working directory to workspace (so tools can access workspace files)
 	cmd.Dir = t.guard.WorkspaceDir()
 
 	// Capture output
 	output, err := cmd.CombinedOutput()
-	
+
 	if err != nil {
 		if execCtx.Err() == context.DeadlineExceeded {
 			return "", nil, fmt.Errorf("tool execution timed out after %.0f seconds", timeout)

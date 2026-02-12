@@ -100,7 +100,7 @@ func (pb *PromptBuilder) Build() string {
 
 	// Add custom tools guidance
 	builder.WriteString(CustomToolsGuidancePrompt)
-	
+
 	// Add available custom tools list if provided
 	if pb.customToolsList != "" {
 		builder.WriteString("\n\n")

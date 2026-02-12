@@ -169,8 +169,6 @@ func runHeadless(ctx context.Context, config *Config) error {
 		}
 	}
 
-
-
 	// Create and run executor
 	return runExecutor(ctx, ag, execConfig)
 }

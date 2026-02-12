@@ -46,8 +46,8 @@ func (r *Registry) Refresh() error {
 	}
 
 	// Create tools directory if it doesn't exist
-	if err := os.MkdirAll(toolsDir, 0755); err != nil {
-		return fmt.Errorf("failed to create tools directory: %w", err)
+	if mkdirErr := os.MkdirAll(toolsDir, 0750); mkdirErr != nil {
+		return fmt.Errorf("failed to create tools directory: %w", mkdirErr)
 	}
 
 	// Read all subdirectories
@@ -107,7 +107,7 @@ func (r *Registry) Refresh() error {
 func (r *Registry) Get(toolName string) (*ToolMetadata, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	metadata, ok := r.tools[toolName]
 	return metadata, ok
 }
@@ -116,7 +116,7 @@ func (r *Registry) Get(toolName string) (*ToolMetadata, bool) {
 func (r *Registry) List() []*ToolMetadata {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	tools := make([]*ToolMetadata, 0, len(r.tools))
 	for _, metadata := range r.tools {
 		tools = append(tools, metadata)

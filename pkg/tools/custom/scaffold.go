@@ -46,7 +46,7 @@ func Scaffold(opts ScaffoldOptions) error {
 	}
 
 	// Create tool directory
-	if err := os.MkdirAll(toolDir, 0755); err != nil {
+	if err := os.MkdirAll(toolDir, 0750); err != nil {
 		return fmt.Errorf("failed to create tool directory: %w", err)
 	}
 

@@ -257,8 +257,6 @@ func run(ctx context.Context, cliConfig *CLIConfig) error {
 		}
 	}
 
-
-
 	// Create headless executor with configured agent
 	executor, err := headless.NewExecutor(ag, execConfig)
 	if err != nil {

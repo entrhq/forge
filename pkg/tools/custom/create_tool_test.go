@@ -25,7 +25,7 @@ func TestCreateCustomToolTool_Execute(t *testing.T) {
 			wantErr: false,
 			validate: func(t *testing.T, toolsDir string) {
 				toolDir := filepath.Join(toolsDir, "test_tool")
-				
+
 				// Check tool directory exists
 				if _, err := os.Stat(toolDir); os.IsNotExist(err) {
 					t.Errorf("tool directory not created: %s", toolDir)
@@ -211,7 +211,7 @@ func TestCreateCustomToolTool_Description(t *testing.T) {
 
 // Helper function to check if a string contains a substring
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(substr) == 0 || 
+	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
 		(len(s) > 0 && len(substr) > 0 && findSubstring(s, substr)))
 }
 
