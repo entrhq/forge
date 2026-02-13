@@ -322,27 +322,51 @@ When a session starts, the SessionManager automatically registers the dynamic to
 
 ### Content Extraction
 
-The ExtractContentTool provides multiple extraction modes:
+The ExtractContentTool provides three extraction formats aligned with PRD requirements:
 
-**Text Extraction** (default):
-- Extracts visible text from element
-- Preserves basic structure (paragraphs, lists)
-- Strips scripts and styles
-- Limits to 10,000 characters with truncation
+**1. Markdown Format** (default, recommended):
+- Converts page content to clean Markdown
+- Preserves headings, links, lists, and basic formatting
+- Strips scripts, styles, and navigation elements
+- Uses Playwright's built-in text content + manual markdown conversion
+- Most readable for agent consumption
+- Limits to 10,000 characters with truncation warning
 
-**HTML Extraction**:
-- Returns outer HTML of matched element
-- Useful for structure preservation
-- Subject to same size limits
+**2. Plain Text Format**:
+- Extracts visible text only via Playwright's textContent()
+- Removes all HTML structure
+- Useful for simple text search and analysis
+- Smallest token footprint
+- Subject to same 10,000 character limit
 
-**Attribute Extraction**:
-- Extracts specific attribute value
-- Common for links (href), images (src), etc.
+**3. Structured Format**:
+- Returns JSON object with:
+  - `title`: Page title string
+  - `headings`: Array of heading text (H1-H6)
+  - `links`: Array of {text, href} objects
+  - `body`: Main content text
+- Useful for programmatic processing
+- Each field subject to size limits
+- Agent can request specific fields
 
-**Multi-Element Extraction**:
-- When selector matches multiple elements
-- Returns array of extracted values
-- Useful for lists, tables, repeated structures
+**Selector-Based Extraction**:
+- Optional CSS selector parameter for all formats
+- Extracts only matching element(s) instead of full page
+- When selector matches multiple elements, returns array
+- Reduces content size for targeted extraction
+
+**Truncation Handling**:
+- Content exceeding 10,000 chars is truncated
+- Warning message includes: original size, truncated size, truncation point
+- Agent notified to use selector or search_page for specific content
+
+**Implementation Notes**:
+- Markdown conversion: Custom logic using Playwright element queries
+  - Query all headings, links, lists via CSS selectors
+  - Build markdown string from structured elements
+  - No external markdown library dependency
+- Structured format: Direct element queries with JSON serialization
+- All formats strip: <script>, <style>, <nav>, <footer>, <header> by default
 
 ---
 
@@ -439,9 +463,10 @@ Browser automation is controlled via UI configuration settings in `pkg/config/ui
   - Prevents accidental browser usage when not needed
 
 - `browser_headless` (bool): Default mode for new browser sessions
-  - Default: `true` (headless mode)
+  - Default: `false` (headed mode - user sees what agent does)
   - Can be overridden per-session via `start_browser_session` tool
-  - Headed mode useful for debugging and visual verification
+  - Headed mode provides transparency and builds trust
+  - Headless mode useful for automation and CI/CD
 
 ### Configuration Access
 
@@ -455,15 +480,16 @@ if config.GetUI().IsBrowserEnabled() {
 headless := config.GetUI().IsBrowserHeadless()
 ```
 
-### Future: Settings UI
+### Settings UI Integration
 
-A `/settings` slash command could provide interactive configuration:
+Browser configuration integrates with existing `/settings` slash command:
 - Toggle browser automation on/off
-- Set default headless/headed mode preference
-- Configure session limits and timeouts
-- Manage custom browser paths (future)
+- Set default headless/headed mode preference  
+- Configure max concurrent sessions (default: 5)
+- Configure idle timeout in seconds (default: 300)
+- Select browser type: Chromium (MVP), Firefox/WebKit (future)
 
-Settings persist in the config file and apply to all future sessions.
+Settings persist in ~/.forge/config.yaml and apply to all future sessions.
 
 ---
 
@@ -476,14 +502,29 @@ This is a new capability with no migration required. Implementation plan:
    - Implement getters/setters with thread safety
    - Add comprehensive test coverage
 
-2. **Phase 1**: Core session management and basic tools (navigate, click, extract)
+2. **Phase 1 (MVP)**: Core session management and browser tools
    - Conditional tool registration based on `browser_enabled` setting
    - Respect `browser_headless` default in session creation
+   - Implement all MVP tools: navigate, extract_content (3 formats), click, fill, wait, search
+   - Session lifecycle with idle timeout
+   - Dynamic tool availability based on session existence
 
-3. **Phase 2**: Add screenshot, form filling, waiting capabilities
-4. **Phase 3**: Documentation, examples, and integration tests
-5. **Phase 4**: Security hardening and resource limits
-6. **Phase 5**: Advanced features based on user feedback
+3. **Phase 2 (P1)**: Enhanced capabilities per PRD priorities
+   - Screenshot support (saved to workspace)
+   - Enhanced error handling with retry logic
+   - Performance optimizations (pooling, caching)
+   - Advanced selectors and form features
+
+4. **Phase 3 (P2)**: Future enhancements
+   - Multi-browser support (Firefox, WebKit)
+   - Mobile emulation
+   - Visual regression testing
+   - Network interception
+
+5. **Phase 4**: Advanced features based on user feedback
+   - Scriptable workflows
+   - AI-native capabilities
+   - Integration with external systems
 
 ---
 
