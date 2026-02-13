@@ -14,6 +14,8 @@ const (
 	defaultAutoCloseCommandOverlay = false
 	defaultKeepOpenOnError         = false
 	defaultAutoCloseDelay          = 1 * time.Second
+	defaultBrowserEnabled          = false
+	defaultBrowserHeadless         = true
 )
 
 // UISection manages user interface configuration settings.
@@ -21,6 +23,8 @@ type UISection struct {
 	AutoCloseCommandOverlay bool          `json:"auto_close_command_overlay"`
 	KeepOpenOnError         bool          `json:"keep_open_on_error"`
 	AutoCloseDelay          time.Duration `json:"auto_close_delay"`
+	BrowserEnabled          bool          `json:"browser_enabled"`
+	BrowserHeadless         bool          `json:"browser_headless"`
 	mu                      sync.RWMutex
 }
 
@@ -30,6 +34,8 @@ func NewUISection() *UISection {
 		AutoCloseCommandOverlay: defaultAutoCloseCommandOverlay,
 		KeepOpenOnError:         defaultKeepOpenOnError,
 		AutoCloseDelay:          defaultAutoCloseDelay,
+		BrowserEnabled:          defaultBrowserEnabled,
+		BrowserHeadless:         defaultBrowserHeadless,
 	}
 }
 
@@ -45,7 +51,7 @@ func (s *UISection) Title() string {
 
 // Description returns the section description.
 func (s *UISection) Description() string {
-	return "Configure user interface behavior including command overlay auto-close settings."
+	return "Configure user interface behavior including command overlay auto-close and browser automation settings."
 }
 
 // Data returns the current configuration data.
@@ -57,6 +63,8 @@ func (s *UISection) Data() map[string]any {
 		"auto_close_command_overlay": s.AutoCloseCommandOverlay,
 		"keep_open_on_error":         s.KeepOpenOnError,
 		"auto_close_delay":           s.AutoCloseDelay.String(),
+		"browser_enabled":            s.BrowserEnabled,
+		"browser_headless":           s.BrowserHeadless,
 	}
 }
 
@@ -106,6 +114,20 @@ func (s *UISection) SetData(data map[string]any) error {
 				return fmt.Errorf("invalid value type for auto_close_delay: expected string or number, got %T", value)
 			}
 
+		case "browser_enabled":
+			if enabled, ok := value.(bool); ok {
+				s.BrowserEnabled = enabled
+			} else {
+				return fmt.Errorf("invalid value type for browser_enabled: expected bool, got %T", value)
+			}
+
+		case "browser_headless":
+			if enabled, ok := value.(bool); ok {
+				s.BrowserHeadless = enabled
+			} else {
+				return fmt.Errorf("invalid value type for browser_headless: expected bool, got %T", value)
+			}
+
 		default:
 			// Ignore unknown keys for forward compatibility
 			continue
@@ -136,6 +158,8 @@ func (s *UISection) Reset() {
 	s.AutoCloseCommandOverlay = defaultAutoCloseCommandOverlay
 	s.KeepOpenOnError = defaultKeepOpenOnError
 	s.AutoCloseDelay = defaultAutoCloseDelay
+	s.BrowserEnabled = defaultBrowserEnabled
+	s.BrowserHeadless = defaultBrowserHeadless
 }
 
 // GetAutoCloseSettings returns the current auto-close configuration.
@@ -187,4 +211,32 @@ func (s *UISection) ShouldAutoClose(exitCode int) bool {
 	// If keep_open_on_error is true, don't auto-close errors
 	// If keep_open_on_error is false, auto-close errors too
 	return !s.KeepOpenOnError
+}
+
+// IsBrowserEnabled returns whether browser automation is enabled.
+func (s *UISection) IsBrowserEnabled() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.BrowserEnabled
+}
+
+// SetBrowserEnabled sets whether browser automation is enabled.
+func (s *UISection) SetBrowserEnabled(enabled bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.BrowserEnabled = enabled
+}
+
+// IsBrowserHeadless returns whether browser runs in headless mode by default.
+func (s *UISection) IsBrowserHeadless() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.BrowserHeadless
+}
+
+// SetBrowserHeadless sets whether browser runs in headless mode by default.
+func (s *UISection) SetBrowserHeadless(headless bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.BrowserHeadless = headless
 }

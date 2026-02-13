@@ -278,6 +278,8 @@ func (s *SettingsOverlay) loadSettings() {
 				{"auto_close_command_overlay", "Auto-close Command Overlay", itemTypeToggle},
 				{"keep_open_on_error", "Keep Open On Error", itemTypeToggle},
 				{"auto_close_delay", "Auto-close Delay", itemTypeText},
+				{"browser_enabled", "Browser Automation Enabled", itemTypeToggle},
+				{"browser_headless", "Browser Headless Mode", itemTypeToggle},
 			}
 
 			for _, field := range uiFields {

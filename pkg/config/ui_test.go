@@ -18,6 +18,14 @@ func TestUISection_DefaultValues(t *testing.T) {
 	if delay != 1*time.Second {
 		t.Errorf("Expected default delay of 1s, got %v", delay)
 	}
+
+	// Test browser defaults
+	if ui.IsBrowserEnabled() {
+		t.Error("Expected browser to be disabled by default")
+	}
+	if !ui.IsBrowserHeadless() {
+		t.Error("Expected browser headless mode to be enabled by default")
+	}
 }
 
 func TestUISection_SetAutoCloseSettings(t *testing.T) {
@@ -247,4 +255,115 @@ func TestUISection_ThreadSafety(t *testing.T) {
 	<-done
 
 	// If we get here without a race condition, test passes
+}
+
+func TestUISection_BrowserSettings(t *testing.T) {
+	ui := NewUISection()
+
+	// Test default values
+	if ui.IsBrowserEnabled() {
+		t.Error("Expected browser to be disabled by default")
+	}
+	if !ui.IsBrowserHeadless() {
+		t.Error("Expected browser headless to be true by default")
+	}
+
+	// Test enabling browser
+	ui.SetBrowserEnabled(true)
+	if !ui.IsBrowserEnabled() {
+		t.Error("Expected browser to be enabled after SetBrowserEnabled(true)")
+	}
+
+	// Test disabling browser
+	ui.SetBrowserEnabled(false)
+	if ui.IsBrowserEnabled() {
+		t.Error("Expected browser to be disabled after SetBrowserEnabled(false)")
+	}
+
+	// Test headless mode
+	ui.SetBrowserHeadless(false)
+	if ui.IsBrowserHeadless() {
+		t.Error("Expected browser headless to be false after SetBrowserHeadless(false)")
+	}
+
+	ui.SetBrowserHeadless(true)
+	if !ui.IsBrowserHeadless() {
+		t.Error("Expected browser headless to be true after SetBrowserHeadless(true)")
+	}
+}
+
+func TestUISection_BrowserData(t *testing.T) {
+	ui := NewUISection()
+	ui.SetBrowserEnabled(true)
+	ui.SetBrowserHeadless(false)
+
+	data := ui.Data()
+
+	// Verify browser settings are included in data
+	if enabled, ok := data["browser_enabled"].(bool); !ok || !enabled {
+		t.Error("Expected browser_enabled to be true in data")
+	}
+	if headless, ok := data["browser_headless"].(bool); !ok || headless {
+		t.Error("Expected browser_headless to be false in data")
+	}
+}
+
+func TestUISection_BrowserSetData(t *testing.T) {
+	ui := NewUISection()
+
+	// Test setting browser data
+	data := map[string]any{
+		"browser_enabled":  true,
+		"browser_headless": false,
+	}
+
+	err := ui.SetData(data)
+	if err != nil {
+		t.Fatalf("Unexpected error setting data: %v", err)
+	}
+
+	if !ui.IsBrowserEnabled() {
+		t.Error("Expected browser to be enabled after SetData")
+	}
+	if ui.IsBrowserHeadless() {
+		t.Error("Expected browser headless to be false after SetData")
+	}
+
+	// Test invalid data types
+	invalidData := map[string]any{
+		"browser_enabled": "not a bool",
+	}
+
+	err = ui.SetData(invalidData)
+	if err == nil {
+		t.Error("Expected error when setting invalid browser_enabled type")
+	}
+
+	invalidData = map[string]any{
+		"browser_headless": 123,
+	}
+
+	err = ui.SetData(invalidData)
+	if err == nil {
+		t.Error("Expected error when setting invalid browser_headless type")
+	}
+}
+
+func TestUISection_BrowserReset(t *testing.T) {
+	ui := NewUISection()
+
+	// Change settings
+	ui.SetBrowserEnabled(true)
+	ui.SetBrowserHeadless(false)
+
+	// Reset
+	ui.Reset()
+
+	// Verify reset to defaults
+	if ui.IsBrowserEnabled() {
+		t.Error("Expected browser to be disabled after reset")
+	}
+	if !ui.IsBrowserHeadless() {
+		t.Error("Expected browser headless to be true after reset")
+	}
 }

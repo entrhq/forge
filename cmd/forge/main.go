@@ -22,6 +22,7 @@ import (
 	"github.com/entrhq/forge/pkg/executor/tui"
 
 	"github.com/entrhq/forge/pkg/security/workspace"
+	"github.com/entrhq/forge/pkg/tools/browser"
 	"github.com/entrhq/forge/pkg/tools/coding"
 	"github.com/entrhq/forge/pkg/tools/custom"
 	"github.com/entrhq/forge/pkg/tools/scratchpad"
@@ -265,6 +266,9 @@ func runTUI(ctx context.Context, config *Config) error {
 	// Create notes manager for scratchpad
 	notesManager := notes.NewManager()
 
+	// Create browser session manager
+	browserManager := browser.NewSessionManager()
+
 	// Create agent with custom system prompt, repository context, context manager, and shared notes manager
 	agentOptions := []agent.AgentOption{
 		agent.WithCustomInstructions(systemPrompt),
@@ -320,6 +324,16 @@ func runTUI(ctx context.Context, config *Config) error {
 	for _, tool := range customTools {
 		if err := ag.RegisterTool(tool); err != nil {
 			return fmt.Errorf("failed to register custom tool: %w", err)
+		}
+	}
+
+	// Register browser tools using the browser registry
+	browserRegistry := browser.NewToolRegistry(browserManager)
+	browserTools := browserRegistry.RegisterTools()
+
+	for _, tool := range browserTools {
+		if err := ag.RegisterTool(tool); err != nil {
+			return fmt.Errorf("failed to register browser tool: %w", err)
 		}
 	}
 

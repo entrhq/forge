@@ -69,6 +69,15 @@ func (tc *ToolCall) GetArgumentsXML() []byte {
 	return result
 }
 
+// ConditionallyVisible is an optional interface that tools can implement to
+// control their visibility in the system prompt based on runtime conditions.
+// This enables dynamic tool availability (e.g., showing browser tools only when sessions exist).
+type ConditionallyVisible interface {
+	// ShouldShow returns true if this tool should be included in the system prompt.
+	// Returns false to hide the tool from the LLM while keeping it registered.
+	ShouldShow() bool
+}
+
 // Previewable is an optional interface that tools can implement to provide
 // a preview of their changes before execution. This enables the approval flow
 // where users can review and approve/reject tool actions.
