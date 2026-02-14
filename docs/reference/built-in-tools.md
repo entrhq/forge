@@ -13,6 +13,17 @@ Complete reference for all built-in tools available in the Forge coding agent fr
   - [apply_diff](#apply_diff)
 - [Command Execution](#command-execution)
   - [execute_command](#execute_command)
+- [Browser Automation](#browser-automation)
+  - [start_session](#start_session)
+  - [close_session](#close_session)
+  - [list_sessions](#list_sessions)
+  - [navigate](#navigate)
+  - [click](#click)
+  - [fill](#fill)
+  - [search](#search)
+  - [extract_content](#extract_content)
+  - [analyze_page](#analyze_page)
+  - [wait](#wait)
 - [Agent Control](#agent-control)
   - [task_completion](#task_completion)
   - [ask_question](#ask_question)
@@ -288,6 +299,293 @@ Execute a shell command in the workspace directory with timeout and streaming su
 - Shell injection protection through context cancellation
 
 **Implementation**: `pkg/tools/coding/execute_command.go`
+
+---
+
+## Browser Automation
+
+Tools for controlling a headless browser to perform web automation tasks. Powered by Playwright.
+
+### start_session
+
+Start a new browser session.
+
+**Server Name**: `local`
+
+**Parameters**:
+- `session_id` (string, optional): A unique ID for the session. If not provided, one will be generated.
+- `headless` (boolean, optional): Whether to run the browser in headless mode (default: true).
+
+**Returns**: The session ID of the new browser session.
+
+**Example**:
+```xml
+<tool>
+<server_name>local</server_name>
+<tool_name>start_session</tool_name>
+<arguments>
+  <session_id>my-web-session</session_id>
+  <headless>true</headless>
+</arguments>
+</tool>
+```
+
+**Features**:
+- Creates an isolated browser context.
+- Supports multiple concurrent sessions.
+- Automatic cleanup of timed-out sessions.
+
+**Implementation**: `pkg/tools/browser/start_session.go`
+
+---
+### close_session
+
+Close an existing browser session.
+
+**Server Name**: `local`
+
+**Parameters**:
+- `session_id` (string, required): The ID of the browser session to close.
+
+**Returns**: A success message.
+
+**Example**:
+```xml
+<tool>
+<server_name>local</server_name>
+<tool_name>close_session</tool_name>
+<arguments>
+  <session_id>my-web-session</session_id>
+</arguments>
+</tool>
+```
+
+**Implementation**: `pkg/tools/browser/close_session.go`
+
+---
+
+### list_sessions
+
+List all active browser sessions.
+
+**Server Name**: `local`
+
+**Parameters**: None
+
+**Returns**: A list of active session IDs and their statuses.
+
+**Example**:
+```xml
+<tool>
+<server_name>local</server_name>
+<tool_name>list_sessions</tool_name>
+<arguments/>
+</tool>
+```
+
+**Implementation**: `pkg/tools/browser/list_sessions.go`
+
+---
+
+### navigate
+
+Navigate the browser to a specific URL.
+
+**Server Name**: `local`
+
+**Parameters**:
+- `session_id` (string, required): The ID of the browser session.
+- `url` (string, required): The URL to navigate to.
+
+**Returns**: A success message with the final URL.
+
+**Example**:
+```xml
+<tool>
+<server_name>local</server_name>
+<tool_name>navigate</tool_name>
+<arguments>
+  <session_id>my-web-session</session_id>
+  <url>https://www.google.com</url>
+</arguments>
+</tool>
+```
+
+**Implementation**: `pkg/tools/browser/navigate.go`
+
+---
+
+### click
+
+Click on an element on the page.
+
+**Server Name**: `local`
+
+**Parameters**:
+- `session_id` (string, required): The ID of the browser session.
+- `selector` (string, required): The CSS selector of the element to click.
+
+**Returns**: A success message.
+
+**Example**:
+```xml
+<tool>
+<server_name>local</server_name>
+<tool_name>click</tool_name>
+<arguments>
+  <session_id>my-web-session</session_id>
+  <selector>#submit-button</selector>
+</arguments>
+</tool>
+```
+
+**Implementation**: `pkg/tools/browser/click.go`
+
+---
+
+### fill
+
+Fill an input field on the page.
+
+**Server Name**: `local`
+
+**Parameters**:
+- `session_id` (string, required): The ID of the browser session.
+- `selector` (string, required): The CSS selector of the input field.
+- `text` (string, required): The text to fill into the input field.
+
+**Returns**: A success message.
+
+**Example**:
+```xml
+<tool>
+<server_name>local</server_name>
+<tool_name>fill</tool_name>
+<arguments>
+  <session_id>my-web-session</session_id>
+  <selector>#username</selector>
+  <text>my-user</text>
+</arguments>
+</tool>
+```
+
+**Implementation**: `pkg/tools/browser/fill.go`
+
+---
+
+### search
+
+Perform a search on the page, typically within a search bar.
+
+**Server Name**: `local`
+
+**Parameters**:
+- `session_id` (string, required): The ID of the browser session.
+- `selector` (string, optional): The CSS selector for the search input. Defaults to common search selectors.
+- `query` (string, required): The search query.
+
+**Returns**: A success message.
+
+**Example**:
+```xml
+<tool>
+<server_name>local</server_name>
+<tool_name>search</tool_name>
+<arguments>
+  <session_id>my-web-session</session_id>
+  <query>AI agents</query>
+</arguments>
+</tool>
+```
+
+**Implementation**:
+`pkg/tools/browser/search.go`
+
+---
+
+### extract_content
+
+Extract content from the page, optionally filtered by a selector.
+
+**Server Name**: `local`
+
+**Parameters**:
+- `session_id` (string, required): The ID of the browser session.
+- `selector` (string, optional): The CSS selector to extract content from. If not provided, extracts from the entire page.
+
+**Returns**: The extracted content.
+
+**Example**:
+```xml
+<tool>
+<server_name>local</server_name>
+<tool_name>extract_content</tool_name>
+<arguments>
+  <session_id>my-web-session</session_id>
+  <selector>.main-content</selector>
+</arguments>
+</tool>
+```
+
+**Implementation**: `pkg/tools/browser/extract_content.go`
+
+---
+
+### analyze_page
+
+Use an AI model to analyze the current page content and identify key components.
+
+**Server Name**: `local`
+
+**Parameters**:
+- `session_id` (string, required): The ID of the browser session.
+- `objective` (string, required): The objective for the analysis (e.g., "Find the login form").
+
+**Returns**: A structured analysis of the page, including identified components and their selectors.
+
+**Example**:
+```xml
+<tool>
+<server_name>local</server_name>
+<tool_name>analyze_page</tool_name>
+<arguments>
+  <session_id>my-web-session</session_id>
+  <objective>Find the main navigation bar</objective>
+</arguments>
+</tool>
+```
+
+**Implementation**: `pkg/tools/browser/analyze_page.go`
+
+---
+
+### wait
+
+Wait for a specific amount of time or for an element to appear.
+
+**Server Name**: `local`
+
+**Parameters**:
+- `session_id` (string, required): The ID of the browser session.
+- `selector` (string, optional): The CSS selector of an element to wait for.
+- `timeout` (integer, optional): The maximum time to wait in seconds.
+
+**Returns**: A success message.
+
+**Example**:
+```xml
+<tool>
+<server_name>local</server_name>
+<tool_name>wait</tool_name>
+<arguments>
+  <session_id>my-web-session</session_id>
+  <selector>#dynamic-content</selector>
+  <timeout>10</timeout>
+</arguments>
+</tool>
+```
+
+**Implementation**: `pkg/tools/browser/wait.go`
 
 ---
 
