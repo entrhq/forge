@@ -224,9 +224,10 @@ type Session struct {
 }
 
 type SessionManager struct {
-    mu       sync.RWMutex
-    sessions map[string]*Session
-    registry *tools.Registry
+    mu          sync.RWMutex
+    sessions    map[string]*Session
+    registry    *tools.Registry
+    llmProvider llm.Provider
 }
 
 // Start creates session and registers dynamic tools

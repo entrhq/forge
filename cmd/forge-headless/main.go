@@ -265,6 +265,10 @@ func run(ctx context.Context, cliConfig *CLIConfig) error {
 	browserTools := browserRegistry.RegisterTools()
 
 	for _, tool := range browserTools {
+		// Filter tools based on allowed_tools constraint
+		if !execConfig.Constraints.ShouldRegisterTool(tool.Name()) {
+			continue
+		}
 		if regErr := ag.RegisterTool(tool); regErr != nil {
 			return fmt.Errorf("failed to register browser tool: %w", regErr)
 		}

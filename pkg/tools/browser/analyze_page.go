@@ -146,7 +146,7 @@ func buildAnalysisPrompt(url, title, htmlContent, focus string) string {
 	prompt.WriteString("Provide a structured analysis with the following sections:\n\n")
 	prompt.WriteString("1. PAGE TYPE: Identify the type of page and framework/platform based on HTML structure\n")
 	prompt.WriteString("2. PURPOSE: Brief description of the page's main purpose and target audience\n")
-	prompt.WriteString("3. KEY ELEMENTS &amp; SELECTORS: List important interactive elements with suggested CSS selectors (using id, class, data-* attributes)\n")
+	prompt.WriteString("3. KEY ELEMENTS & SELECTORS: List important interactive elements with suggested CSS selectors (using id, class, data-* attributes)\n")
 	prompt.WriteString("4. SEMANTIC STRUCTURE: Describe the DOM hierarchy (header, nav, main, sections, footer) and content organization\n")
 	prompt.WriteString("5. INTERACTION OPPORTUNITIES: Identify key actions the user can take (navigation, form submission, clicking elements) with specific selectors\n\n")
 

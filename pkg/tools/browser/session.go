@@ -2,6 +2,7 @@ package browser
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -338,14 +339,14 @@ func (s *Session) Search(opts SearchOptions) ([]SearchResult, error) {
 	var results []SearchResult
 	searchText := opts.Pattern
 	if !opts.CaseSensitive {
-		bodyText = toLowerCase(bodyText)
-		searchText = toLowerCase(searchText)
+		bodyText = strings.ToLower(bodyText)
+		searchText = strings.ToLower(searchText)
 	}
 
 	// Find all occurrences
 	index := 0
 	for {
-		pos := indexString(bodyText[index:], searchText)
+		pos := strings.Index(bodyText[index:], searchText)
 		if pos == -1 {
 			break
 		}
@@ -353,8 +354,8 @@ func (s *Session) Search(opts SearchOptions) ([]SearchResult, error) {
 		actualPos := index + pos
 
 		// Extract context (50 chars before and after)
-		contextStart := max(0, actualPos-50)
-		contextEnd := min(len(bodyText), actualPos+len(searchText)+50)
+		contextStart := int(math.Max(0, float64(actualPos-50)))
+		contextEnd := int(math.Min(float64(len(bodyText)), float64(actualPos+len(searchText)+50)))
 		context := bodyText[contextStart:contextEnd]
 
 		results = append(results, SearchResult{
@@ -397,47 +398,4 @@ func truncateString(s string, maxLen int) string {
 	return s[:maxLen] + "..."
 }
 
-func toLowerCase(s string) string {
-	// Simple ASCII lowercase (can use strings.ToLower for full Unicode)
-	result := make([]byte, len(s))
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		if c >= 'A' && c <= 'Z' {
-			result[i] = c + 32
-		} else {
-			result[i] = c
-		}
-	}
-	return string(result)
-}
 
-func indexString(s, substr string) int {
-	// Simple substring search
-	if len(substr) == 0 {
-		return 0
-	}
-	if len(substr) > len(s) {
-		return -1
-	}
-
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return i
-		}
-	}
-	return -1
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
