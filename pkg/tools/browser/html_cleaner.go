@@ -51,88 +51,94 @@ func cleanNode(n *html.Node, builder *strings.Builder, currentLength *int, maxLe
 	}
 
 	// Skip script, style, noscript, and other noise elements
-	if n.Type == html.ElementNode {
-		tagName := strings.ToLower(n.Data)
-		if isSkippedElement(tagName) {
-			return false
-		}
+	if n.Type == html.ElementNode && isSkippedElement(strings.ToLower(n.Data)) {
+		return false
 	}
 
 	// Process text nodes
 	if n.Type == html.TextNode {
-		text := strings.TrimSpace(n.Data)
-		if text != "" {
-			if *currentLength+len(text) > maxLength {
-				remaining := maxLength - *currentLength
-				text = text[:remaining] + "..."
-				builder.WriteString(text)
-				*currentLength = maxLength
-				return true
-			}
-			builder.WriteString(text)
-			*currentLength += len(text)
-		}
-		return false
+		return processTextNode(n, builder, currentLength, maxLength)
 	}
 
 	// Process element nodes
 	if n.Type == html.ElementNode {
-		tagName := strings.ToLower(n.Data)
-
-		// Add indentation for readability
-		if depth > 0 && isBlockElement(tagName) {
-			builder.WriteString("\n")
-			builder.WriteString(strings.Repeat("  ", depth))
-		}
-
-		// Write opening tag with preserved attributes
-		builder.WriteString("<")
-		builder.WriteString(tagName)
-
-		// Preserve important attributes
-		for _, attr := range n.Attr {
-			if shouldPreserveAttribute(tagName, attr.Key) {
-				builder.WriteString(fmt.Sprintf(` %s="%s"`, attr.Key, html.EscapeString(attr.Val)))
-			}
-		}
-
-		builder.WriteString(">")
-		*currentLength += len(tagName) + 2
-
-		// Process children
-		truncated := false
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			if cleanNode(c, builder, currentLength, maxLength, depth+1) {
-				truncated = true
-				break
-			}
-		}
-
-		// Write closing tag for non-void elements
-		if !isVoidElement(tagName) {
-			if isBlockElement(tagName) {
-				builder.WriteString("\n")
-				builder.WriteString(strings.Repeat("  ", depth))
-			}
-			builder.WriteString("</")
-			builder.WriteString(tagName)
-			builder.WriteString(">")
-			*currentLength += len(tagName) + 3
-		}
-
-		return truncated
+		return processElementNode(n, builder, currentLength, maxLength, depth)
 	}
 
 	// Process children for document/fragment nodes
-	truncated := false
-	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		if cleanNode(c, builder, currentLength, maxLength, depth) {
-			truncated = true
-			break
+	return processChildren(n, builder, currentLength, maxLength, depth)
+}
+
+// processTextNode handles text node processing with truncation
+func processTextNode(n *html.Node, builder *strings.Builder, currentLength *int, maxLength int) bool {
+	text := strings.TrimSpace(n.Data)
+	if text == "" {
+		return false
+	}
+
+	if *currentLength+len(text) > maxLength {
+		remaining := maxLength - *currentLength
+		text = text[:remaining] + "..."
+		builder.WriteString(text)
+		*currentLength = maxLength
+		return true
+	}
+
+	builder.WriteString(text)
+	*currentLength += len(text)
+	return false
+}
+
+// processElementNode handles element node processing with attributes and children
+func processElementNode(n *html.Node, builder *strings.Builder, currentLength *int, maxLength int, depth int) bool {
+	tagName := strings.ToLower(n.Data)
+
+	// Add indentation for readability
+	if depth > 0 && isBlockElement(tagName) {
+		builder.WriteString("\n")
+		builder.WriteString(strings.Repeat("  ", depth))
+	}
+
+	// Write opening tag with preserved attributes
+	builder.WriteString("<")
+	builder.WriteString(tagName)
+
+	// Preserve important attributes
+	for _, attr := range n.Attr {
+		if shouldPreserveAttribute(tagName, attr.Key) {
+			fmt.Fprintf(builder, ` %s="%s"`, attr.Key, html.EscapeString(attr.Val))
 		}
 	}
 
+	builder.WriteString(">")
+	*currentLength += len(tagName) + 2
+
+	// Process children
+	truncated := processChildren(n, builder, currentLength, maxLength, depth+1)
+
+	// Write closing tag for non-void elements
+	if !isVoidElement(tagName) {
+		if isBlockElement(tagName) {
+			builder.WriteString("\n")
+			builder.WriteString(strings.Repeat("  ", depth))
+		}
+		builder.WriteString("</")
+		builder.WriteString(tagName)
+		builder.WriteString(">")
+		*currentLength += len(tagName) + 3
+	}
+
 	return truncated
+}
+
+// processChildren recursively processes child nodes
+func processChildren(n *html.Node, builder *strings.Builder, currentLength *int, maxLength int, depth int) bool {
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		if cleanNode(c, builder, currentLength, maxLength, depth) {
+			return true
+		}
+	}
+	return false
 }
 
 // isSkippedElement returns true for elements that should be completely removed
@@ -207,15 +213,8 @@ func isVoidElement(tagName string) bool {
 func shouldPreserveAttribute(tagName, attrName string) bool {
 	attrName = strings.ToLower(attrName)
 
-	// Always preserve these attributes
-	globalAttrs := map[string]bool{
-		"id":               true,
-		"class":            true,
-		"role":             true,
-		"aria-label":       true,
-		"aria-describedby": true,
-	}
-	if globalAttrs[attrName] {
+	// Always preserve global attributes
+	if isGlobalAttribute(attrName) {
 		return true
 	}
 
@@ -225,6 +224,23 @@ func shouldPreserveAttribute(tagName, attrName string) bool {
 	}
 
 	// Tag-specific attributes
+	return isTagSpecificAttribute(tagName, attrName)
+}
+
+// isGlobalAttribute returns true for globally preserved attributes
+func isGlobalAttribute(attrName string) bool {
+	globalAttrs := map[string]bool{
+		"id":               true,
+		"class":            true,
+		"role":             true,
+		"aria-label":       true,
+		"aria-describedby": true,
+	}
+	return globalAttrs[attrName]
+}
+
+// isTagSpecificAttribute returns true for tag-specific preserved attributes
+func isTagSpecificAttribute(tagName, attrName string) bool {
 	switch tagName {
 	case "a":
 		return attrName == "href" || attrName == "target"
@@ -239,7 +255,6 @@ func shouldPreserveAttribute(tagName, attrName string) bool {
 	case "table":
 		return attrName == "summary"
 	}
-
 	return false
 }
 
