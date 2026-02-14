@@ -89,10 +89,10 @@ type ExtractOptions struct {
 
 // StructuredContent represents content extracted in structured format.
 type StructuredContent struct {
-	Title    string         `json:"title"`
-	Headings []string       `json:"headings"`
-	Links    []Link         `json:"links"`
-	Body     string         `json:"body"`
+	Title    string   `json:"title"`
+	Headings []string `json:"headings"`
+	Links    []Link   `json:"links"`
+	Body     string   `json:"body"`
 }
 
 // Link represents a hyperlink with text and URL.
@@ -160,10 +160,10 @@ type SearchResult struct {
 
 // Default values for various operations
 const (
-	DefaultTimeout       = 30000.0 // 30 seconds in milliseconds
-	DefaultMaxLength     = 10000   // 10,000 characters
-	DefaultViewportWidth = 1280
+	DefaultTimeout        = 30000.0 // 30 seconds in milliseconds
+	DefaultMaxLength      = 10000   // 10,000 characters
+	DefaultViewportWidth  = 1280
 	DefaultViewportHeight = 720
-	DefaultMaxSessions   = 5
-	DefaultIdleTimeout   = 300 // 5 minutes in seconds
+	DefaultMaxSessions    = 5
+	DefaultIdleTimeout    = 300 // 5 minutes in seconds
 )

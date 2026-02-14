@@ -105,8 +105,8 @@ func (t *NavigateTool) Execute(ctx context.Context, argsXML []byte) (string, map
 	}
 
 	// Navigate
-	if err := session.Navigate(input.URL, opts); err != nil {
-		return "", nil, err
+	if navErr := session.Navigate(input.URL, opts); navErr != nil {
+		return "", nil, navErr
 	}
 
 	// Get page title
@@ -141,5 +141,3 @@ func (t *NavigateTool) IsLoopBreaking() bool {
 func (t *NavigateTool) ShouldShow() bool {
 	return t.manager.HasSessions()
 }
-
-

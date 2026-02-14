@@ -161,5 +161,3 @@ func (t *WaitTool) IsLoopBreaking() bool {
 func (t *WaitTool) ShouldShow() bool {
 	return t.manager.HasSessions()
 }
-
-

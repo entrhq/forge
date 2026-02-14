@@ -11,12 +11,12 @@ import (
 // SessionManager manages all active browser sessions and coordinates
 // with the tool registry for dynamic tool registration.
 type SessionManager struct {
-	mu           sync.RWMutex
-	sessions     map[string]*Session
-	playwright   *playwright.Playwright
-	maxSessions  int
-	idleTimeout  time.Duration
-	initialized  bool
+	mu          sync.RWMutex
+	sessions    map[string]*Session
+	playwright  *playwright.Playwright
+	maxSessions int
+	idleTimeout time.Duration
+	initialized bool
 }
 
 // NewSessionManager creates a new session manager.
@@ -147,15 +147,9 @@ func (m *SessionManager) CloseSession(name string) error {
 	}
 
 	// Close Playwright resources
-	if err := session.Page.Close(); err != nil {
-		// Log but continue cleanup
-	}
-	if err := session.Context.Close(); err != nil {
-		// Log but continue cleanup
-	}
-	if err := session.Browser.Close(); err != nil {
-		// Log but continue cleanup
-	}
+	_ = session.Page.Close()    // Ignore errors, continue cleanup
+	_ = session.Context.Close() // Ignore errors, continue cleanup
+	_ = session.Browser.Close() // Ignore errors, continue cleanup
 
 	delete(m.sessions, name)
 	return nil
@@ -208,7 +202,7 @@ func (m *SessionManager) CloseAll() error {
 	var errs []error
 	for name := range m.sessions {
 		session := m.sessions[name]
-		
+
 		// Close resources
 		if err := session.Page.Close(); err != nil {
 			errs = append(errs, err)
@@ -219,7 +213,7 @@ func (m *SessionManager) CloseAll() error {
 		if err := session.Browser.Close(); err != nil {
 			errs = append(errs, err)
 		}
-		
+
 		delete(m.sessions, name)
 	}
 
@@ -272,7 +266,7 @@ func (m *SessionManager) CleanupIdleSessions() error {
 	var errs []error
 	for _, name := range toClose {
 		session := m.sessions[name]
-		
+
 		if err := session.Page.Close(); err != nil {
 			errs = append(errs, err)
 		}
@@ -282,7 +276,7 @@ func (m *SessionManager) CleanupIdleSessions() error {
 		if err := session.Browser.Close(); err != nil {
 			errs = append(errs, err)
 		}
-		
+
 		delete(m.sessions, name)
 	}
 

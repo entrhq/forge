@@ -125,16 +125,18 @@ func (t *ClickTool) Execute(ctx context.Context, argsXML []byte) (string, map[st
 
 	// Build result message
 	clickType := "single click"
-	if opts.ClickCount == 2 {
+	switch opts.ClickCount {
+	case 2:
 		clickType = "double click"
-	} else if opts.ClickCount == 3 {
+	case 3:
 		clickType = "triple click"
 	}
 
 	buttonDesc := "left button"
-	if opts.Button == "right" {
+	switch opts.Button {
+	case "right":
 		buttonDesc = "right button"
-	} else if opts.Button == "middle" {
+	case "middle":
 		buttonDesc = "middle button"
 	}
 
@@ -167,5 +169,3 @@ func (t *ClickTool) IsLoopBreaking() bool {
 func (t *ClickTool) ShouldShow() bool {
 	return t.manager.HasSessions()
 }
-
-

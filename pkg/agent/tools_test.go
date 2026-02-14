@@ -9,7 +9,7 @@ import (
 
 // mockConditionalTool is a mock tool that implements ConditionallyVisible
 type mockConditionalTool struct {
-	name      string
+	name       string
 	shouldShow bool
 }
 
@@ -42,14 +42,14 @@ func (m *mockRegularTool) Execute(ctx context.Context, args []byte) (string, map
 	return "", nil, nil
 }
 func (m *mockRegularTool) IsLoopBreaking() bool                         { return false }
-func (m *mockRegularTool) RequiresApproval(params map[string]any) bool { return false }
+func (m *mockRegularTool) RequiresApproval(params map[string]any) bool  { return false }
 func (m *mockRegularTool) ApprovalMessage(params map[string]any) string { return "" }
 
 func TestGetToolsList_ConditionalVisibility(t *testing.T) {
 	tests := []struct {
-		name          string
+		name            string
 		registeredTools []tools.Tool
-		expectedNames []string
+		expectedNames   []string
 	}{
 		{
 			name: "all regular tools shown",
@@ -101,7 +101,7 @@ func TestGetToolsList_ConditionalVisibility(t *testing.T) {
 			agent := &DefaultAgent{
 				tools: make(map[string]tools.Tool),
 			}
-			
+
 			// Register the mock tools
 			for _, tool := range tt.registeredTools {
 				agent.tools[tool.Name()] = tool

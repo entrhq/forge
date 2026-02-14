@@ -164,5 +164,3 @@ func (t *SearchTool) IsLoopBreaking() bool {
 func (t *SearchTool) ShouldShow() bool {
 	return t.manager.HasSessions()
 }
-
-

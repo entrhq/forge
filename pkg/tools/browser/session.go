@@ -18,12 +18,12 @@ func (s *Session) Navigate(url string, opts NavigateOptions) error {
 
 	// Build Playwright navigation options
 	playwrightOpts := playwright.PageGotoOptions{}
-	
+
 	if opts.WaitUntil != "" {
 		waitUntil := playwright.WaitUntilState(opts.WaitUntil)
 		playwrightOpts.WaitUntil = &waitUntil
 	}
-	
+
 	if opts.Timeout > 0 {
 		playwrightOpts.Timeout = &opts.Timeout
 	}
@@ -109,9 +109,9 @@ func (s *Session) extractText(opts ExtractOptions) (string, error) {
 func (s *Session) extractMarkdown(opts ExtractOptions) (string, error) {
 	// For MVP, we'll use a simplified markdown extraction
 	// This can be enhanced later with better formatting
-	
+
 	var markdown string
-	
+
 	// Get page title
 	title, err := s.Page.Title()
 	if err == nil && title != "" {
@@ -142,8 +142,8 @@ func (s *Session) extractStructured(opts ExtractOptions) (string, error) {
 	headings, err := s.Page.QuerySelectorAll("h1, h2, h3, h4, h5, h6")
 	if err == nil {
 		for _, heading := range headings {
-			text, err := heading.TextContent()
-			if err == nil && text != "" {
+			text, textErr := heading.TextContent()
+			if textErr == nil && text != "" {
 				structured.Headings = append(structured.Headings, text)
 			}
 		}
@@ -178,7 +178,7 @@ func (s *Session) extractStructured(opts ExtractOptions) (string, error) {
   "headings": %v,
   "links": %d links,
   "body": %q
-}`, structured.Title, len(structured.Headings), len(structured.Links), 
+}`, structured.Title, len(structured.Headings), len(structured.Links),
 		truncateString(structured.Body, opts.MaxLength))
 
 	return result, nil
@@ -189,16 +189,16 @@ func (s *Session) Click(opts ClickOptions) error {
 	s.UpdateLastUsed()
 
 	playwrightOpts := playwright.PageClickOptions{}
-	
+
 	if opts.Button != "" {
 		button := playwright.MouseButton(opts.Button)
 		playwrightOpts.Button = &button
 	}
-	
+
 	if opts.ClickCount > 0 {
 		playwrightOpts.ClickCount = &opts.ClickCount
 	}
-	
+
 	if opts.Timeout > 0 {
 		playwrightOpts.Timeout = &opts.Timeout
 	}
@@ -218,7 +218,7 @@ func (s *Session) Fill(opts FillOptions) error {
 	s.UpdateLastUsed()
 
 	playwrightOpts := playwright.PageFillOptions{}
-	
+
 	if opts.Timeout > 0 {
 		playwrightOpts.Timeout = &opts.Timeout
 	}
@@ -240,12 +240,12 @@ func (s *Session) Wait(opts WaitOptions) error {
 	}
 
 	playwrightOpts := playwright.PageWaitForSelectorOptions{}
-	
+
 	if opts.State != "" {
 		state := playwright.WaitForSelectorState(opts.State)
 		playwrightOpts.State = &state
 	}
-	
+
 	if opts.Timeout > 0 {
 		playwrightOpts.Timeout = &opts.Timeout
 	}
@@ -283,21 +283,21 @@ func (s *Session) Search(opts SearchOptions) ([]SearchResult, error) {
 		if pos == -1 {
 			break
 		}
-		
+
 		actualPos := index + pos
-		
+
 		// Extract context (50 chars before and after)
 		contextStart := max(0, actualPos-50)
 		contextEnd := min(len(bodyText), actualPos+len(searchText)+50)
 		context := bodyText[contextStart:contextEnd]
-		
+
 		results = append(results, SearchResult{
 			Text:    bodyText[actualPos : actualPos+len(searchText)],
 			Context: context,
 		})
-		
+
 		index = actualPos + len(searchText)
-		
+
 		// Limit results
 		if opts.MaxResults > 0 && len(results) >= opts.MaxResults {
 			break
@@ -353,7 +353,7 @@ func indexString(s, substr string) int {
 	if len(substr) > len(s) {
 		return -1
 	}
-	
+
 	for i := 0; i <= len(s)-len(substr); i++ {
 		if s[i:i+len(substr)] == substr {
 			return i

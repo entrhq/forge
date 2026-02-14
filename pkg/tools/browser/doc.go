@@ -17,10 +17,10 @@
 //
 // Browser sessions follow this lifecycle:
 //
-//	1. Create: start_browser_session tool creates a new named session
-//	2. Use: Navigation, interaction, and extraction tools operate on the session
-//	3. Close: close_browser_session explicitly closes and cleans up resources
-//	4. Timeout: Sessions auto-close after idle timeout (configurable)
+//  1. Create: start_browser_session tool creates a new named session
+//  2. Use: Navigation, interaction, and extraction tools operate on the session
+//  3. Close: close_browser_session explicitly closes and cleans up resources
+//  4. Timeout: Sessions auto-close after idle timeout (configurable)
 //
 // # Tool Registration
 //

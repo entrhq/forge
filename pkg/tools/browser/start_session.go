@@ -57,7 +57,8 @@ func (t *StartSessionTool) Schema() map[string]interface{} {
 }
 
 // startSessionParams represents the parameters for starting a session.
-type startSessionParams struct {
+// StartSessionInput defines the input parameters for starting a browser session.
+type StartSessionInput struct {
 	XMLName  xml.Name `xml:"arguments"`
 	Name     string   `xml:"name"`
 	Headless *bool    `xml:"headless"`
@@ -67,25 +68,54 @@ type startSessionParams struct {
 
 // Execute starts a new browser session.
 func (t *StartSessionTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
-	// Parse parameters
-	var input struct {
-		XMLName  xml.Name `xml:"arguments"`
-		Name     string   `xml:"name"`
-		Headless *bool    `xml:"headless"`
-		Width    *int     `xml:"width"`
-		Height   *int     `xml:"height"`
+	// Parse and validate input
+	input, err := t.parseInput(argsXML)
+	if err != nil {
+		return "", nil, err
 	}
+
+	// Build session options
+	opts := t.buildSessionOptions(input)
+
+	// Validate viewport dimensions
+	if validateErr := t.validateViewport(opts.Viewport); validateErr != nil {
+		return "", nil, validateErr
+	}
+
+	// Ensure manager is initialized
+	if initErr := t.manager.Initialize(); initErr != nil {
+		return "", nil, fmt.Errorf("failed to initialize browser: %w", initErr)
+	}
+
+	// Start session
+	session, err := t.manager.StartSession(input.Name, opts)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to start session: %w", err)
+	}
+
+	// Build and return success message
+	result := t.buildSuccessMessage(session, opts)
+	return result, nil, nil
+}
+
+// parseInput parses and validates the XML input parameters.
+func (t *StartSessionTool) parseInput(argsXML []byte) (*StartSessionInput, error) {
+	var input StartSessionInput
 	if err := tools.UnmarshalXMLWithFallback(argsXML, &input); err != nil {
-		return "", nil, fmt.Errorf("invalid parameters: %w", err)
+		return nil, fmt.Errorf("invalid parameters: %w", err)
 	}
 
-	// Validate session name
 	if input.Name == "" {
-		return "", nil, fmt.Errorf("session name is required")
+		return nil, fmt.Errorf("session name is required")
 	}
 
-	// Build session options with config defaults
-	headlessDefault := false // Fallback if config not available
+	return &input, nil
+}
+
+// buildSessionOptions constructs SessionOptions from input and config defaults.
+func (t *StartSessionTool) buildSessionOptions(input *StartSessionInput) SessionOptions {
+	// Get headless default from config
+	headlessDefault := false
 	if config.IsInitialized() {
 		if ui := config.GetUI(); ui != nil {
 			headlessDefault = ui.IsBrowserHeadless()
@@ -101,6 +131,7 @@ func (t *StartSessionTool) Execute(ctx context.Context, argsXML []byte) (string,
 		Timeout: DefaultTimeout,
 	}
 
+	// Apply user-provided overrides
 	if input.Headless != nil {
 		opts.Headless = *input.Headless
 	}
@@ -111,32 +142,33 @@ func (t *StartSessionTool) Execute(ctx context.Context, argsXML []byte) (string,
 		opts.Viewport.Height = *input.Height
 	}
 
-	// Validate viewport dimensions
-	if opts.Viewport.Width < 100 || opts.Viewport.Width > 5000 {
-		return "", nil, fmt.Errorf("viewport width must be between 100 and 5000 pixels")
-	}
-	if opts.Viewport.Height < 100 || opts.Viewport.Height > 5000 {
-		return "", nil, fmt.Errorf("viewport height must be between 100 and 5000 pixels")
-	}
+	return opts
+}
 
-	// Ensure manager is initialized
-	if err := t.manager.Initialize(); err != nil {
-		return "", nil, fmt.Errorf("failed to initialize browser: %w", err)
+// validateViewport validates viewport dimensions are within acceptable range.
+func (t *StartSessionTool) validateViewport(vp *Viewport) error {
+	if vp.Width < 100 || vp.Width > 5000 {
+		return fmt.Errorf("viewport width must be between 100 and 5000 pixels")
 	}
-
-	// Start session
-	session, err := t.manager.StartSession(input.Name, opts)
-	if err != nil {
-		return "", nil, fmt.Errorf("failed to start session: %w", err)
+	if vp.Height < 100 || vp.Height > 5000 {
+		return fmt.Errorf("viewport height must be between 100 and 5000 pixels")
 	}
+	return nil
+}
 
-	// Build success message
+// buildSuccessMessage creates the success message for session creation.
+func (t *StartSessionTool) buildSuccessMessage(session *Session, opts SessionOptions) string {
 	mode := "headed"
 	if session.Headless {
 		mode = "headless"
 	}
 
-	result := fmt.Sprintf(`Browser session created successfully
+	visibilityNote := "You should see a browser window open. The agent will interact with this window."
+	if session.Headless {
+		visibilityNote = "Browser is running in the background (headless mode)."
+	}
+
+	return fmt.Sprintf(`Browser session created successfully
 
 Session Details:
 - Name: %s
@@ -151,15 +183,8 @@ The session is now active and browser tools are available. Use navigate, extract
 		mode,
 		opts.Viewport.Width,
 		opts.Viewport.Height,
-		func() string {
-			if session.Headless {
-				return "Browser is running in the background (headless mode)."
-			}
-			return "You should see a browser window open. The agent will interact with this window."
-		}(),
+		visibilityNote,
 	)
-
-	return result, nil, nil
 }
 
 // IsLoopBreaking returns whether this tool breaks the agent loop.
@@ -182,7 +207,7 @@ func (t *StartSessionTool) ShouldShow() bool {
 
 // GeneratePreview generates a preview of the browser session start.
 func (t *StartSessionTool) GeneratePreview(ctx context.Context, argsXML []byte) (*tools.ToolPreview, error) {
-	var params startSessionParams
+	var params StartSessionInput
 	if err := tools.UnmarshalXMLWithFallback(argsXML, &params); err != nil {
 		return nil, fmt.Errorf("failed to parse arguments: %w", err)
 	}
@@ -199,5 +224,3 @@ func (t *StartSessionTool) GeneratePreview(ctx context.Context, argsXML []byte) 
 
 	return preview, nil
 }
-
-

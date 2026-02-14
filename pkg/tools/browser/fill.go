@@ -132,5 +132,3 @@ func (t *FillTool) IsLoopBreaking() bool {
 func (t *FillTool) ShouldShow() bool {
 	return t.manager.HasSessions()
 }
-
-
