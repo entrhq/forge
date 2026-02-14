@@ -73,6 +73,9 @@ const (
 
 	// FormatStructured extracts content as structured JSON
 	FormatStructured ExtractFormat = "structured"
+
+	// FormatHTML extracts cleaned HTML with semantic structure
+	FormatHTML ExtractFormat = "html"
 )
 
 // ExtractOptions configures content extraction.

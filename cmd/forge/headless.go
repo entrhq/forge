@@ -173,6 +173,7 @@ func runHeadless(ctx context.Context, config *Config) error {
 	// Register browser tools using the browser registry
 	browserManager := browser.NewSessionManager()
 	browserRegistry := browser.NewToolRegistry(browserManager)
+	browserRegistry.SetLLMProvider(provider) // Enable AI-powered browser tools
 	browserTools := browserRegistry.RegisterTools()
 
 	for _, tool := range browserTools {

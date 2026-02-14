@@ -204,23 +204,3 @@ func (t *StartSessionTool) ShouldShow() bool {
 	}
 	return ui.IsBrowserEnabled()
 }
-
-// GeneratePreview generates a preview of the browser session start.
-func (t *StartSessionTool) GeneratePreview(ctx context.Context, argsXML []byte) (*tools.ToolPreview, error) {
-	var params StartSessionInput
-	if err := tools.UnmarshalXMLWithFallback(argsXML, &params); err != nil {
-		return nil, fmt.Errorf("failed to parse arguments: %w", err)
-	}
-
-	preview := &tools.ToolPreview{
-		Type:        tools.PreviewTypeCommand,
-		Title:       "Start Browser Session",
-		Description: fmt.Sprintf("Opening a new browser session named '%s'", params.Name),
-		Metadata: map[string]interface{}{
-			"session_name": params.Name,
-			"headless":     params.Headless,
-		},
-	}
-
-	return preview, nil
-}

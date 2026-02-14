@@ -15,6 +15,7 @@ import (
 	"github.com/entrhq/forge/pkg/llm"
 	"github.com/entrhq/forge/pkg/llm/tokenizer"
 	"github.com/entrhq/forge/pkg/logging"
+	"github.com/entrhq/forge/pkg/tools/browser"
 	"github.com/entrhq/forge/pkg/types"
 )
 
@@ -74,6 +75,10 @@ type DefaultAgent struct {
 
 	// Notes management
 	notesManager *notes.Manager
+
+	// Browser session management
+	browserManager *browser.SessionManager
+
 }
 
 // AgentOption is a function that configures an agent
@@ -107,6 +112,13 @@ func WithMaxTurns(max int) AgentOption {
 func WithNotesManager(manager *notes.Manager) AgentOption {
 	return func(a *DefaultAgent) {
 		a.notesManager = manager
+	}
+}
+
+// WithBrowserManager sets a browser session manager for the agent
+func WithBrowserManager(manager *browser.SessionManager) AgentOption {
+	return func(a *DefaultAgent) {
+		a.browserManager = manager
 	}
 }
 

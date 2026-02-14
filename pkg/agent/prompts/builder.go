@@ -14,6 +14,7 @@ type PromptBuilder struct {
 	customInstructions string
 	repositoryContext  string
 	customToolsList    string
+	browserGuidance    string
 }
 
 // NewPromptBuilder creates a new prompt builder with default settings
@@ -46,6 +47,12 @@ func (pb *PromptBuilder) WithRepositoryContext(context string) *PromptBuilder {
 // WithCustomToolsList adds the formatted list of available custom tools
 func (pb *PromptBuilder) WithCustomToolsList(customTools string) *PromptBuilder {
 	pb.customToolsList = customTools
+	return pb
+}
+
+// WithBrowserGuidance adds browser automation workflow guidance when browser tools are enabled
+func (pb *PromptBuilder) WithBrowserGuidance(guidance string) *PromptBuilder {
+	pb.browserGuidance = guidance
 	return pb
 }
 
@@ -105,6 +112,12 @@ func (pb *PromptBuilder) Build() string {
 	if pb.customToolsList != "" {
 		builder.WriteString("\n\n")
 		builder.WriteString(pb.customToolsList)
+	}
+
+	// Add browser automation guidance if provided
+	if pb.browserGuidance != "" {
+		builder.WriteString("\n\n")
+		builder.WriteString(pb.browserGuidance)
 	}
 
 	return builder.String()

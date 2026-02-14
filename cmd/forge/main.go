@@ -274,6 +274,7 @@ func runTUI(ctx context.Context, config *Config) error {
 		agent.WithCustomInstructions(systemPrompt),
 		agent.WithContextManager(contextManager),
 		agent.WithNotesManager(notesManager),
+		agent.WithBrowserManager(browserManager),
 	}
 
 	// Add repository context if AGENTS.md was loaded
@@ -329,6 +330,7 @@ func runTUI(ctx context.Context, config *Config) error {
 
 	// Register browser tools using the browser registry
 	browserRegistry := browser.NewToolRegistry(browserManager)
+	browserRegistry.SetLLMProvider(provider) // Enable AI-powered browser tools
 	browserTools := browserRegistry.RegisterTools()
 
 	for _, tool := range browserTools {

@@ -2,6 +2,7 @@ package browser
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/playwright-community/playwright-go"
@@ -58,6 +59,8 @@ func (s *Session) ExtractContent(opts ExtractOptions) (string, error) {
 		return s.extractText(opts)
 	case FormatStructured:
 		return s.extractStructured(opts)
+	case FormatHTML:
+		return s.extractHTML(opts)
 	default:
 		return "", fmt.Errorf("unsupported format: %s", opts.Format)
 	}
@@ -187,6 +190,58 @@ func (s *Session) extractStructured(opts ExtractOptions) (string, error) {
 		truncateString(structured.Body, opts.MaxLength))
 
 	return result, nil
+}
+
+// extractHTML extracts cleaned HTML with semantic structure preserved.
+func (s *Session) extractHTML(opts ExtractOptions) (string, error) {
+	// Get the raw HTML content
+	var rawHTML string
+	var err error
+
+	if opts.Selector != "" {
+		// Extract HTML from specific element
+		locator := s.Page.Locator(opts.Selector)
+		count, countErr := locator.Count()
+		if countErr != nil {
+			return "", fmt.Errorf("selector query failed: %w", countErr)
+		}
+		if count == 0 {
+			return "", fmt.Errorf("no element found matching selector: %s", opts.Selector)
+		}
+		rawHTML, err = locator.First().InnerHTML()
+		if err != nil {
+			return "", fmt.Errorf("HTML extraction failed: %w", err)
+		}
+	} else {
+		// Extract full page HTML
+		rawHTML, err = s.Page.Content()
+		if err != nil {
+			return "", fmt.Errorf("page content extraction failed: %w", err)
+		}
+	}
+
+	// Clean the HTML
+	cleaned, err := cleanHTML(rawHTML, opts.MaxLength)
+	if err != nil {
+		return "", fmt.Errorf("HTML cleaning failed: %w", err)
+	}
+
+	// Build the result with metadata
+	var result strings.Builder
+	
+	if cleaned.Title != "" {
+		result.WriteString(fmt.Sprintf("<!-- Title: %s -->\n", cleaned.Title))
+	}
+	if cleaned.Description != "" {
+		result.WriteString(fmt.Sprintf("<!-- Description: %s -->\n", cleaned.Description))
+	}
+	if cleaned.Truncated {
+		result.WriteString("<!-- Note: Content truncated to fit size limit -->\n")
+	}
+	result.WriteString("\n")
+	result.WriteString(cleaned.HTML)
+
+	return result.String(), nil
 }
 
 // Click clicks an element matching the selector.

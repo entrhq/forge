@@ -1,13 +1,16 @@
 package browser
 
 import (
+	"github.com/entrhq/forge/pkg/agent/prompts"
 	"github.com/entrhq/forge/pkg/agent/tools"
+	"github.com/entrhq/forge/pkg/llm"
 )
 
 // ToolRegistry manages dynamic browser tool registration.
 type ToolRegistry struct {
-	manager *SessionManager
-	tools   []tools.Tool
+	manager  *SessionManager
+	provider llm.Provider
+	tools    []tools.Tool
 }
 
 // NewToolRegistry creates a new browser tool registry.
@@ -16,6 +19,11 @@ func NewToolRegistry(manager *SessionManager) *ToolRegistry {
 		manager: manager,
 		tools:   make([]tools.Tool, 0),
 	}
+}
+
+// SetLLMProvider sets the LLM provider for AI-powered tools.
+func (r *ToolRegistry) SetLLMProvider(provider llm.Provider) {
+	r.provider = provider
 }
 
 // RegisterTools creates and returns all browser tools.
@@ -42,6 +50,13 @@ func (r *ToolRegistry) RegisterTools() []tools.Tool {
 		NewSearchTool(r.manager),
 	)
 
+	// AI-powered tools (only if LLM provider is available)
+	if r.provider != nil {
+		r.tools = append(r.tools,
+			NewAnalyzePageTool(r.manager, r.provider),
+		)
+	}
+
 	return r.tools
 }
 
@@ -61,3 +76,15 @@ func (r *ToolRegistry) ShouldShowBrowserTools() bool {
 func (r *ToolRegistry) GetSessionManager() *SessionManager {
 	return r.manager
 }
+
+// GetBrowserGuidance returns browser automation guidance if sessions exist.
+// Returns empty string if no sessions are active (guidance not applicable).
+func (r *ToolRegistry) GetBrowserGuidance() string {
+	if !r.ShouldShowBrowserTools() {
+		return ""
+	}
+	// Return the browser guidance from static prompts package
+	return prompts.BrowserUsePrompt
+}
+
+
