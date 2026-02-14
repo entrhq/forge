@@ -51,8 +51,8 @@ func (t *FillTool) Schema() map[string]interface{} {
 	)
 }
 
-// fillParams represents the parameters for filling.
-type fillParams struct {
+// FillInput represents the parameters for filling.
+type FillInput struct {
 	XMLName  xml.Name `xml:"arguments"`
 	Session  string   `xml:"session"`
 	Selector string   `xml:"selector"`
@@ -62,12 +62,7 @@ type fillParams struct {
 // Execute fills a form input.
 func (t *FillTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
 	// Parse parameters
-	var input struct {
-		XMLName  xml.Name `xml:"arguments"`
-		Session  string   `xml:"session"`
-		Selector string   `xml:"selector"`
-		Value    string   `xml:"value"`
-	}
+	var input FillInput
 	if err := tools.UnmarshalXMLWithFallback(argsXML, &input); err != nil {
 		return "", nil, fmt.Errorf("invalid parameters: %w", err)
 	}

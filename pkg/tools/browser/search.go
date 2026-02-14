@@ -56,8 +56,8 @@ func (t *SearchTool) Schema() map[string]interface{} {
 	)
 }
 
-// searchParams represents the parameters for searching.
-type searchParams struct {
+// SearchInput represents the parameters for searching.
+type SearchInput struct {
 	XMLName       xml.Name `xml:"arguments"`
 	Session       string   `xml:"session"`
 	Pattern       string   `xml:"pattern"`
@@ -68,13 +68,7 @@ type searchParams struct {
 // Execute searches the page.
 func (t *SearchTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
 	// Parse parameters
-	var input struct {
-		XMLName       xml.Name `xml:"arguments"`
-		Session       string   `xml:"session"`
-		Pattern       string   `xml:"pattern"`
-		CaseSensitive *bool    `xml:"case_sensitive"`
-		MaxResults    *int     `xml:"max_results"`
-	}
+	var input SearchInput
 	if err := tools.UnmarshalXMLWithFallback(argsXML, &input); err != nil {
 		return "", nil, fmt.Errorf("invalid parameters: %w", err)
 	}

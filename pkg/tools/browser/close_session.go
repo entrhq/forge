@@ -44,8 +44,8 @@ func (t *CloseSessionTool) Schema() map[string]interface{} {
 	)
 }
 
-// closeSessionParams represents the parameters for closing a session.
-type closeSessionParams struct {
+// CloseSessionInput represents the parameters for closing a session.
+type CloseSessionInput struct {
 	XMLName xml.Name `xml:"arguments"`
 	Session string   `xml:"session"`
 }
@@ -53,10 +53,7 @@ type closeSessionParams struct {
 // Execute closes a browser session.
 func (t *CloseSessionTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
 	// Parse parameters
-	var input struct {
-		XMLName xml.Name `xml:"arguments"`
-		Session string   `xml:"session"`
-	}
+	var input CloseSessionInput
 	if err := tools.UnmarshalXMLWithFallback(argsXML, &input); err != nil {
 		return "", nil, fmt.Errorf("invalid parameters: %w", err)
 	}

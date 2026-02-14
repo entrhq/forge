@@ -68,28 +68,30 @@ func (s *Session) extractText(opts ExtractOptions) (string, error) {
 	var content string
 
 	if opts.Selector != "" {
-		// Extract from specific element
-		element, err := s.Page.QuerySelector(opts.Selector)
+		// Extract from specific element using locator-based API
+		locator := s.Page.Locator(opts.Selector)
+		count, err := locator.Count()
 		if err != nil {
 			return "", fmt.Errorf("selector query failed: %w", err)
 		}
-		if element == nil {
+		if count == 0 {
 			return "", fmt.Errorf("no element found matching selector: %s", opts.Selector)
 		}
-		content, err = element.TextContent()
+		content, err = locator.First().TextContent()
 		if err != nil {
 			return "", fmt.Errorf("text extraction failed: %w", err)
 		}
 	} else {
-		// Extract from body
-		body, err := s.Page.QuerySelector("body")
+		// Extract from body using locator-based API
+		bodyLocator := s.Page.Locator("body")
+		count, err := bodyLocator.Count()
 		if err != nil {
 			return "", fmt.Errorf("body query failed: %w", err)
 		}
-		if body == nil {
+		if count == 0 {
 			return "", fmt.Errorf("no body element found")
 		}
-		content, err = body.TextContent()
+		content, err = bodyLocator.TextContent()
 		if err != nil {
 			return "", fmt.Errorf("text extraction failed: %w", err)
 		}
@@ -138,23 +140,26 @@ func (s *Session) extractStructured(opts ExtractOptions) (string, error) {
 		structured.Title = title
 	}
 
-	// Get headings
-	headings, err := s.Page.QuerySelectorAll("h1, h2, h3, h4, h5, h6")
-	if err == nil {
-		for _, heading := range headings {
-			text, textErr := heading.TextContent()
+	// Get headings using locator-based API
+	headingLocator := s.Page.Locator("h1, h2, h3, h4, h5, h6")
+	count, err := headingLocator.Count()
+	if err == nil && count > 0 {
+		for i := 0; i < count; i++ {
+			text, textErr := headingLocator.Nth(i).TextContent()
 			if textErr == nil && text != "" {
 				structured.Headings = append(structured.Headings, text)
 			}
 		}
 	}
 
-	// Get links
-	links, err := s.Page.QuerySelectorAll("a[href]")
-	if err == nil {
-		for _, link := range links {
-			text, _ := link.TextContent()
-			href, _ := link.GetAttribute("href")
+	// Get links using locator-based API
+	linkLocator := s.Page.Locator("a[href]")
+	linkCount, err := linkLocator.Count()
+	if err == nil && linkCount > 0 {
+		for i := 0; i < linkCount; i++ {
+			linkElem := linkLocator.Nth(i)
+			text, _ := linkElem.TextContent()
+			href, _ := linkElem.GetAttribute("href")
 			if href != "" {
 				structured.Links = append(structured.Links, Link{
 					Text: text,
@@ -188,7 +193,9 @@ func (s *Session) extractStructured(opts ExtractOptions) (string, error) {
 func (s *Session) Click(opts ClickOptions) error {
 	s.UpdateLastUsed()
 
-	playwrightOpts := playwright.PageClickOptions{}
+	locator := s.Page.Locator(opts.Selector)
+	
+	playwrightOpts := playwright.LocatorClickOptions{}
 
 	if opts.Button != "" {
 		button := playwright.MouseButton(opts.Button)
@@ -203,7 +210,7 @@ func (s *Session) Click(opts ClickOptions) error {
 		playwrightOpts.Timeout = &opts.Timeout
 	}
 
-	err := s.Page.Click(opts.Selector, playwrightOpts)
+	err := locator.Click(playwrightOpts)
 	if err != nil {
 		return fmt.Errorf("click failed: %w", err)
 	}
@@ -217,13 +224,15 @@ func (s *Session) Click(opts ClickOptions) error {
 func (s *Session) Fill(opts FillOptions) error {
 	s.UpdateLastUsed()
 
-	playwrightOpts := playwright.PageFillOptions{}
+	locator := s.Page.Locator(opts.Selector)
+	
+	playwrightOpts := playwright.LocatorFillOptions{}
 
 	if opts.Timeout > 0 {
 		playwrightOpts.Timeout = &opts.Timeout
 	}
 
-	err := s.Page.Fill(opts.Selector, opts.Value, playwrightOpts)
+	err := locator.Fill(opts.Value, playwrightOpts)
 	if err != nil {
 		return fmt.Errorf("fill failed: %w", err)
 	}
@@ -239,7 +248,9 @@ func (s *Session) Wait(opts WaitOptions) error {
 		return fmt.Errorf("selector is required for wait")
 	}
 
-	playwrightOpts := playwright.PageWaitForSelectorOptions{}
+	locator := s.Page.Locator(opts.Selector)
+	
+	playwrightOpts := playwright.LocatorWaitForOptions{}
 
 	if opts.State != "" {
 		state := playwright.WaitForSelectorState(opts.State)
@@ -250,7 +261,7 @@ func (s *Session) Wait(opts WaitOptions) error {
 		playwrightOpts.Timeout = &opts.Timeout
 	}
 
-	_, err := s.Page.WaitForSelector(opts.Selector, playwrightOpts)
+	err := locator.WaitFor(playwrightOpts)
 	if err != nil {
 		return fmt.Errorf("wait failed: %w", err)
 	}

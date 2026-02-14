@@ -55,8 +55,8 @@ func (t *WaitTool) Schema() map[string]interface{} {
 	)
 }
 
-// waitParams represents the parameters for waiting.
-type waitParams struct {
+// WaitInput represents the parameters for waiting.
+type WaitInput struct {
 	XMLName  xml.Name `xml:"arguments"`
 	Session  string   `xml:"session"`
 	Selector string   `xml:"selector"`
@@ -67,13 +67,7 @@ type waitParams struct {
 // Execute waits for an element.
 func (t *WaitTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
 	// Parse parameters
-	var input struct {
-		XMLName  xml.Name `xml:"arguments"`
-		Session  string   `xml:"session"`
-		Selector string   `xml:"selector"`
-		State    string   `xml:"state"`
-		Timeout  *float64 `xml:"timeout"`
-	}
+	var input WaitInput
 	if err := tools.UnmarshalXMLWithFallback(argsXML, &input); err != nil {
 		return "", nil, fmt.Errorf("invalid parameters: %w", err)
 	}

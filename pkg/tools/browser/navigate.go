@@ -51,8 +51,8 @@ func (t *NavigateTool) Schema() map[string]interface{} {
 	)
 }
 
-// navigateParams represents the parameters for navigation.
-type navigateParams struct {
+// NavigateInput represents the parameters for navigation.
+type NavigateInput struct {
 	XMLName   xml.Name `xml:"arguments"`
 	Session   string   `xml:"session"`
 	URL       string   `xml:"url"`
@@ -62,12 +62,7 @@ type navigateParams struct {
 // Execute navigates to a URL.
 func (t *NavigateTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
 	// Parse parameters
-	var input struct {
-		XMLName   xml.Name `xml:"arguments"`
-		Session   string   `xml:"session"`
-		URL       string   `xml:"url"`
-		WaitUntil string   `xml:"wait_until"`
-	}
+	var input NavigateInput
 	if err := tools.UnmarshalXMLWithFallback(argsXML, &input); err != nil {
 		return "", nil, fmt.Errorf("invalid parameters: %w", err)
 	}

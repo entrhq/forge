@@ -41,8 +41,8 @@ func (t *ListSessionsTool) Schema() map[string]interface{} {
 	)
 }
 
-// listSessionsParams represents the parameters (none for this tool).
-type listSessionsParams struct {
+// ListSessionsInput represents the parameters (none for this tool).
+type ListSessionsInput struct {
 	XMLName xml.Name `xml:"arguments"`
 }
 

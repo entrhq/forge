@@ -55,8 +55,8 @@ func (t *ClickTool) Schema() map[string]interface{} {
 	)
 }
 
-// clickParams represents the parameters for clicking.
-type clickParams struct {
+// ClickInput represents the parameters for clicking.
+type ClickInput struct {
 	XMLName    xml.Name `xml:"arguments"`
 	Session    string   `xml:"session"`
 	Selector   string   `xml:"selector"`
@@ -67,13 +67,7 @@ type clickParams struct {
 // Execute clicks an element.
 func (t *ClickTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
 	// Parse parameters
-	var input struct {
-		XMLName    xml.Name `xml:"arguments"`
-		Session    string   `xml:"session"`
-		Selector   string   `xml:"selector"`
-		Button     string   `xml:"button"`
-		ClickCount *int     `xml:"click_count"`
-	}
+	var input ClickInput
 	if err := tools.UnmarshalXMLWithFallback(argsXML, &input); err != nil {
 		return "", nil, fmt.Errorf("invalid parameters: %w", err)
 	}

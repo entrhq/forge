@@ -55,8 +55,8 @@ func (t *ExtractContentTool) Schema() map[string]interface{} {
 	)
 }
 
-// extractContentParams represents the parameters for content extraction.
-type extractContentParams struct {
+// ExtractContentInput represents the parameters for content extraction.
+type ExtractContentInput struct {
 	XMLName   xml.Name `xml:"arguments"`
 	Session   string   `xml:"session"`
 	Format    string   `xml:"format"`
@@ -67,13 +67,7 @@ type extractContentParams struct {
 // Execute extracts content from the page.
 func (t *ExtractContentTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
 	// Parse parameters
-	var input struct {
-		XMLName   xml.Name `xml:"arguments"`
-		Session   string   `xml:"session"`
-		Format    string   `xml:"format"`
-		Selector  string   `xml:"selector"`
-		MaxLength *int     `xml:"max_length"`
-	}
+	var input ExtractContentInput
 	if err := tools.UnmarshalXMLWithFallback(argsXML, &input); err != nil {
 		return "", nil, fmt.Errorf("invalid parameters: %w", err)
 	}
