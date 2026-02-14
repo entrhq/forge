@@ -15,6 +15,7 @@ import (
 	appconfig "github.com/entrhq/forge/pkg/config"
 	"github.com/entrhq/forge/pkg/executor/headless"
 	"github.com/entrhq/forge/pkg/security/workspace"
+	"github.com/entrhq/forge/pkg/tools/browser"
 	"github.com/entrhq/forge/pkg/tools/coding"
 	"github.com/entrhq/forge/pkg/tools/custom"
 	"github.com/entrhq/forge/pkg/tools/scratchpad"
@@ -166,6 +167,18 @@ func runHeadless(ctx context.Context, config *Config) error {
 	for _, tool := range customTools {
 		if regErr := ag.RegisterTool(tool); regErr != nil {
 			return fmt.Errorf("failed to register custom tool: %w", regErr)
+		}
+	}
+
+	// Register browser tools using the browser registry
+	browserManager := browser.NewSessionManager()
+	browserRegistry := browser.NewToolRegistry(browserManager)
+	browserRegistry.SetLLMProvider(provider) // Enable AI-powered browser tools
+	browserTools := browserRegistry.RegisterTools()
+
+	for _, tool := range browserTools {
+		if regErr := ag.RegisterTool(tool); regErr != nil {
+			return fmt.Errorf("failed to register browser tool: %w", regErr)
 		}
 	}
 

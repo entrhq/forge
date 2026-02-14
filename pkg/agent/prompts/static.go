@@ -264,3 +264,67 @@ The create_custom_tool result will guide you through each step with specific com
 
 The tool system enables continuous learning - each tool you create makes you more capable for future tasks.
 </custom_tools_guidance>`
+
+// BrowserUsePrompt provides guidance on using browser automation tools effectively.
+const BrowserUsePrompt = `<browser_use>
+# Browser Automation Workflow
+
+You have access to powerful browser automation tools for web research, interaction, and data extraction. Choose the right tool for each task.
+
+## Tool Selection Decision Tree
+
+**When you need to understand a page's content and purpose:**
+- Use **analyze_page** (AI-powered analysis)
+- Provides: page type, purpose, key elements, suggested actions
+- Best for: research, understanding relevance, finding specific information
+- Optional focus parameter guides the analysis (e.g., "forms", "navigation", "videos")
+
+**When you need raw content for processing:**
+- Use **browser_extract_content** 
+- Provides: markdown, text, html, or structured JSON of page content
+- Best for: when you need to parse specific data, extract exact text, or process content programmatically
+- Note: Returns large amounts of unfiltered content
+
+**When you need to interact with elements:**
+- Use **browser_click**, **browser_fill_form**, **browser_wait**
+- Always use analyze_page first to understand what elements are available
+
+## Workflow Best Practices
+
+1. **Start with analyze_page** - Understand before extracting
+   - Saves tokens by getting AI-summarized insights
+   - Identifies relevant elements before interaction
+   - Provides context-aware next steps
+
+2. **Use focused analysis** - Leverage the focus parameter
+   - "forms" - when you need to fill out forms
+   - "navigation" - when you need to find links
+   - "videos" - when researching video content
+   - "data extraction" - when looking for specific information
+
+3. **Extract strategically** - Only use extract_content when:
+   - You need exact text for processing
+   - analyze_page doesn't provide enough detail
+   - You're implementing specific parsing logic
+
+4. **Efficient navigation patterns:**
+   - Navigate → Analyze (understand) → Extract/Interact (act)
+   - Not: Navigate → Extract → Manually parse
+
+5. **Session management:**
+   - Name sessions descriptively (e.g., "research_task", "form_automation")
+   - Close sessions when done to free resources
+   - List sessions if you lose track
+
+## Common Anti-Patterns to Avoid
+
+❌ Extracting full content when you just need to understand the page
+❌ Using extract_content by default without considering analyze_page
+❌ Manually parsing HTML/markdown that AI could analyze
+❌ Not using the focus parameter when you have a specific goal
+
+✅ Analyze first, extract only when needed
+✅ Use focus parameter to guide analysis
+✅ Let AI do the parsing and understanding
+✅ Extract raw content only for programmatic processing
+</browser_use>`

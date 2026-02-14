@@ -21,6 +21,7 @@ import (
 	"github.com/entrhq/forge/pkg/executor/headless"
 	"github.com/entrhq/forge/pkg/llm/openai"
 	"github.com/entrhq/forge/pkg/security/workspace"
+	"github.com/entrhq/forge/pkg/tools/browser"
 	"github.com/entrhq/forge/pkg/tools/coding"
 	"github.com/entrhq/forge/pkg/tools/scratchpad"
 	"gopkg.in/yaml.v3"
@@ -254,6 +255,22 @@ func run(ctx context.Context, cliConfig *CLIConfig) error {
 	for _, tool := range scratchpadTools {
 		if regErr := ag.RegisterTool(tool); regErr != nil {
 			return fmt.Errorf("failed to register scratchpad tool: %w", regErr)
+		}
+	}
+
+	// Register browser tools using the browser registry
+	browserManager := browser.NewSessionManager()
+	browserRegistry := browser.NewToolRegistry(browserManager)
+	browserRegistry.SetLLMProvider(provider) // Enable AI-powered browser tools
+	browserTools := browserRegistry.RegisterTools()
+
+	for _, tool := range browserTools {
+		// Filter tools based on allowed_tools constraint
+		if !execConfig.Constraints.ShouldRegisterTool(tool.Name()) {
+			continue
+		}
+		if regErr := ag.RegisterTool(tool); regErr != nil {
+			return fmt.Errorf("failed to register browser tool: %w", regErr)
 		}
 	}
 

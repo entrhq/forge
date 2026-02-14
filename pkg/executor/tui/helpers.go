@@ -113,16 +113,18 @@ func wordWrap(text string, width int) string {
 	// Split by newlines to preserve paragraph breaks
 	paragraphs := strings.Split(text, "\n")
 
-	for i, para := range paragraphs {
-		if i > 0 {
-			result.WriteString("\n")
-		}
-
+	firstPara := true
+	for _, para := range paragraphs {
 		// Trim leading/trailing spaces from paragraph but preserve structure
 		para = strings.TrimSpace(para)
 		if para == "" {
 			continue
 		}
+
+		if !firstPara {
+			result.WriteString("\n")
+		}
+		firstPara = false
 
 		// Extract and preserve leading whitespace
 		leadingSpace := ""

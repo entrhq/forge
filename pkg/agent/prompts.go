@@ -2,6 +2,7 @@ package agent
 
 import (
 	"github.com/entrhq/forge/pkg/agent/prompts"
+	"github.com/entrhq/forge/pkg/config"
 	customtools "github.com/entrhq/forge/pkg/tools/custom"
 )
 
@@ -24,6 +25,12 @@ func (a *DefaultAgent) buildSystemPrompt() string {
 	customToolsList := a.getCustomToolsList()
 	if customToolsList != "" {
 		builder.WithCustomToolsList(customToolsList)
+	}
+
+	// Add browser automation guidance if sessions exist
+	browserGuidance := a.getBrowserGuidance()
+	if browserGuidance != "" {
+		builder.WithBrowserGuidance(browserGuidance)
 	}
 
 	return builder.Build()
@@ -61,4 +68,23 @@ func (a *DefaultAgent) getCustomToolsList() string {
 	}
 
 	return prompts.FormatCustomToolsList(metadataList)
+}
+
+// getBrowserGuidance returns browser automation guidance if browser tools are active
+func (a *DefaultAgent) getBrowserGuidance() string {
+	// Check if browser is enabled in config
+	if !config.IsInitialized() {
+		return ""
+	}
+	ui := config.GetUI()
+	if ui == nil || !ui.IsBrowserEnabled() {
+		return ""
+	}
+
+	// Get browser manager if available and check for active sessions
+	if a.browserManager == nil || !a.browserManager.HasSessions() {
+		return ""
+	}
+
+	return prompts.BrowserUsePrompt
 }

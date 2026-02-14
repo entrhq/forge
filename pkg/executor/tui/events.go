@@ -201,7 +201,6 @@ func (m *model) handleToolResult(event *pkgtypes.AgentEvent) {
 		// Command execution already handled by overlay system
 		// Don't display anything inline
 	}
-
 	m.content.WriteString("\n\n")
 }
 
