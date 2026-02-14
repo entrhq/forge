@@ -1,4 +1,4 @@
-.PHONY: test lint fmt clean examples run-example help install-tools tidy install uninstall build validate-workflows
+.PHONY: test test-verbose test-quiet test-coverage lint fmt clean examples run-example help install-tools tidy install uninstall build validate-workflows
 
 # Go parameters
 GOCMD=go
@@ -18,9 +18,24 @@ help: ## Display this help screen
 
 test: ## Run tests with coverage
 	@echo "Running tests..."
+	$(GOTEST) -race -timeout=5m -coverprofile=coverage.out -covermode=atomic ./...
+	@echo ""
+	@echo "Total coverage:"
+	@$(GOCMD) tool cover -func=coverage.out | tail -n 1
+
+test-verbose: ## Run tests with verbose output
+	@echo "Running tests (verbose)..."
 	$(GOTEST) -v -race -timeout=5m -coverprofile=coverage.out -covermode=atomic ./...
-	@echo "\nCoverage report:"
-	$(GOCMD) tool cover -func=coverage.out
+	@echo ""
+	@echo "Coverage report:"
+	@$(GOCMD) tool cover -func=coverage.out
+
+test-quiet: ## Run tests with minimal output (agent-friendly)
+	@echo "Running tests (quiet mode)..."
+	@$(GOTEST) -race -timeout=5m -coverprofile=coverage.out -covermode=atomic ./... 2>&1 | \
+		grep -E '(PASS|FAIL|coverage:|^ok|^FAIL)' || true
+	@echo ""
+	@$(GOCMD) tool cover -func=coverage.out | tail -n 1
 
 test-coverage: test ## Run tests and generate HTML coverage report
 	$(GOCMD) tool cover -html=coverage.out -o coverage.html

@@ -8,7 +8,9 @@ Forge is an open-source AI coding agent framework in Go with LLM provider abstra
 
 ```bash
 # Development
-make test            # Run tests with coverage
+make test            # Run tests with total coverage summary (agent-friendly)
+make test-verbose    # Run tests with full per-function coverage
+make test-quiet      # Run tests with minimal output
 make lint            # Run golangci-lint
 make fmt             # Format code
 make all             # Run all checks
