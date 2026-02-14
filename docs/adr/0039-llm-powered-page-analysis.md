@@ -219,8 +219,21 @@ func NewAnalyzePageTool(manager *SessionManager, provider llm.Provider) *Analyze
 **Tool Parameters:**
 - `session` (required): Name of browser session to analyze
 - `selector` (optional): CSS selector to analyze specific element instead of full page
-- `max_content_length` (optional): Maximum content length to send to LLM (default: 8000 chars)
 - `focus` (optional): Analysis focus area: "navigation", "forms", "data", "general" (default: "general")
+
+**Usage Guidance:**
+
+Use `analyze_page` when:
+- First visiting a page to understand its structure, purpose, and available actions
+- Making navigation decisions (which link to click, where to go next)
+- Identifying actionable elements (forms, buttons, key links) and their purposes
+- Need a high-level summary to decide next steps
+
+Use `extract_content` when:
+- Need full page text for detailed reading or data extraction
+- Looking for specific information you know exists on the page
+- Require precise content for copy/paste or verification
+- Already understand page structure and need raw content
 
 **Analysis Prompt Template:**
 
@@ -250,9 +263,9 @@ Format your response as structured text, keeping it concise (under 500 words).
 **Execution Flow:**
 
 1. Validate parameters (session exists, valid focus option)
-2. Extract page content using existing `ExtractContent` method (markdown format, limited to max_content_length)
+2. Extract page content using existing `ExtractContent` method (markdown format)
 3. Build analysis prompt with extracted content
-4. Call `provider.Complete()` with analysis prompt
+4. Call `provider.Complete()` with analysis prompt (provider handles content length limits)
 5. Return structured analysis result
 6. Update session LastUsedAt timestamp
 
@@ -300,13 +313,12 @@ Navigation Options:
 **Error Handling:**
 - Handle extraction failures (delegate to ExtractContent error handling)
 - Handle LLM API failures (timeout, rate limit, invalid response)
-- Handle content too large (truncate with warning)
+- Handle content too large (provider will handle via context limits)
 - Clear error messages back to agent
 
 ### Configuration
 
 **Settings (optional, future enhancement):**
-- `browser_analysis_max_length`: Max content chars to analyze (default: 8000)
 - `browser_analysis_model`: Override model for analysis (default: use agent's model)
 - `browser_analysis_timeout`: Analysis timeout in seconds (default: 30)
 
