@@ -78,7 +78,6 @@ type DefaultAgent struct {
 
 	// Browser session management
 	browserManager *browser.SessionManager
-
 }
 
 // AgentOption is a function that configures an agent

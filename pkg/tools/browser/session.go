@@ -228,7 +228,7 @@ func (s *Session) extractHTML(opts ExtractOptions) (string, error) {
 
 	// Build the result with metadata
 	var result strings.Builder
-	
+
 	if cleaned.Title != "" {
 		result.WriteString(fmt.Sprintf("<!-- Title: %s -->\n", cleaned.Title))
 	}
@@ -249,7 +249,7 @@ func (s *Session) Click(opts ClickOptions) error {
 	s.UpdateLastUsed()
 
 	locator := s.Page.Locator(opts.Selector)
-	
+
 	playwrightOpts := playwright.LocatorClickOptions{}
 
 	if opts.Button != "" {
@@ -280,7 +280,7 @@ func (s *Session) Fill(opts FillOptions) error {
 	s.UpdateLastUsed()
 
 	locator := s.Page.Locator(opts.Selector)
-	
+
 	playwrightOpts := playwright.LocatorFillOptions{}
 
 	if opts.Timeout > 0 {
@@ -304,7 +304,7 @@ func (s *Session) Wait(opts WaitOptions) error {
 	}
 
 	locator := s.Page.Locator(opts.Selector)
-	
+
 	playwrightOpts := playwright.LocatorWaitForOptions{}
 
 	if opts.State != "" {

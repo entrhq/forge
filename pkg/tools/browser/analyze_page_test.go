@@ -118,7 +118,7 @@ func TestAnalyzePageTool_BuildPrompt(t *testing.T) {
 	title := "Test Page"
 
 	prompt := buildAnalysisPrompt(url, title, markdown, "")
-	
+
 	assert.Contains(t, prompt, url)
 	assert.Contains(t, prompt, title)
 	assert.Contains(t, prompt, markdown)

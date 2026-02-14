@@ -1,8 +1,8 @@
 package agent
 
 import (
-	"github.com/entrhq/forge/pkg/config"
 	"github.com/entrhq/forge/pkg/agent/prompts"
+	"github.com/entrhq/forge/pkg/config"
 	customtools "github.com/entrhq/forge/pkg/tools/custom"
 )
 

@@ -209,10 +209,10 @@ func shouldPreserveAttribute(tagName, attrName string) bool {
 
 	// Always preserve these attributes
 	globalAttrs := map[string]bool{
-		"id":    true,
-		"class": true,
-		"role":  true,
-		"aria-label": true,
+		"id":               true,
+		"class":            true,
+		"role":             true,
+		"aria-label":       true,
 		"aria-describedby": true,
 	}
 	if globalAttrs[attrName] {

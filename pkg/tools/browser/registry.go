@@ -86,5 +86,3 @@ func (r *ToolRegistry) GetBrowserGuidance() string {
 	// Return the browser guidance from static prompts package
 	return prompts.BrowserUsePrompt
 }
-
-

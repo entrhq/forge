@@ -159,6 +159,40 @@ func buildAnalysisPrompt(url, title, htmlContent, focus string) string {
 	return prompt.String()
 }
 
+// GeneratePreview implements the Previewable interface to show analyze page details before execution.
+func (t *AnalyzePageTool) GeneratePreview(ctx context.Context, argsXML []byte) (*tools.ToolPreview, error) {
+	var input analyzePageInput
+	if err := tools.UnmarshalXMLWithFallback(argsXML, &input); err != nil {
+		return nil, fmt.Errorf("failed to parse input: %w", err)
+	}
+
+	if input.Session == "" {
+		return nil, fmt.Errorf("session name is required")
+	}
+
+	description := fmt.Sprintf("This will analyze the current page in browser session '%s' using AI", input.Session)
+	if input.Focus != "" {
+		description += fmt.Sprintf(" with focus on: %s", input.Focus)
+	}
+
+	content := fmt.Sprintf("Session: %s\n\n", input.Session)
+	if input.Focus != "" {
+		content += fmt.Sprintf("Focus: %s\n\n", input.Focus)
+	}
+	content += "The AI will analyze the page structure, identify key elements, and suggest relevant actions."
+
+	return &tools.ToolPreview{
+		Type:        tools.PreviewTypeCommand,
+		Title:       "Analyze Page with AI",
+		Description: description,
+		Content:     content,
+		Metadata: map[string]interface{}{
+			"session": input.Session,
+			"focus":   input.Focus,
+		},
+	}, nil
+}
+
 // callLLMForAnalysis calls the LLM provider to analyze the page.
 func (t *AnalyzePageTool) callLLMForAnalysis(ctx context.Context, prompt string) (string, error) {
 	if t.provider == nil {
