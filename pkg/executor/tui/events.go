@@ -178,6 +178,7 @@ func (m *model) handleToolResult(event *pkgtypes.AgentEvent) {
 		// Display full result inline (loop-breaking tools)
 		formatted := formatEntry("    ✓ ", resultStr, toolResultStyle, m.width, false)
 		m.content.WriteString(formatted)
+		m.content.WriteString("\n\n")
 
 	case TierSummaryWithPreview:
 		// Display summary + preview lines
@@ -186,6 +187,7 @@ func (m *model) handleToolResult(event *pkgtypes.AgentEvent) {
 		displayText := summary + "\n" + preview
 		formatted := formatEntry("    ✓ ", displayText, toolResultStyle, m.width, false)
 		m.content.WriteString(formatted)
+		m.content.WriteString("\n\n")
 		// Cache the full result for viewing
 		m.resultCache.store(m.lastToolCallID, m.lastToolName, resultStr, summary)
 
@@ -194,15 +196,15 @@ func (m *model) handleToolResult(event *pkgtypes.AgentEvent) {
 		summary := m.resultSummarizer.GenerateSummary(m.lastToolName, resultStr)
 		formatted := formatEntry("    ✓ ", summary, toolResultStyle, m.width, false)
 		m.content.WriteString(formatted)
+		m.content.WriteString("\n\n")
 		// Cache the full result for viewing
 		m.resultCache.store(m.lastToolCallID, m.lastToolName, resultStr, summary)
 
 	case TierOverlayOnly:
 		// Command execution already handled by overlay system
 		// Don't display anything inline
+		// No spacing needed since nothing is displayed
 	}
-
-	m.content.WriteString("\n\n")
 }
 
 // Message event handlers

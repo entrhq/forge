@@ -187,6 +187,31 @@ The session is now active and browser tools are available. Use navigate, extract
 	)
 }
 
+// GeneratePreview generates a concise one-line preview of the start session operation.
+func (t *StartSessionTool) GeneratePreview(argsXML []byte) (string, error) {
+	input, err := t.parseInput(argsXML)
+	if err != nil {
+		return "", err
+	}
+
+	mode := "headed"
+	if input.Headless != nil && *input.Headless {
+		mode = "headless"
+	}
+
+	width := DefaultViewportWidth
+	if input.Width != nil {
+		width = *input.Width
+	}
+
+	height := DefaultViewportHeight
+	if input.Height != nil {
+		height = *input.Height
+	}
+
+	return fmt.Sprintf("Start browser session '%s' (%s, %dx%d)", input.Name, mode, width, height), nil
+}
+
 // IsLoopBreaking returns whether this tool breaks the agent loop.
 func (t *StartSessionTool) IsLoopBreaking() bool {
 	return false

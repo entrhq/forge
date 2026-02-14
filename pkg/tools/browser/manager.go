@@ -2,6 +2,7 @@ package browser
 
 import (
 	"fmt"
+	"io"
 	"sync"
 	"time"
 
@@ -39,13 +40,19 @@ func (m *SessionManager) Initialize() error {
 		return nil
 	}
 
-	// Install and run Playwright
-	err := playwright.Install()
+	// Install and run Playwright with verbose=false and discard output to avoid interfering with TUI
+	opts := &playwright.RunOptions{
+		Verbose: false,
+		Stdout:  io.Discard,
+		Stderr:  io.Discard,
+	}
+
+	err := playwright.Install(opts)
 	if err != nil {
 		return fmt.Errorf("failed to install playwright: %w", err)
 	}
 
-	pw, err := playwright.Run()
+	pw, err := playwright.Run(opts)
 	if err != nil {
 		return fmt.Errorf("failed to start playwright: %w", err)
 	}
