@@ -89,19 +89,9 @@ func (t *ListSessionsTool) Execute(ctx context.Context, argsXML []byte) (string,
 	return result.String(), nil, nil
 }
 
-// RequiresApproval returns whether this tool requires approval.
-func (t *ListSessionsTool) RequiresApproval() bool {
-	return false // Listing sessions doesn't require approval
-}
-
 // IsLoopBreaking returns whether this tool breaks the agent loop.
 func (t *ListSessionsTool) IsLoopBreaking() bool {
 	return false
-}
-
-// ApprovalMessage returns the message shown when requesting approval.
-func (t *ListSessionsTool) ApprovalMessage(params map[string]any) string {
-	return ""
 }
 
 // ShouldShow returns whether this tool should be visible.

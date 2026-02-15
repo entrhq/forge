@@ -22,11 +22,7 @@ func (m *mockConditionalTool) Execute(ctx context.Context, args []byte) (string,
 	return "", nil, nil
 }
 func (m *mockConditionalTool) IsLoopBreaking() bool { return false }
-func (m *mockConditionalTool) RequiresApproval(params map[string]any) bool {
-	return false
-}
-func (m *mockConditionalTool) ApprovalMessage(params map[string]any) string { return "" }
-func (m *mockConditionalTool) ShouldShow() bool                             { return m.shouldShow }
+func (m *mockConditionalTool) ShouldShow() bool     { return m.shouldShow }
 
 // mockRegularTool is a mock tool that does not implement ConditionallyVisible
 type mockRegularTool struct {
@@ -41,9 +37,7 @@ func (m *mockRegularTool) Schema() map[string]interface{} {
 func (m *mockRegularTool) Execute(ctx context.Context, args []byte) (string, map[string]interface{}, error) {
 	return "", nil, nil
 }
-func (m *mockRegularTool) IsLoopBreaking() bool                         { return false }
-func (m *mockRegularTool) RequiresApproval(params map[string]any) bool  { return false }
-func (m *mockRegularTool) ApprovalMessage(params map[string]any) string { return "" }
+func (m *mockRegularTool) IsLoopBreaking() bool { return false }
 
 func TestGetToolsList_ConditionalVisibility(t *testing.T) {
 	tests := []struct {
