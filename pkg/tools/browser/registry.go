@@ -48,6 +48,7 @@ func (r *ToolRegistry) RegisterTools() []tools.Tool {
 		NewFillTool(r.manager),
 		NewWaitTool(r.manager),
 		NewSearchTool(r.manager),
+		NewEvaluateTool(r.manager),
 	)
 
 	// AI-powered tools (only if LLM provider is available)
