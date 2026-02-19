@@ -22,6 +22,6 @@ type Strategy interface {
 	// Summarize performs the actual summarization operation.
 	// It receives a context (for cancellation), the conversation memory to summarize,
 	// and an LLM provider for generating summaries.
-	// Returns number of tokens saved and any error. The conversation is modified in place.
+	// Returns the number of messages (or groups) summarized and any error. The conversation is modified in place.
 	Summarize(ctx context.Context, conv *memory.ConversationMemory, llm llm.Provider) (int, error)
 }

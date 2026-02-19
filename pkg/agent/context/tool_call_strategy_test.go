@@ -283,26 +283,51 @@ func TestSummarize_ExcludesLoopBreakingTools(t *testing.T) {
 	assert.True(t, foundAskQuestion, "ask_question should still be in conversation")
 }
 
-// TestShouldRun_WithExcludedTools tests that ShouldRun works correctly with exclusions
-func TestShouldRun_WithExcludedTools(t *testing.T) {
+// TestSummarize_PreservesUserMessages verifies that user (human) messages in the
+// "old" portion of the conversation are never dropped during tool call summarization.
+// This is the core regression test for the user-message-loss bug.
+func TestSummarize_PreservesUserMessages(t *testing.T) {
 	strategy := NewToolCallSummarizationStrategy(5, 2, 20)
 	conv := memory.NewConversationMemory()
 
-	// Add only excluded tools (should not trigger summarization)
-	conv.Add(types.NewAssistantMessage(`<tool>{"tool_name": "ask_question", "arguments": {}}</tool>`))
-	conv.Add(types.NewToolMessage("User answered"))
-	conv.Add(types.NewAssistantMessage(`<tool>{"tool_name": "task_completion", "arguments": {}}</tool>`))
-	conv.Add(types.NewToolMessage("Task done"))
+	userMsg1 := "Please read the config file"
+	userMsg2 := "Now show me the tests"
 
-	// Add recent messages
+	// Interleave user messages with tool calls in the "old" window
+	conv.Add(types.NewUserMessage(userMsg1))
+	conv.Add(types.NewAssistantMessage(`<tool>{"tool_name": "read_file", "arguments": {}}</tool>`))
+	conv.Add(types.NewToolMessage("config file content"))
+	conv.Add(types.NewUserMessage(userMsg2))
+	conv.Add(types.NewAssistantMessage(`<tool>{"tool_name": "execute_command", "arguments": {}}</tool>`))
+	conv.Add(types.NewToolMessage("test output"))
+
+	// Add recent messages to push the above into "old" territory
 	for i := 0; i < 6; i++ {
-		conv.Add(types.NewUserMessage("Recent message"))
+		conv.Add(types.NewAssistantMessage("Working on it..."))
 	}
 
-	// Note: ShouldRun doesn't check exclusions (it just counts tool calls)
-	// This is expected behavior - exclusions happen during Summarize
-	shouldRun := strategy.ShouldRun(conv, 1000, 2000)
+	mockLLM := new(MockLLMProvider)
+	mockLLM.On("Complete", mock.Anything, mock.Anything).Return(
+		types.NewAssistantMessage("Summary of tool call"),
+		nil,
+	)
 
-	// Should run because there are enough old tool calls (even though they'll be excluded during grouping)
-	assert.True(t, shouldRun, "ShouldRun should trigger based on tool call count")
+	ctx := context.Background()
+	_, err := strategy.Summarize(ctx, conv, mockLLM)
+	assert.NoError(t, err)
+
+	messages := conv.GetAll()
+
+	foundUser1, foundUser2 := false, false
+	for _, msg := range messages {
+		if msg.Role == types.RoleUser && msg.Content == userMsg1 {
+			foundUser1 = true
+		}
+		if msg.Role == types.RoleUser && msg.Content == userMsg2 {
+			foundUser2 = true
+		}
+	}
+
+	assert.True(t, foundUser1, "First user message must be preserved after tool call summarization")
+	assert.True(t, foundUser2, "Second user message must be preserved after tool call summarization")
 }

@@ -61,68 +61,83 @@ func (s *ThresholdSummarizationStrategy) ShouldRun(conv *memory.ConversationMemo
 	return usagePercent >= s.thresholdPercent
 }
 
-// Summarize creates summaries for old messages to free up context space
+// Summarize creates summaries for old messages to free up context space.
+// It processes one contiguous block of assistant messages per iteration,
+// stopping at user-message boundaries so that each block is summarized
+// independently and inserted at the correct position in the conversation.
 func (s *ThresholdSummarizationStrategy) Summarize(ctx context.Context, conv *memory.ConversationMemory, llm llm.Provider) (int, error) {
-	messages := conv.GetAll()
-	if len(messages) == 0 {
-		return 0, nil
+	total := 0
+
+	for {
+		messages := conv.GetAll()
+		if len(messages) == 0 {
+			break
+		}
+
+		// Collect the next summarizable block (stops at user-message boundaries).
+		toSummarize := s.collectMessagesToSummarize(messages)
+		if len(toSummarize) == 0 {
+			break
+		}
+
+		// Generate a summary for this block.
+		summary, err := s.generateSummary(ctx, toSummarize, llm)
+		if err != nil {
+			return total, err
+		}
+
+		// Replace this block's messages with the summary, preserving everything else.
+		if err := s.replaceMessagesWithSummary(conv, messages, toSummarize, summary); err != nil {
+			return total, err
+		}
+
+		total += len(toSummarize)
 	}
 
-	// Collect messages to summarize
-	toSummarize := s.collectMessagesToSummarize(messages)
-	if len(toSummarize) == 0 {
-		return 0, nil
-	}
-
-	// Generate summary using LLM
-	summary, err := s.generateSummary(ctx, toSummarize, llm)
-	if err != nil {
-		return 0, err
-	}
-
-	// Replace summarized messages with the summary
-	if err := s.replaceMessagesWithSummary(conv, messages, toSummarize, summary); err != nil {
-		return 0, err
-	}
-
-	return len(toSummarize), nil
+	return total, nil
 }
 
-// collectMessagesToSummarize finds messages to summarize (oldest first, skip system message)
+// collectMessagesToSummarize returns a single contiguous block of assistant
+// messages to summarize, working from oldest to newest.
+//
+// User messages act as block boundaries: once we have started collecting
+// assistant messages, we stop at the next user message so that the summary
+// is placed correctly relative to the human turn that follows it.
+// User messages that appear before any assistant messages are skipped so we
+// can reach the first actual block.
 func (s *ThresholdSummarizationStrategy) collectMessagesToSummarize(messages []*types.Message) []*types.Message {
 	var toSummarize []*types.Message
 	startIdx := 0
 
-	// Skip system message if present
+	// Skip system message if present.
 	if len(messages) > 0 && messages[0].Role == types.RoleSystem {
 		startIdx = 1
 	}
 
-	// Collect messages to summarize, respecting the batch size
 	for i := startIdx; i < len(messages) && len(toSummarize) < s.messagesPerSummary; i++ {
 		msg := messages[i]
 
-		// Skip already summarized messages
-		if s.isSummarized(msg) {
-			continue
-		}
+		switch {
+		case msg.Role == types.RoleUser:
+			// A user message is a hard block boundary.
+			// If we have already collected assistant messages, stop here so the
+			// summary is inserted before this user turn, not after it.
+			if len(toSummarize) > 0 {
+				return toSummarize
+			}
+			// Nothing collected yet — skip this boundary and keep looking for
+			// the first assistant block.
 
-		// Only summarize user and assistant messages
-		if msg.Role == types.RoleUser || msg.Role == types.RoleAssistant {
+		case isSummarized(msg):
+			// Already summarized — skip but do NOT treat as a boundary, so we
+			// continue collecting from the same block.
+
+		case msg.Role == types.RoleAssistant:
 			toSummarize = append(toSummarize, msg)
 		}
 	}
 
 	return toSummarize
-}
-
-// isSummarized checks if a message has already been summarized
-func (s *ThresholdSummarizationStrategy) isSummarized(msg *types.Message) bool {
-	if msg.Metadata == nil {
-		return false
-	}
-	summarized, ok := msg.Metadata["summarized"].(bool)
-	return ok && summarized
 }
 
 // generateSummary calls the LLM to create a summary of the given messages
@@ -132,7 +147,16 @@ func (s *ThresholdSummarizationStrategy) generateSummary(ctx context.Context, to
 
 	// Create messages for LLM
 	llmMessages := []*types.Message{
-		types.NewSystemMessage("You are a helpful assistant that creates concise summaries of agent conversations. You are excellent at preserving important context."),
+		types.NewSystemMessage(
+			"You are writing episodic memory for an AI coding agent. " +
+				"Your output will be injected directly into the agent's context window as its own recalled experience. " +
+				"Write entirely in operational first-person: declarative statements of completed actions " +
+				"('I ran X, result was Y', 'I found Z at path P') — not reflective narrative ('I remember trying', 'I think I'). " +
+				"Uncertainty markers are forbidden: never write 'I think', 'I believe', 'I'm not sure'. " +
+				"Be dense, exact, and technical. " +
+				"Preserve every concrete artifact (file paths, function names, error strings, command output, line numbers). " +
+				"Omit XML markup, role labels, conversational filler, and hedging language.",
+		),
 		types.NewUserMessage(prompt),
 	}
 
@@ -142,8 +166,10 @@ func (s *ThresholdSummarizationStrategy) generateSummary(ctx context.Context, to
 		return nil, fmt.Errorf("failed to generate summary: %w", err)
 	}
 
-	// Create a single summarized message to replace the batch
-	summary := types.NewAssistantMessage(response.Content).
+	// Create a single summarized message to replace the batch.
+	// The [SUMMARIZED] prefix is an explicit epistemic marker so the agent
+	// knows this content is compressed recalled experience, not raw history.
+	summary := types.NewAssistantMessage(fmt.Sprintf("[SUMMARIZED] %s", response.Content)).
 		WithMetadata("summarized", true).
 		WithMetadata("summary_count", len(toSummarize)).
 		WithMetadata("summary_method", s.Name())
@@ -151,65 +177,88 @@ func (s *ThresholdSummarizationStrategy) generateSummary(ctx context.Context, to
 	return summary, nil
 }
 
-// replaceMessagesWithSummary removes summarized messages and inserts the summary
+// replaceMessagesWithSummary removes the specifically-summarized assistant messages
+// and inserts the summary at the position of the first one. All other messages
+// (including user messages interleaved between assistant messages) are preserved.
 func (s *ThresholdSummarizationStrategy) replaceMessagesWithSummary(conv *memory.ConversationMemory, messages []*types.Message, toSummarize []*types.Message, summary *types.Message) error {
-	// Find the index of the first message to summarize
-	firstIdx := s.findMessageIndex(messages, toSummarize[0])
-	if firstIdx == -1 {
+	if len(toSummarize) == 0 {
+		return nil
+	}
+
+	// Use pointer identity for membership checks — this is idiomatic Go and
+	// avoids false matches when messages share timestamps (e.g. in fast tests).
+	summarizedSet := make(map[*types.Message]bool, len(toSummarize))
+	for _, msg := range toSummarize {
+		summarizedSet[msg] = true
+	}
+
+	// Walk all messages: skip summarized ones, insert the summary once at the
+	// position of the first summarized message, keep everything else intact.
+	newMessages := make([]*types.Message, 0, len(messages)-len(toSummarize)+1)
+	summaryInserted := false
+	for _, msg := range messages {
+		if summarizedSet[msg] {
+			if !summaryInserted {
+				newMessages = append(newMessages, summary)
+				summaryInserted = true
+			}
+			// Drop this message — its content is captured in the summary.
+			continue
+		}
+		newMessages = append(newMessages, msg)
+	}
+
+	if !summaryInserted {
 		return fmt.Errorf("failed to find messages to remove")
 	}
 
-	// Build new message list
-	newMessages := s.buildNewMessageList(messages, firstIdx, len(toSummarize), summary)
-
-	// Clear and re-add all messages
+	// Clear and re-add all messages.
 	conv.Clear()
 	conv.AddMultiple(newMessages)
 
 	return nil
 }
 
-// findMessageIndex finds the index of a message by comparing timestamps
-func (s *ThresholdSummarizationStrategy) findMessageIndex(messages []*types.Message, target *types.Message) int {
-	for i, msg := range messages {
-		if msg.Timestamp.Equal(target.Timestamp) {
-			return i
-		}
-	}
-	return -1
-}
-
-// buildNewMessageList creates a new message list with the summary replacing the batch
-func (s *ThresholdSummarizationStrategy) buildNewMessageList(messages []*types.Message, firstIdx, replaceCount int, summary *types.Message) []*types.Message {
-	var newMessages []*types.Message
-
-	// Keep messages before the summarized range
-	newMessages = append(newMessages, messages[:firstIdx]...)
-
-	// Add the summary
-	newMessages = append(newMessages, summary)
-
-	// Keep messages after the summarized range
-	if firstIdx+replaceCount < len(messages) {
-		newMessages = append(newMessages, messages[firstIdx+replaceCount:]...)
-	}
-
-	return newMessages
-}
-
-// buildSummarizationPrompt creates a prompt for summarizing a batch of messages
+// buildSummarizationPrompt creates a structured prompt for summarizing a block of
+// agent messages. The output is consumed by another LLM agent (not a human), so
+// the instructions optimize for density, specificity, and decision traceability
+// over readability or narrative flow.
 func (s *ThresholdSummarizationStrategy) buildSummarizationPrompt(messages []*types.Message) string {
 	var b strings.Builder
 
-	b.WriteString("Please create a concise summary of the following conversation messages.\n")
-	b.WriteString("Preserve key information, decisions, and context. Be brief but comprehensive.\n\n")
-	b.WriteString("Messages to summarize:\n\n")
+	b.WriteString("The following messages are from your own recent past. " +
+		"Write a first-person summary as if you are the agent recalling your own actions. " +
+		"Use 'I' throughout — this is your episodic memory, not a report about someone else. " +
+		"Use exactly six sections:\n\n")
 
+	b.WriteString("## Milestones\n")
+	b.WriteString("Work I fully completed: files I created or edited, tests I passed, commands I ran successfully, features I shipped.\n\n")
+
+	b.WriteString("## Key Decisions\n")
+	b.WriteString("What I chose and WHY — not just 'I used X' but 'I used X because Y'. Include algorithm choices, architecture choices, and trade-offs I accepted.\n\n")
+
+	b.WriteString("## Findings\n")
+	b.WriteString("Important discoveries I made: bugs I identified, constraints I uncovered, API behaviors I confirmed, patterns I observed.\n\n")
+
+	b.WriteString("## Dead Ends\n")
+	b.WriteString("Approaches I tried and abandoned. Write as personal lessons — 'I tried X — abandoned because Y' — so I will not re-attempt these paths.\n\n")
+
+	b.WriteString("## Current State\n")
+	b.WriteString("Precise description of where things stand: what I have in progress, what is partially complete, what is broken.\n\n")
+
+	b.WriteString("## Open Items\n")
+	b.WriteString("Unresolved questions, active blockers, and my confirmed next steps.\n\n")
+
+	b.WriteString("---\n\n")
+	b.WriteString("MUST PRESERVE (never omit or paraphrase): file paths, function names, variable names, error messages, test names.\n")
+	b.WriteString("MUST NOT INCLUDE: conversational filler, re-statements of the obvious, hedging language, offers of help, apologies.\n")
+	b.WriteString("MUST USE: first-person voice throughout ('I tried', 'I found', 'I abandoned') — never 'the agent'.\n")
+	b.WriteString("FOR LONG TOOL OUTPUTS: abridge intelligently — extract the essential signal (key errors, relevant values, test names) rather than quoting verbatim. The goal is density, not completeness.\n\n")
+
+	b.WriteString("Messages to summarize:\n\n")
 	for i, msg := range messages {
 		b.WriteString(fmt.Sprintf("%d. %s: %s\n\n", i+1, msg.Role, msg.Content))
 	}
-
-	b.WriteString("Please provide a concise summary:")
 
 	return b.String()
 }

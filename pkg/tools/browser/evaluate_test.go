@@ -43,8 +43,6 @@ func TestEvaluateTool_Schema(t *testing.T) {
 	assert.Contains(t, required, "code")
 }
 
-
-
 func TestEvaluateTool_Execute_ValidationErrors(t *testing.T) {
 	manager := NewSessionManager()
 	tool := NewEvaluateTool(manager)
