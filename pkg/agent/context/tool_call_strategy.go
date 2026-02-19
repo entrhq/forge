@@ -162,174 +162,190 @@ func (s *ToolCallSummarizationStrategy) Summarize(ctx context.Context, conv *mem
 		return 0, nil // Nothing to summarize
 	}
 
-	// Summarize groups in parallel with progress tracking
-	summarizedMessages, err := s.summarizeGroupsParallel(ctx, groups, llm)
+	// Summarize all groups in a single batched LLM call, anchored to the
+	// user's original goal so the summarizer can reason about strategy.
+	summarizedMessages, err := s.summarizeBatch(ctx, groups, llm, findNearestUserGoal(oldMessages))
 	if err != nil {
 		return 0, err
 	}
 
-	// Reconstruct conversation with summarized messages
-	// Keep system messages and excluded tool messages, add summarized messages, then add recent messages
-	newMessages := make([]*types.Message, 0)
+	// Reconstruct: retained system/user/excluded messages + summaries + recent messages
+	retained := retainNonSummarizedMessages(oldMessages, s.excludedTools)
+	retained = append(retained, summarizedMessages...)
+	retained = append(retained, recentMessages...)
 
-	// Keep system messages and excluded tool call sequences from old messages
+	conv.Clear()
+	for _, msg := range retained {
+		conv.Add(msg)
+	}
+
+	return len(groups), nil
+}
+
+// findNearestUserGoal scans messages in reverse and returns the content of the
+// most recent user message. This anchors the batch summarizer to the user's
+// original request so it can reason about strategy relative to what was asked.
+func findNearestUserGoal(messages []*types.Message) string {
+	for i := len(messages) - 1; i >= 0; i-- {
+		if messages[i].Role == types.RoleUser {
+			return messages[i].Content
+		}
+	}
+	return ""
+}
+
+// retainNonSummarizedMessages returns the subset of oldMessages that must be
+// preserved verbatim: system messages, user messages, and complete excluded-tool
+// call sequences. Summarizable assistant/tool message pairs are dropped here
+// because they will be replaced by the batch summary.
+func retainNonSummarizedMessages(oldMessages []*types.Message, excludedTools map[string]bool) []*types.Message {
+	retained := make([]*types.Message, 0)
 	inExcludedGroup := false
-	excludedGroupMessages := make([]*types.Message, 0)
+	excludedBuf := make([]*types.Message, 0)
 
 	for _, msg := range oldMessages {
-		// Always keep system messages
-		if msg.Role == types.RoleSystem {
-			newMessages = append(newMessages, msg)
-			continue
-		}
+		switch {
+		case msg.Role == types.RoleSystem:
+			retained = append(retained, msg)
 
-		// Check if this starts an excluded tool group
-		if msg.Role == types.RoleAssistant && containsToolCallIndicators(msg.Content) {
+		case msg.Role == types.RoleUser:
+			// Human input must never be lost during summarization
+			retained = append(retained, msg)
+
+		case msg.Role == types.RoleAssistant && containsToolCallIndicators(msg.Content):
 			toolName := extractToolName(msg.Content)
-			if toolName != "" && s.excludedTools[toolName] {
+			if toolName != "" && excludedTools[toolName] {
 				inExcludedGroup = true
-				excludedGroupMessages = append(excludedGroupMessages, msg)
-				continue
+				excludedBuf = append(excludedBuf, msg)
 			}
-		}
 
-		// If we're in an excluded group, collect messages until we hit the tool result
-		if inExcludedGroup {
-			excludedGroupMessages = append(excludedGroupMessages, msg)
+		case inExcludedGroup:
+			excludedBuf = append(excludedBuf, msg)
 			if msg.Role == types.RoleTool {
-				// End of excluded group - add all messages
-				newMessages = append(newMessages, excludedGroupMessages...)
-				excludedGroupMessages = make([]*types.Message, 0)
+				retained = append(retained, excludedBuf...)
+				excludedBuf = make([]*types.Message, 0)
 				inExcludedGroup = false
 			}
 		}
 	}
 
-	// Add any remaining excluded group messages
-	if len(excludedGroupMessages) > 0 {
-		newMessages = append(newMessages, excludedGroupMessages...)
+	// Flush any incomplete excluded group
+	if len(excludedBuf) > 0 {
+		retained = append(retained, excludedBuf...)
 	}
 
-	// Add summarized messages
-	newMessages = append(newMessages, summarizedMessages...)
-
-	// Add recent messages unchanged
-	newMessages = append(newMessages, recentMessages...)
-
-	// Replace conversation messages
-	conv.Clear()
-	for _, msg := range newMessages {
-		conv.Add(msg)
-	}
-
-	// Return the number of groups processed (items summarized)
-	return len(groups), nil
+	return retained
 }
 
-// summarizeGroup creates a concise summary of a tool call and its result using the LLM.
-func (s *ToolCallSummarizationStrategy) summarizeGroup(ctx context.Context, group []*types.Message, llm llm.Provider) (*types.Message, error) {
-	// Build context for summarization
-	var builder strings.Builder
-	for _, msg := range group {
-		builder.WriteString(fmt.Sprintf("[%s]: %s\n\n", msg.Role, msg.Content))
-	}
-
-	// Create summarization prompt
-	prompt := fmt.Sprintf(`You are summarizing an old tool call and its result to compress context. Provide a concise 2-3 sentence summary that captures:
-
-1. What tool was called and why
-2. Key input parameters or actions
-3. Result summary (success/failure, key outcomes)
-
-Original messages:
-%s
-
-Provide only the summary, no additional commentary:`, builder.String())
-
-	// Call LLM for summarization
-	messages := []*types.Message{
-		types.NewSystemMessage("You are a helpful assistant that summarizes tool calls concisely."),
-		types.NewUserMessage(prompt),
-	}
-
-	response, err := llm.Complete(ctx, messages)
-	if err != nil {
-		return nil, fmt.Errorf("LLM summarization failed: %w", err)
-	}
-
-	// Create summarized message
-	summary := types.NewAssistantMessage(fmt.Sprintf("[SUMMARIZED] %s", response.Content))
-	summary.WithMetadata("summarized", true)
-	summary.WithMetadata("original_message_count", len(group))
-
-	return summary, nil
-}
-
-// summarizeGroupsParallel processes multiple tool call groups concurrently,
-// emitting progress events as each group completes.
-func (s *ToolCallSummarizationStrategy) summarizeGroupsParallel(ctx context.Context, groups [][]*types.Message, llm llm.Provider) ([]*types.Message, error) {
-	numGroups := len(groups)
-	if numGroups == 0 {
+// summarizeBatch compresses all eligible tool call groups into a single LLM call,
+// producing one structured operation-batch summary message. Batching rather than
+// per-call summarization provides two benefits:
+//  1. N→1 LLM API calls, regardless of how many tool groups are present.
+//  2. The summarizer sees the full operation sequence and can infer the connecting
+//     intent across calls — something per-call summarization cannot do.
+//
+// The output is consumed by another AI agent (not a human), so the prompt optimizes
+// for density, exact artifact preservation, and cross-operation context.
+// userGoal is the nearest preceding user message to the batch. When provided it
+// anchors the summary to what was actually asked for, enabling strategy-aware
+// summarization: what was tried, what failed, and what ultimately worked.
+func (s *ToolCallSummarizationStrategy) summarizeBatch(ctx context.Context, groups [][]*types.Message, provider llm.Provider, userGoal string) ([]*types.Message, error) {
+	if len(groups) == 0 {
 		return nil, nil
 	}
 
-	// Create channels for results and errors
-	type result struct {
-		index       int
-		message     *types.Message
-		tokensSaved int
-		err         error
-	}
-	resultChan := make(chan result, numGroups)
-
-	// Process each group in a separate goroutine
+	// Build the raw message block for all groups, numbered for traceability
+	var rawMessages strings.Builder
+	totalOriginalChars := 0
 	for i, group := range groups {
-		go func(idx int, grp []*types.Message) {
-			summary, err := s.summarizeGroup(ctx, grp, llm)
-
-			// Calculate tokens saved for this group (approximate)
-			tokensSaved := 0
-			if summary != nil {
-				// Rough estimate: original group size minus summary size
-				for _, msg := range grp {
-					tokensSaved += len(msg.Content) / 4 // Approximate tokens
-				}
-				tokensSaved -= len(summary.Content) / 4
-			}
-
-			resultChan <- result{index: idx, message: summary, tokensSaved: tokensSaved, err: err}
-
-			// Emit progress event if event channel is available
-			if s.eventChannel != nil {
-				s.eventChannel <- types.NewContextSummarizationProgressEvent(
-					s.Name(),
-					idx+1,
-					numGroups,
-					tokensSaved,
-				)
-			}
-		}(i, group)
-	}
-
-	// Collect results maintaining original order
-	results := make([]*types.Message, numGroups)
-	var firstError error
-
-	for range numGroups {
-		res := <-resultChan
-		if res.err != nil && firstError == nil {
-			firstError = res.err
-		}
-		if res.message != nil {
-			results[res.index] = res.message
+		rawMessages.WriteString(fmt.Sprintf("--- Operation %d ---\n", i+1))
+		for _, msg := range group {
+			rawMessages.WriteString(fmt.Sprintf("[%s]: %s\n\n", msg.Role, msg.Content))
+			totalOriginalChars += len(msg.Content)
 		}
 	}
 
-	if firstError != nil {
-		return nil, fmt.Errorf("failed to summarize tool call group: %w", firstError)
+	// Build structured batch prompt
+	var prompt strings.Builder
+
+	// Prepend the user's original goal when available so the summarizer can
+	// evaluate strategy success relative to what was actually requested.
+	if userGoal != "" {
+		prompt.WriteString("## User Goal\n")
+		prompt.WriteString(userGoal)
+		prompt.WriteString("\n\n---\n\n")
 	}
 
-	return results, nil
+	fmt.Fprintf(&prompt, "The following %d tool call(s) were made by an AI coding agent in response to the goal above. "+
+		"Summarize them as a single strategy-aware operation record using exactly this structure:\n\n", len(groups))
+
+	prompt.WriteString("## Strategy\n")
+	prompt.WriteString("One sentence: the approach the agent took to address the goal.\n\n")
+
+	prompt.WriteString("## Operations\n")
+	prompt.WriteString("One line per tool call:\n")
+	prompt.WriteString("- **<tool_name>** | Inputs: <key params with exact values> | Outcome: <success/failure + key result data>\n\n")
+
+	prompt.WriteString("## Discoveries\n")
+	prompt.WriteString("Facts confirmed or found: file contents, API behavior, test results, existing code structure. Use exact values.\n\n")
+
+	prompt.WriteString("## Dead Ends\n")
+	prompt.WriteString("Approaches tried and abandoned. For each: what was attempted, why it failed or was rejected. " +
+		"This section is critical — the agent must not re-attempt these paths.\n\n")
+
+	prompt.WriteString("## What Worked\n")
+	prompt.WriteString("The successful approach or solution, with enough detail that the agent can build on it.\n\n")
+
+	prompt.WriteString("## Critical Artifacts\n")
+	prompt.WriteString("Exact file paths, function names, error strings, command outputs, line numbers, test names — " +
+		"any concrete artifact the agent will need to reference. One item per line.\n\n")
+
+	prompt.WriteString("## Status\n")
+	prompt.WriteString("One of: COMPLETE | PARTIAL | BLOCKED — followed by one sentence on current state.\n\n")
+
+	prompt.WriteString("---\n\n")
+	prompt.WriteString("MUST PRESERVE: exact tool names, file paths, function names, error messages, command strings, line numbers, test names.\n")
+	prompt.WriteString("MUST NOT INCLUDE: XML markup, role labels, conversational filler, hedging language, obvious re-statements.\n")
+	prompt.WriteString("Omit any section that has nothing meaningful to say (e.g. Dead Ends if no approach was abandoned).\n\n")
+	prompt.WriteString("Tool calls to summarize:\n\n")
+	prompt.WriteString(rawMessages.String())
+
+	// Single LLM call covering all groups
+	messages := []*types.Message{
+		types.NewSystemMessage(
+			"You are a technical memory encoder for an AI coding agent. " +
+				"Your output replaces a sequence of raw tool call messages in the agent's context window. " +
+				"The agent must be able to continue its work seamlessly by reading your summary alone — write for an AI consumer, not a human reader. " +
+				"Be dense, exact, and technical. " +
+				"Preserve every concrete artifact (tool names, file paths, error strings, command output, line numbers). " +
+				"Omit XML markup, role labels, conversational filler, and hedging language.",
+		),
+		types.NewUserMessage(prompt.String()),
+	}
+
+	response, err := provider.Complete(ctx, messages)
+	if err != nil {
+		return nil, fmt.Errorf("LLM batch summarization failed: %w", err)
+	}
+
+	// Emit a single progress event for the completed batch
+	tokensSaved := totalOriginalChars/4 - len(response.Content)/4
+	if s.eventChannel != nil {
+		s.eventChannel <- types.NewContextSummarizationProgressEvent(
+			s.Name(),
+			len(groups),
+			len(groups),
+			tokensSaved,
+		)
+	}
+
+	// Return as a single summarized message covering all groups
+	summary := types.NewAssistantMessage(fmt.Sprintf("[SUMMARIZED] %s", response.Content))
+	summary.WithMetadata("summarized", true)
+	summary.WithMetadata("original_message_count", len(groups))
+	summary.WithMetadata("original_group_count", len(groups))
+
+	return []*types.Message{summary}, nil
 }
 
 // Helper functions
