@@ -99,8 +99,10 @@ func (s *ToolCallSummarizationStrategy) ShouldRun(conv *memory.ConversationMemor
 	// Identify old messages that can enter the buffer
 	oldMessages := messages[:totalMessages-s.messagesOldThreshold]
 
-	// Count unsummarized, non-excluded tool call pairs in the buffer
-	// and track the oldest qualifying position.
+	// Count unsummarized, non-excluded tool calls in the buffer by inspecting
+	// only the assistant tool-call messages. Each such message represents one
+	// complete call+result pair, so counting only once here avoids double-counting
+	// that would occur if the paired RoleTool result were also incremented.
 	bufferCount := 0
 	oldestToolCallPosition := -1
 	skipNextToolResult := false
@@ -119,6 +121,7 @@ func (s *ToolCallSummarizationStrategy) ShouldRun(conv *memory.ConversationMemor
 				continue
 			}
 			skipNextToolResult = false
+			// Count this assistant tool-call message as one complete pair.
 			bufferCount++
 			if oldestToolCallPosition == -1 {
 				oldestToolCallPosition = i
@@ -128,12 +131,9 @@ func (s *ToolCallSummarizationStrategy) ShouldRun(conv *memory.ConversationMemor
 			if skipNextToolResult {
 				// This is the result of an excluded tool call — skip it.
 				skipNextToolResult = false
-				continue
 			}
-			bufferCount++
-			if oldestToolCallPosition == -1 {
-				oldestToolCallPosition = i
-			}
+			// Tool result messages are not counted; the paired assistant message
+			// already represents this call+result pair in bufferCount.
 		}
 	}
 
@@ -185,8 +185,10 @@ func (s *ToolCallSummarizationStrategy) Summarize(ctx context.Context, conv *mem
 		return 0, err
 	}
 
-	// Reconstruct: retained system/user/excluded messages + summaries + recent messages
-	retained := retainNonSummarizedMessages(oldMessages, s.excludedTools)
+	// Reconstruct: all non-summarized old messages + summaries + recent messages.
+	// Pass groups so retainNonSummarizedMessages can build a pointer-set of the
+	// messages being replaced, rather than filtering by role/tool markers.
+	retained := retainNonSummarizedMessages(oldMessages, groups)
 	retained = append(retained, summarizedMessages...)
 	retained = append(retained, recentMessages...)
 
@@ -210,46 +212,25 @@ func findNearestUserGoal(messages []*types.Message) string {
 	return ""
 }
 
-// retainNonSummarizedMessages returns the subset of oldMessages that must be
-// preserved verbatim: system messages, user messages, and complete excluded-tool
-// call sequences. Summarizable assistant/tool message pairs are dropped here
-// because they will be replaced by the batch summary.
-func retainNonSummarizedMessages(oldMessages []*types.Message, excludedTools map[string]bool) []*types.Message {
-	retained := make([]*types.Message, 0)
-	inExcludedGroup := false
-	excludedBuf := make([]*types.Message, 0)
-
-	for _, msg := range oldMessages {
-		switch {
-		case msg.Role == types.RoleSystem:
-			retained = append(retained, msg)
-
-		case msg.Role == types.RoleUser:
-			// Human input must never be lost during summarization
-			retained = append(retained, msg)
-
-		case msg.Role == types.RoleAssistant && containsToolCallIndicators(msg.Content):
-			toolName := extractToolName(msg.Content)
-			if toolName != "" && excludedTools[toolName] {
-				inExcludedGroup = true
-				excludedBuf = append(excludedBuf, msg)
-			}
-
-		case inExcludedGroup:
-			excludedBuf = append(excludedBuf, msg)
-			if msg.Role == types.RoleTool {
-				retained = append(retained, excludedBuf...)
-				excludedBuf = make([]*types.Message, 0)
-				inExcludedGroup = false
-			}
+// retainNonSummarizedMessages returns every message from oldMessages that is NOT
+// part of any summarized group. It uses pointer identity to identify which
+// messages are being replaced, so non-tool assistant messages (reasoning turns,
+// narrative responses) are preserved rather than silently dropped.
+func retainNonSummarizedMessages(oldMessages []*types.Message, groups [][]*types.Message) []*types.Message {
+	// Build a set of message pointers that will be replaced by the batch summary.
+	summarizedSet := make(map[*types.Message]bool, len(groups)*2)
+	for _, group := range groups {
+		for _, msg := range group {
+			summarizedSet[msg] = true
 		}
 	}
 
-	// Flush any incomplete excluded group
-	if len(excludedBuf) > 0 {
-		retained = append(retained, excludedBuf...)
+	retained := make([]*types.Message, 0, len(oldMessages))
+	for _, msg := range oldMessages {
+		if !summarizedSet[msg] {
+			retained = append(retained, msg)
+		}
 	}
-
 	return retained
 }
 
@@ -371,15 +352,6 @@ func (s *ToolCallSummarizationStrategy) summarizeBatch(ctx context.Context, grou
 }
 
 // Helper functions
-
-// isSummarized checks if a message has already been summarized.
-func isSummarized(msg *types.Message) bool {
-	if msg.Metadata == nil {
-		return false
-	}
-	summarized, ok := msg.Metadata["summarized"].(bool)
-	return ok && summarized
-}
 
 // containsToolCallIndicators checks if the message content contains tool call XML tags.
 func containsToolCallIndicators(content string) bool {

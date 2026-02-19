@@ -331,4 +331,3 @@ func TestSummarize_PreservesUserMessages(t *testing.T) {
 	assert.True(t, foundUser1, "First user message must be preserved after tool call summarization")
 	assert.True(t, foundUser2, "Second user message must be preserved after tool call summarization")
 }
-
