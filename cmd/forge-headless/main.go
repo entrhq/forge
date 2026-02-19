@@ -38,6 +38,11 @@ const (
 	defaultMinToolCalls     = 10     // Minimum 10 tool calls in buffer before summarizing
 	defaultMaxToolCallDist  = 40     // Force summarization if any tool call is 40+ messages old
 	defaultSummaryBatchSize = 10     // Summarize 10 messages at a time
+
+	// Goal-batch compaction defaults (strategy 3: compact old completed turns into goal-batch blocks)
+	defaultGoalBatchTurnsOld = 20 // Turns must be 20+ messages old to be eligible for compaction
+	defaultGoalBatchMinTurns = 3  // Minimum 3 complete turns before triggering compaction
+	defaultGoalBatchMaxTurns = 6  // Compact at most 6 turns per LLM call
 )
 
 // CLIConfig holds command-line configuration
@@ -191,11 +196,18 @@ func run(ctx context.Context, cliConfig *CLIConfig) error {
 		defaultSummaryBatchSize,
 	)
 
+	goalBatchStrategy := agentcontext.NewGoalBatchCompactionStrategy(
+		defaultGoalBatchTurnsOld,
+		defaultGoalBatchMinTurns,
+		defaultGoalBatchMaxTurns,
+	)
+
 	contextManager, err := agentcontext.NewManager(
 		provider,
 		defaultMaxTokens,
 		toolCallStrategy,
 		thresholdStrategy,
+		goalBatchStrategy,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create context manager: %w", err)

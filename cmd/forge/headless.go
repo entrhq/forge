@@ -68,11 +68,18 @@ func runHeadless(ctx context.Context, config *Config) error {
 		defaultSummaryBatchSize,
 	)
 
+	goalBatchStrategy := agentcontext.NewGoalBatchCompactionStrategy(
+		defaultGoalBatchTurnsOld,
+		defaultGoalBatchMinTurns,
+		defaultGoalBatchMaxTurns,
+	)
+
 	contextManager, err := agentcontext.NewManager(
 		provider,
 		defaultMaxTokens,
 		toolCallStrategy,
 		thresholdStrategy,
+		goalBatchStrategy,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create context manager: %w", err)
