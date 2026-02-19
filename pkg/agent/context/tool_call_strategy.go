@@ -99,9 +99,11 @@ func (s *ToolCallSummarizationStrategy) ShouldRun(conv *memory.ConversationMemor
 	// Identify old messages that can enter the buffer
 	oldMessages := messages[:totalMessages-s.messagesOldThreshold]
 
-	// Count unsummarized tool calls in buffer and track oldest position
+	// Count unsummarized, non-excluded tool call pairs in the buffer
+	// and track the oldest qualifying position.
 	bufferCount := 0
 	oldestToolCallPosition := -1
+	skipNextToolResult := false
 
 	for i, msg := range oldMessages {
 		// Skip if already summarized
@@ -109,11 +111,25 @@ func (s *ToolCallSummarizationStrategy) ShouldRun(conv *memory.ConversationMemor
 			continue
 		}
 
-		// Check if this is a tool-related message
-		isToolMessage := msg.Role == types.RoleTool ||
-			(msg.Role == types.RoleAssistant && containsToolCallIndicators(msg.Content))
+		switch {
+		case msg.Role == types.RoleAssistant && containsToolCallIndicators(msg.Content):
+			if isExcludedToolCall(msg, s.excludedTools) {
+				// Mark the paired tool result for skipping; don't count this pair.
+				skipNextToolResult = true
+				continue
+			}
+			skipNextToolResult = false
+			bufferCount++
+			if oldestToolCallPosition == -1 {
+				oldestToolCallPosition = i
+			}
 
-		if isToolMessage {
+		case msg.Role == types.RoleTool:
+			if skipNextToolResult {
+				// This is the result of an excluded tool call — skip it.
+				skipNextToolResult = false
+				continue
+			}
 			bufferCount++
 			if oldestToolCallPosition == -1 {
 				oldestToolCallPosition = i

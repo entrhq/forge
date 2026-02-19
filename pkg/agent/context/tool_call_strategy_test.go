@@ -332,26 +332,3 @@ func TestSummarize_PreservesUserMessages(t *testing.T) {
 	assert.True(t, foundUser2, "Second user message must be preserved after tool call summarization")
 }
 
-// TestShouldRun_WithExcludedTools tests that ShouldRun works correctly with exclusions
-func TestShouldRun_WithExcludedTools(t *testing.T) {
-	strategy := NewToolCallSummarizationStrategy(5, 2, 20)
-	conv := memory.NewConversationMemory()
-
-	// Add only excluded tools (should not trigger summarization)
-	conv.Add(types.NewAssistantMessage(`<tool>{"tool_name": "ask_question", "arguments": {}}</tool>`))
-	conv.Add(types.NewToolMessage("User answered"))
-	conv.Add(types.NewAssistantMessage(`<tool>{"tool_name": "task_completion", "arguments": {}}</tool>`))
-	conv.Add(types.NewToolMessage("Task done"))
-
-	// Add recent messages
-	for i := 0; i < 6; i++ {
-		conv.Add(types.NewUserMessage("Recent message"))
-	}
-
-	// Note: ShouldRun doesn't check exclusions (it just counts tool calls)
-	// This is expected behavior - exclusions happen during Summarize
-	shouldRun := strategy.ShouldRun(conv, 1000, 2000)
-
-	// Should run because there are enough old tool calls (even though they'll be excluded during grouping)
-	assert.True(t, shouldRun, "ShouldRun should trigger based on tool call count")
-}

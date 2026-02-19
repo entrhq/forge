@@ -128,7 +128,7 @@ func (s *ThresholdSummarizationStrategy) collectMessagesToSummarize(messages []*
 			// Nothing collected yet — skip this boundary and keep looking for
 			// the first assistant block.
 
-		case s.isSummarized(msg):
+		case isSummarized(msg):
 			// Already summarized — skip but do NOT treat as a boundary, so we
 			// continue collecting from the same block.
 
@@ -138,15 +138,6 @@ func (s *ThresholdSummarizationStrategy) collectMessagesToSummarize(messages []*
 	}
 
 	return toSummarize
-}
-
-// isSummarized checks if a message has already been summarized
-func (s *ThresholdSummarizationStrategy) isSummarized(msg *types.Message) bool {
-	if msg.Metadata == nil {
-		return false
-	}
-	summarized, ok := msg.Metadata["summarized"].(bool)
-	return ok && summarized
 }
 
 // generateSummary calls the LLM to create a summary of the given messages
