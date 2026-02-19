@@ -13,11 +13,11 @@ import (
 // TestNewThresholdSummarizationStrategy tests constructor clamping and defaults.
 func TestNewThresholdSummarizationStrategy(t *testing.T) {
 	tests := []struct {
-		name                    string
-		thresholdPercent        float64
-		messagesPerSummary      int
-		wantThresholdPercent    float64
-		wantMessagesPerSummary  int
+		name                   string
+		thresholdPercent       float64
+		messagesPerSummary     int
+		wantThresholdPercent   float64
+		wantMessagesPerSummary int
 	}{
 		{
 			name:                   "valid inputs",

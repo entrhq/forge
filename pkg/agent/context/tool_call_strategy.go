@@ -254,7 +254,7 @@ func (s *ToolCallSummarizationStrategy) summarizeBatch(ctx context.Context, grou
 		return nil, nil
 	}
 
-	// Build the raw message block for all groups, numbered for traceability
+	// Build the raw message block for all groups, numbered for traceability.
 	var rawMessages strings.Builder
 	totalOriginalChars := 0
 	for i, group := range groups {
@@ -276,29 +276,31 @@ func (s *ToolCallSummarizationStrategy) summarizeBatch(ctx context.Context, grou
 		prompt.WriteString("\n\n---\n\n")
 	}
 
-	fmt.Fprintf(&prompt, "The following %d tool call(s) were made by an AI coding agent in response to the goal above. "+
-		"Summarize them as a single strategy-aware operation record using exactly this structure:\n\n", len(groups))
+	fmt.Fprintf(&prompt, "The following %d tool call(s) are from your own recent past. "+
+		"Write a first-person summary as if you are the agent recalling your own actions. "+
+		"Use 'I' throughout — this is your episodic memory, not a report about someone else. "+
+		"Use exactly this structure:\n\n", len(groups))
 
 	prompt.WriteString("## Strategy\n")
-	prompt.WriteString("One sentence: the approach the agent took to address the goal.\n\n")
+	prompt.WriteString("One sentence: the approach I took to address the goal.\n\n")
 
 	prompt.WriteString("## Operations\n")
 	prompt.WriteString("One line per tool call:\n")
 	prompt.WriteString("- **<tool_name>** | Inputs: <key params with exact values> | Outcome: <success/failure + key result data>\n\n")
 
 	prompt.WriteString("## Discoveries\n")
-	prompt.WriteString("Facts confirmed or found: file contents, API behavior, test results, existing code structure. Use exact values.\n\n")
+	prompt.WriteString("Facts I confirmed or found: file contents, API behavior, test results, existing code structure. Use exact values.\n\n")
 
 	prompt.WriteString("## Dead Ends\n")
-	prompt.WriteString("Approaches tried and abandoned. For each: what was attempted, why it failed or was rejected. " +
-		"This section is critical — the agent must not re-attempt these paths.\n\n")
+	prompt.WriteString("Approaches I tried and abandoned. For each: what I attempted and why I abandoned it. " +
+		"Write as personal lessons — 'I tried X — abandoned because Y' — so I will not re-attempt these paths.\n\n")
 
 	prompt.WriteString("## What Worked\n")
-	prompt.WriteString("The successful approach or solution, with enough detail that the agent can build on it.\n\n")
+	prompt.WriteString("The approach I used that succeeded, with enough detail that I can build on it.\n\n")
 
 	prompt.WriteString("## Critical Artifacts\n")
 	prompt.WriteString("Exact file paths, function names, error strings, command outputs, line numbers, test names — " +
-		"any concrete artifact the agent will need to reference. One item per line.\n\n")
+		"any concrete artifact I will need to reference. One item per line.\n\n")
 
 	prompt.WriteString("## Status\n")
 	prompt.WriteString("One of: COMPLETE | PARTIAL | BLOCKED — followed by one sentence on current state.\n\n")
@@ -306,6 +308,8 @@ func (s *ToolCallSummarizationStrategy) summarizeBatch(ctx context.Context, grou
 	prompt.WriteString("---\n\n")
 	prompt.WriteString("MUST PRESERVE: exact tool names, file paths, function names, error messages, command strings, line numbers, test names.\n")
 	prompt.WriteString("MUST NOT INCLUDE: XML markup, role labels, conversational filler, hedging language, obvious re-statements.\n")
+	prompt.WriteString("MUST USE: first-person voice throughout ('I tried', 'I found', 'I abandoned') — never 'the agent'.\n")
+	prompt.WriteString("FOR LONG TOOL OUTPUTS: abridge intelligently — extract the essential signal (key errors, relevant values, test names) rather than quoting verbatim. The goal is density, not completeness.\n")
 	prompt.WriteString("Omit any section that has nothing meaningful to say (e.g. Dead Ends if no approach was abandoned).\n\n")
 	prompt.WriteString("Tool calls to summarize:\n\n")
 	prompt.WriteString(rawMessages.String())
@@ -313,9 +317,11 @@ func (s *ToolCallSummarizationStrategy) summarizeBatch(ctx context.Context, grou
 	// Single LLM call covering all groups
 	messages := []*types.Message{
 		types.NewSystemMessage(
-			"You are a technical memory encoder for an AI coding agent. " +
-				"Your output replaces a sequence of raw tool call messages in the agent's context window. " +
-				"The agent must be able to continue its work seamlessly by reading your summary alone — write for an AI consumer, not a human reader. " +
+			"You are writing episodic memory for an AI coding agent. " +
+				"Your output will be injected directly into the agent's context window as its own recalled experience. " +
+				"Write entirely in operational first-person: declarative statements of completed actions " +
+				"('I ran X, result was Y', 'I found Z at path P') — not reflective narrative ('I remember trying', 'I think I'). " +
+				"Uncertainty markers are forbidden: never write 'I think', 'I believe', 'I'm not sure'. " +
 				"Be dense, exact, and technical. " +
 				"Preserve every concrete artifact (tool names, file paths, error strings, command output, line numbers). " +
 				"Omit XML markup, role labels, conversational filler, and hedging language.",

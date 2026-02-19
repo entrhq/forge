@@ -157,10 +157,14 @@ func (s *ThresholdSummarizationStrategy) generateSummary(ctx context.Context, to
 	// Create messages for LLM
 	llmMessages := []*types.Message{
 		types.NewSystemMessage(
-			"You are a technical memory encoder for an AI coding agent. " +
-				"Your summaries replace a section of that agent's conversation history. " +
-				"The agent must be able to continue its work seamlessly by reading your summary alone — " +
-				"write for an AI consumer, not a human reader. Be dense, specific, and technical.",
+			"You are writing episodic memory for an AI coding agent. " +
+				"Your output will be injected directly into the agent's context window as its own recalled experience. " +
+				"Write entirely in operational first-person: declarative statements of completed actions " +
+				"('I ran X, result was Y', 'I found Z at path P') — not reflective narrative ('I remember trying', 'I think I'). " +
+				"Uncertainty markers are forbidden: never write 'I think', 'I believe', 'I'm not sure'. " +
+				"Be dense, exact, and technical. " +
+				"Preserve every concrete artifact (file paths, function names, error strings, command output, line numbers). " +
+				"Omit XML markup, role labels, conversational filler, and hedging language.",
 		),
 		types.NewUserMessage(prompt),
 	}
@@ -171,8 +175,10 @@ func (s *ThresholdSummarizationStrategy) generateSummary(ctx context.Context, to
 		return nil, fmt.Errorf("failed to generate summary: %w", err)
 	}
 
-	// Create a single summarized message to replace the batch
-	summary := types.NewAssistantMessage(response.Content).
+	// Create a single summarized message to replace the batch.
+	// The [SUMMARIZED] prefix is an explicit epistemic marker so the agent
+	// knows this content is compressed recalled experience, not raw history.
+	summary := types.NewAssistantMessage(fmt.Sprintf("[SUMMARIZED] %s", response.Content)).
 		WithMetadata("summarized", true).
 		WithMetadata("summary_count", len(toSummarize)).
 		WithMetadata("summary_method", s.Name())
@@ -229,30 +235,34 @@ func (s *ThresholdSummarizationStrategy) replaceMessagesWithSummary(conv *memory
 func (s *ThresholdSummarizationStrategy) buildSummarizationPrompt(messages []*types.Message) string {
 	var b strings.Builder
 
-	b.WriteString("Summarize the following agent conversation block into exactly six sections.\n")
-	b.WriteString("Your output will be injected directly into an AI coding agent's context window.\n\n")
+	b.WriteString("The following messages are from your own recent past. " +
+		"Write a first-person summary as if you are the agent recalling your own actions. " +
+		"Use 'I' throughout — this is your episodic memory, not a report about someone else. " +
+		"Use exactly six sections:\n\n")
 
 	b.WriteString("## Milestones\n")
-	b.WriteString("Work that was fully completed: files created or edited, tests passed, commands run successfully, features shipped.\n\n")
+	b.WriteString("Work I fully completed: files I created or edited, tests I passed, commands I ran successfully, features I shipped.\n\n")
 
 	b.WriteString("## Key Decisions\n")
-	b.WriteString("What was chosen and WHY — not just 'used X' but 'used X because Y'. Include algorithm choices, architecture choices, and any trade-offs accepted.\n\n")
+	b.WriteString("What I chose and WHY — not just 'I used X' but 'I used X because Y'. Include algorithm choices, architecture choices, and trade-offs I accepted.\n\n")
 
 	b.WriteString("## Findings\n")
-	b.WriteString("Important discoveries: bugs identified, constraints uncovered, API behaviors confirmed, patterns observed.\n\n")
+	b.WriteString("Important discoveries I made: bugs I identified, constraints I uncovered, API behaviors I confirmed, patterns I observed.\n\n")
 
-	b.WriteString("## Attempted & Abandoned\n")
-	b.WriteString("Approaches that were tried and discarded, and the exact reason each was abandoned. This section prevents the agent from re-investigating known dead ends.\n\n")
+	b.WriteString("## Dead Ends\n")
+	b.WriteString("Approaches I tried and abandoned. Write as personal lessons — 'I tried X — abandoned because Y' — so I will not re-attempt these paths.\n\n")
 
 	b.WriteString("## Current State\n")
-	b.WriteString("Precise description of where things stand right now: what is in progress, what is partially complete, what is broken.\n\n")
+	b.WriteString("Precise description of where things stand: what I have in progress, what is partially complete, what is broken.\n\n")
 
 	b.WriteString("## Open Items\n")
-	b.WriteString("Unresolved questions, active blockers, and confirmed next steps.\n\n")
+	b.WriteString("Unresolved questions, active blockers, and my confirmed next steps.\n\n")
 
 	b.WriteString("---\n\n")
 	b.WriteString("MUST PRESERVE (never omit or paraphrase): file paths, function names, variable names, error messages, test names.\n")
-	b.WriteString("MUST NOT INCLUDE: conversational filler, re-statements of the obvious, hedging language (\"it seems\", \"possibly\", \"I think\"), offers of help, apologies.\n\n")
+	b.WriteString("MUST NOT INCLUDE: conversational filler, re-statements of the obvious, hedging language, offers of help, apologies.\n")
+	b.WriteString("MUST USE: first-person voice throughout ('I tried', 'I found', 'I abandoned') — never 'the agent'.\n")
+	b.WriteString("FOR LONG TOOL OUTPUTS: abridge intelligently — extract the essential signal (key errors, relevant values, test names) rather than quoting verbatim. The goal is density, not completeness.\n\n")
 
 	b.WriteString("Messages to summarize:\n\n")
 	for i, msg := range messages {
