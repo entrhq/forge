@@ -215,7 +215,7 @@ Success - Never types -model flag again, changes take effect instantly
    - Help text: "The LLM model to use for code generation and chat. Changes apply immediately to the current session."
    - Examples: gpt-4o, gpt-4-turbo, claude-3-5-sonnet-20241022
    
-2. **Base URL** (string, optional)
+4. **Base URL** (string, optional)
    - Default: empty (uses OpenAI default)
    - Item type: `itemTypeText`
    - Validation: Valid URL format if provided, or empty

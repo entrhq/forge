@@ -300,6 +300,36 @@ provider := openai.NewProvider("gpt-3.5-turbo", apiKey)
 
 ---
 
+### Summarization and Browser Analysis Models
+
+In addition to the primary model, you can specify distinct models for summarization and browser analysis tasks. This is useful for cost optimization, as these tasks can often be handled by smaller, faster models.
+
+These settings are typically managed via the `config.yaml` file or the TUI settings (`/settings`).
+
+#### `summarization_model`
+- **Type**: `string`
+- **Default**: The primary `model`
+- **Description**: The model to use for all context summarization and compaction tasks. If not set, it defaults to the main agent model.
+- **Example**: `"anthropic/claude-haiku-3-5"`
+
+#### `browser_analysis_model`
+- **Type**: `string`
+- **Default**: The primary `model`
+- **Description**: The model used by the `browser/analyze_page` tool for web page analysis. If not set, it defaults to the main agent model.
+- **Example**: `"anthropic/claude-haiku-3-5"`
+
+**Example `config.yaml`:**
+```yaml
+llm:
+  model: "anthropic/claude-sonnet-4.5"
+  summarization_model: "anthropic/claude-haiku-3-5"
+  browser_analysis_model: "anthropic/claude-haiku-3-5"
+  base_url: "https://openrouter.ai/api/v1"
+  api_key: "sk-..."
+```
+
+---
+
 ## Memory Configuration
 
 ### ConversationMemory Options
