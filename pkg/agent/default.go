@@ -438,6 +438,28 @@ func (a *DefaultAgent) GetTools() []interface{} {
 	return toolsList
 }
 
+// GetMessages returns a snapshot of the current conversation history.
+// Messages are returned in conversation order. The returned slice is a copy —
+// callers may inspect but not modify the agent's message state.
+func (a *DefaultAgent) GetMessages() []*types.Message {
+	return a.memory.GetAll()
+}
+
+// GetSystemPrompt returns the current system prompt as it would be sent to the LLM.
+// It is synthesized fresh on every call (same as at the start of each agent turn).
+func (a *DefaultAgent) GetSystemPrompt() string {
+	a.toolsMu.RLock()
+	defer a.toolsMu.RUnlock()
+	return a.buildSystemPromptLocked()
+}
+
+// buildSystemPromptLocked is the internal version of buildSystemPrompt that assumes
+// the caller already holds toolsMu. It exists so GetSystemPrompt and GetContextInfo
+// can both use it without a double-lock.
+func (a *DefaultAgent) buildSystemPromptLocked() string {
+	return a.buildSystemPrompt()
+}
+
 // GetContextInfo returns detailed context information for debugging and display
 // classifyMessages partitions messages into raw, summary, and goal-batch buckets
 // and returns the number of user turns.

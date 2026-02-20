@@ -61,6 +61,16 @@ type Agent interface {
 	// This includes system prompt length, tool count, message history, and token usage.
 	GetContextInfo() *ContextInfo
 
+	// GetMessages returns a snapshot of the current conversation history in the order
+	// messages will be sent to the LLM. The returned slice is a copy — callers may
+	// inspect but not modify the agent's message state.
+	GetMessages() []*types.Message
+
+	// GetSystemPrompt returns the current system prompt exactly as it would be sent to
+	// the LLM on the next turn (including tool schemas, custom instructions, and
+	// repository context). This is synthesized on every call and is not cached.
+	GetSystemPrompt() string
+
 	// SetProvider updates the LLM provider used by the agent.
 	// This allows hot-reloading of provider configuration without restarting the agent.
 	// The update is thread-safe and will take effect on the next agent iteration.

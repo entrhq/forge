@@ -174,43 +174,62 @@ func TestBuildMessages(t *testing.T) {
 	})
 }
 
-func TestBuildMessagesForIteration(t *testing.T) {
+func TestNormalizeRoleForLLM(t *testing.T) {
+	t.Run("RoleToolRemappedToRoleUser", func(t *testing.T) {
+		original := types.NewToolMessage("Tool result content")
+		normalized := normalizeRoleForLLM(original)
+
+		if normalized.Role != types.RoleUser {
+			t.Errorf("expected RoleUser after normalization, got %s", normalized.Role)
+		}
+		if normalized.Content != original.Content {
+			t.Error("content must be preserved during normalization")
+		}
+		// Original must not be mutated — normalizeRoleForLLM must return a copy.
+		if original.Role != types.RoleTool {
+			t.Error("normalizeRoleForLLM must not mutate the original message")
+		}
+	})
+
+	t.Run("OtherRolesPassThrough", func(t *testing.T) {
+		msgs := []*types.Message{
+			types.NewUserMessage("user msg"),
+			types.NewAssistantMessage("assistant msg"),
+			types.NewSystemMessage("system msg"),
+		}
+		for _, msg := range msgs {
+			result := normalizeRoleForLLM(msg)
+			// Non-tool messages must be returned as-is (same pointer, no copy).
+			if result != msg {
+				t.Errorf("expected same pointer for role %s, got a copy", msg.Role)
+			}
+		}
+	})
+}
+
+func TestBuildMessages_ToolRoleRemapping(t *testing.T) {
+	// Tool results stored in memory as RoleTool must arrive at the LLM as RoleUser.
 	systemPrompt := "You are helpful"
 	history := []*types.Message{
-		types.NewUserMessage("Do something"),
-		types.NewAssistantMessage("Working on it..."),
+		types.NewUserMessage("Run the tests"),
+		types.NewAssistantMessage("<tool>...</tool>"),
+		types.NewToolMessage("Tool 'execute_command' result:\nok"),
 	}
 
-	toolResults := []ToolResult{
-		{
-			ToolName: "test_tool",
-			Result:   "Success!",
-			Error:    nil,
-		},
-	}
+	messages := BuildMessages(systemPrompt, history, "", "")
 
-	messages := BuildMessagesForIteration(systemPrompt, history, toolResults)
-
-	// Should have: system + 2 history + 1 tool result = 4 messages
+	// system + 3 history = 4 messages
 	if len(messages) != 4 {
-		t.Errorf("expected 4 messages, got %d", len(messages))
+		t.Fatalf("expected 4 messages, got %d", len(messages))
 	}
 
-	// First should be system
-	if messages[0].Role != types.RoleSystem {
-		t.Error("first message should be system")
+	// The tool result (index 3) must appear as RoleUser for XML-mode LLMs.
+	toolEntry := messages[3]
+	if toolEntry.Role != types.RoleUser {
+		t.Errorf("tool result must be remapped to RoleUser in LLM payload, got %s", toolEntry.Role)
 	}
-
-	// Last should be tool result as user message
-	if messages[len(messages)-1].Role != types.RoleUser {
-		t.Error("tool result should be presented as user message")
-	}
-
-	if !strings.Contains(messages[len(messages)-1].Content, "test_tool") {
-		t.Error("tool result should contain tool name")
-	}
-	if !strings.Contains(messages[len(messages)-1].Content, "Success!") {
-		t.Error("tool result should contain result text")
+	if toolEntry.Content != history[2].Content {
+		t.Error("tool result content must be preserved after role remapping")
 	}
 }
 

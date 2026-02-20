@@ -2,9 +2,13 @@ package tui
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/entrhq/forge/pkg/agent/git"
@@ -118,6 +122,15 @@ func init() {
 		Description: "View scratchpad notes",
 		Type:        CommandTypeTUI,
 		Handler:     handleNotesCommand,
+		MinArgs:     0,
+		MaxArgs:     0,
+	})
+
+	registerCommand(&SlashCommand{
+		Name:        "snapshot",
+		Description: "Export full context snapshot to .forge/context/ for debugging",
+		Type:        CommandTypeTUI,
+		Handler:     handleSnapshotCommand,
 		MinArgs:     0,
 		MaxArgs:     0,
 	})
@@ -552,4 +565,139 @@ func handleBashCommand(m *model, args []string) interface{} {
 func handleNotesCommand(m *model, args []string) interface{} {
 	// Send notes request to agent
 	return m.requestNotes()
+}
+
+// contextSnapshotTokens holds aggregate token statistics for the exported snapshot.
+type contextSnapshotTokens struct {
+	CurrentContext  int     `json:"current_context"`
+	MaxContext      int     `json:"max_context"`
+	UsagePercent    float64 `json:"usage_percent"`
+	SystemPrompt    int     `json:"system_prompt"`
+	Conversation    int     `json:"conversation"`
+	RawMessages     int     `json:"raw_messages"`
+	SummaryBlocks   int     `json:"summary_blocks"`
+	GoalBatchBlocks int     `json:"goal_batch_blocks"`
+}
+
+// contextSnapshotMessage is one message entry in the exported snapshot.
+type contextSnapshotMessage struct {
+	Index         int    `json:"index"`
+	Role          string `json:"role"`
+	Content       string `json:"content"`
+	Tokens        int    `json:"tokens"`
+	IsSummarized  bool   `json:"is_summarized"`
+	SummaryType   string `json:"summary_type,omitempty"`
+	SummaryCount  int    `json:"summary_count,omitempty"`
+	SummaryMethod string `json:"summary_method,omitempty"`
+}
+
+// contextSnapshot is the top-level structure written to the JSON file.
+type contextSnapshot struct {
+	ExportedAt   string                   `json:"exported_at"`
+	Workspace    string                   `json:"workspace"`
+	TokenSummary contextSnapshotTokens    `json:"token_summary"`
+	Messages     []contextSnapshotMessage `json:"messages"`
+}
+
+// handleSnapshotCommand exports the full conversation payload to a timestamped
+// JSON file in <workspace>/.forge/context/ and shows a toast with the output path.
+func handleSnapshotCommand(m *model, args []string) interface{} {
+	if m.agent == nil {
+		m.showToast("Error", "Agent not available", "❌", true)
+		return nil
+	}
+
+	snapshot := buildContextSnapshot(m)
+
+	// Ensure the output directory exists.
+	outDir := filepath.Join(m.workspaceDir, ".forge", "context")
+	if err := os.MkdirAll(outDir, 0o750); err != nil {
+		m.showToast("Export failed", fmt.Sprintf("Could not create directory: %v", err), "❌", true)
+		return nil
+	}
+
+	// Write the snapshot with a timestamp-based filename so exports accumulate.
+	filename := time.Now().Format("20060102-150405") + "-context.json"
+	outPath := filepath.Join(outDir, filename)
+
+	data, err := json.MarshalIndent(snapshot, "", "  ")
+	if err != nil {
+		m.showToast("Export failed", fmt.Sprintf("Could not marshal JSON: %v", err), "❌", true)
+		return nil
+	}
+
+	if err := os.WriteFile(outPath, data, 0o600); err != nil {
+		m.showToast("Export failed", fmt.Sprintf("Could not write file: %v", err), "❌", true)
+		return nil
+	}
+
+	m.showToast("Context exported", outPath, "📄", false)
+	return nil
+}
+
+// buildContextSnapshot assembles a contextSnapshot from live agent state.
+// It uses GetContextInfo() for token statistics, GetSystemPrompt() for the full
+// system prompt (which is never stored in conversation memory), and GetMessages()
+// for the conversation payload. The resulting Messages slice mirrors exactly what
+// the agent passes to the LLM: [system, ...history].
+func buildContextSnapshot(m *model) *contextSnapshot {
+	info := m.agent.GetContextInfo()
+	systemPrompt := m.agent.GetSystemPrompt()
+	messages := m.agent.GetMessages()
+
+	// Reserve capacity for the system prompt entry + all conversation messages.
+	msgEntries := make([]contextSnapshotMessage, 0, 1+len(messages))
+
+	// Index 0 is always the system prompt, synthesized fresh (not in memory).
+	sysTokens := (len(systemPrompt) + len("system") + 12) / 4
+	msgEntries = append(msgEntries, contextSnapshotMessage{
+		Index:   0,
+		Role:    "system",
+		Content: systemPrompt,
+		Tokens:  sysTokens,
+	})
+
+	// Append conversation history starting at index 1.
+	for i, msg := range messages {
+		isSummarized, _ := msg.Metadata["summarized"].(bool)
+		summaryType, _ := msg.Metadata["summary_type"].(string)
+		summaryCount, _ := msg.Metadata["summary_count"].(int)
+		summaryMethod, _ := msg.Metadata["summary_method"].(string)
+
+		// Approximate per-message token count (content chars / 4 + role overhead).
+		// Accurate counting would require the tokenizer, which is not exposed here.
+		approxTokens := (len(msg.Content) + len(string(msg.Role)) + 12) / 4
+
+		msgEntries = append(msgEntries, contextSnapshotMessage{
+			Index:         i + 1,
+			Role:          string(msg.Role),
+			Content:       msg.Content,
+			Tokens:        approxTokens,
+			IsSummarized:  isSummarized,
+			SummaryType:   summaryType,
+			SummaryCount:  summaryCount,
+			SummaryMethod: summaryMethod,
+		})
+	}
+
+	usagePct := 0.0
+	if info.MaxContextTokens > 0 {
+		usagePct = float64(info.CurrentContextTokens) / float64(info.MaxContextTokens) * 100.0
+	}
+
+	return &contextSnapshot{
+		ExportedAt: time.Now().Format(time.RFC3339),
+		Workspace:  m.workspaceDir,
+		TokenSummary: contextSnapshotTokens{
+			CurrentContext:  info.CurrentContextTokens,
+			MaxContext:      info.MaxContextTokens,
+			UsagePercent:    usagePct,
+			SystemPrompt:    info.SystemPromptTokens,
+			Conversation:    info.ConversationTokens,
+			RawMessages:     info.RawMessageTokens,
+			SummaryBlocks:   info.SummaryBlockTokens,
+			GoalBatchBlocks: info.GoalBatchBlockTokens,
+		},
+		Messages: msgEntries,
+	}
 }

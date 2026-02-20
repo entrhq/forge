@@ -204,6 +204,15 @@ Displays detailed information about:
 ```
 Switches to bash command mode for direct shell command execution. Type `exit` to return to normal mode.
 
+#### `/exportcontext` - Export Context Snapshot
+```
+/exportcontext
+```
+Dumps the full, live conversation payload (as seen by the LLM) to a timestamped JSON file. This is useful for debugging context management, summarization, and goal compaction.
+
+- **Output Path**: `<workspace>/.forge/context/context-<timestamp>.json`
+- **Use Case**: Inspecting the exact data sent to the LLM at any point in the conversation.
+
 ---
 
 ## Overlays

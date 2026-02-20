@@ -440,8 +440,15 @@ func convertToOpenAIMessages(messages []*types.Message) []openai.ChatCompletionM
 			openaiMessages = append(openaiMessages, openai.UserMessage(msg.Content))
 		case types.RoleAssistant:
 			openaiMessages = append(openaiMessages, openai.AssistantMessage(msg.Content))
+		case types.RoleTool:
+			// RoleTool is an internal role used by memory and context summarization.
+			// It should be normalised to RoleUser before reaching the provider via
+			// normalizeRoleForLLM in prompts/builder.go. This case handles it
+			// defensively in case the provider is called directly without going
+			// through BuildMessages.
+			openaiMessages = append(openaiMessages, openai.UserMessage(msg.Content))
 		default:
-			// Default to user message for unknown roles
+			// Default to user message for unknown roles.
 			openaiMessages = append(openaiMessages, openai.UserMessage(msg.Content))
 		}
 	}
