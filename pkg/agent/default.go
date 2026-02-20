@@ -501,13 +501,39 @@ func (a *DefaultAgent) GetContextInfo() *ContextInfo {
 		}
 	}
 
+	// Classify messages into composition buckets
+	var rawMessages, summaryMessages, goalBatchMessages []*types.Message
+	for _, msg := range messages {
+		if msg.Role == types.RoleSystem {
+			continue // system messages tracked separately
+		}
+		summarized, _ := msg.Metadata["summarized"].(bool)
+		if !summarized {
+			rawMessages = append(rawMessages, msg)
+			continue
+		}
+		summaryType, _ := msg.Metadata["summary_type"].(string)
+		if summaryType == "goal_batch" {
+			goalBatchMessages = append(goalBatchMessages, msg)
+		} else {
+			summaryMessages = append(summaryMessages, msg)
+		}
+	}
+
 	// Calculate token counts
 	conversationTokens := 0
 	currentTokens := 0
+	rawMessageTokens := 0
+	summaryBlockTokens := 0
+	goalBatchBlockTokens := 0
 	if a.tokenizer != nil {
 		conversationTokens = a.tokenizer.CountMessagesTokens(messages)
 		// Calculate current context tokens
 		currentTokens = conversationTokens + a.tokenizer.CountTokens(fullSystemPrompt)
+		// Per-category token counts
+		rawMessageTokens = a.tokenizer.CountMessagesTokens(rawMessages)
+		summaryBlockTokens = a.tokenizer.CountMessagesTokens(summaryMessages)
+		goalBatchBlockTokens = a.tokenizer.CountMessagesTokens(goalBatchMessages)
 	} else {
 		// Fallback: approximate token counting when tokenizer is unavailable
 		// Use rough estimate of 1 token ≈ 4 characters
@@ -515,6 +541,15 @@ func (a *DefaultAgent) GetContextInfo() *ContextInfo {
 			conversationTokens += (len(msg.Content) + len(string(msg.Role)) + 12) / 4 // +12 for message overhead
 		}
 		currentTokens = conversationTokens + len(fullSystemPrompt)/4
+		for _, msg := range rawMessages {
+			rawMessageTokens += (len(msg.Content) + len(string(msg.Role)) + 12) / 4
+		}
+		for _, msg := range summaryMessages {
+			summaryBlockTokens += (len(msg.Content) + len(string(msg.Role)) + 12) / 4
+		}
+		for _, msg := range goalBatchMessages {
+			goalBatchBlockTokens += (len(msg.Content) + len(string(msg.Role)) + 12) / 4
+		}
 	}
 
 	// Get max tokens from context manager
@@ -544,6 +579,12 @@ func (a *DefaultAgent) GetContextInfo() *ContextInfo {
 		MessageCount:            messageCount,
 		ConversationTurns:       conversationTurns,
 		ConversationTokens:      conversationTokens,
+		RawMessageCount:         len(rawMessages),
+		RawMessageTokens:        rawMessageTokens,
+		SummaryBlockCount:       len(summaryMessages),
+		SummaryBlockTokens:      summaryBlockTokens,
+		GoalBatchBlockCount:     len(goalBatchMessages),
+		GoalBatchBlockTokens:    goalBatchBlockTokens,
 		CurrentContextTokens:    currentTokens,
 		MaxContextTokens:        maxTokens,
 		FreeTokens:              freeTokens,

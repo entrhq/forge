@@ -191,10 +191,7 @@ func run(ctx context.Context, cliConfig *CLIConfig) error {
 		defaultMaxToolCallDist,
 	)
 
-	thresholdStrategy := agentcontext.NewThresholdSummarizationStrategy(
-		defaultThresholdPercent,
-		defaultSummaryBatchSize,
-	)
+	// thresholdStrategy is disabled - see threshold_strategy.go (gets stuck in a loop)
 
 	goalBatchStrategy := agentcontext.NewGoalBatchCompactionStrategy(
 		defaultGoalBatchTurnsOld,
@@ -206,7 +203,6 @@ func run(ctx context.Context, cliConfig *CLIConfig) error {
 		provider,
 		defaultMaxTokens,
 		toolCallStrategy,
-		thresholdStrategy,
 		goalBatchStrategy,
 	)
 	if err != nil {

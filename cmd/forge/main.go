@@ -220,11 +220,7 @@ func runTUI(ctx context.Context, config *Config) error {
 		defaultMaxToolCallDist,
 	)
 
-	// Strategy 2: Summarize when approaching token limit to prevent exhaustion
-	thresholdStrategy := agentcontext.NewThresholdSummarizationStrategy(
-		defaultThresholdPercent,
-		defaultSummaryBatchSize,
-	)
+	// Strategy 2 (threshold) is disabled - see threshold_strategy.go (gets stuck in a loop)
 
 	// Strategy 3: Compact old completed turns (user message + summaries) into goal-batch blocks
 	goalBatchStrategy := agentcontext.NewGoalBatchCompactionStrategy(
@@ -233,13 +229,12 @@ func runTUI(ctx context.Context, config *Config) error {
 		defaultGoalBatchMaxTurns,
 	)
 
-	// Create context manager with all three strategies
+	// Create context manager with active strategies
 	// Event channel will be set by the agent during initialization
 	contextManager, err := agentcontext.NewManager(
 		provider,
 		defaultMaxTokens,
 		toolCallStrategy,
-		thresholdStrategy,
 		goalBatchStrategy,
 	)
 	if err != nil {

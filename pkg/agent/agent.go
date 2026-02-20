@@ -84,6 +84,14 @@ type ContextInfo struct {
 	ConversationTurns  int
 	ConversationTokens int
 
+	// History composition breakdown
+	RawMessageCount      int // Regular (unsummarized) user/assistant/tool messages
+	RawMessageTokens     int
+	SummaryBlockCount    int // [SUMMARIZED] blocks from tool-call strategy
+	SummaryBlockTokens   int
+	GoalBatchBlockCount  int // [GOAL BATCH] blocks from goal-batch compaction
+	GoalBatchBlockTokens int
+
 	// Token usage - current context
 	CurrentContextTokens int
 	MaxContextTokens     int

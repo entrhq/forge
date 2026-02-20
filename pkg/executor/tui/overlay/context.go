@@ -34,6 +34,14 @@ type ContextInfo struct {
 	ConversationTurns  int
 	ConversationTokens int
 
+	// History composition breakdown
+	RawMessageCount      int
+	RawMessageTokens     int
+	SummaryBlockCount    int
+	SummaryBlockTokens   int
+	GoalBatchBlockCount  int
+	GoalBatchBlockTokens int
+
 	// Token usage - current context
 	CurrentContextTokens int
 	MaxContextTokens     int
@@ -56,14 +64,14 @@ func NewContextOverlay(info *ContextInfo, width, height int) *ContextOverlay {
 
 	// Use fixed width like help overlay for consistent centered appearance
 	overlayWidth := 80
-	overlayHeight := 24
+	overlayHeight := 32
 
 	// Configure base overlay
 	baseConfig := BaseOverlayConfig{
 		Width:          overlayWidth,
 		Height:         overlayHeight,
 		ViewportWidth:  76,
-		ViewportHeight: 20,
+		ViewportHeight: 28,
 		Content:        content,
 		OnClose: func(actions types.ActionHandler) tea.Cmd {
 			// Return nil to signal close - caller will handle ClearOverlay()
@@ -121,6 +129,26 @@ func buildContextContent(info *ContextInfo) string {
 	b.WriteString(fmt.Sprintf("  Messages:           %d\n", info.MessageCount))
 	b.WriteString(fmt.Sprintf("  Conversation Turns: %d\n", info.ConversationTurns))
 	b.WriteString(fmt.Sprintf("  Conversation:       %s tokens\n", formatTokenCount(info.ConversationTokens)))
+	b.WriteString("\n")
+
+	// History composition section
+	b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(types.SalmonPink).Render("History Composition"))
+	b.WriteString("\n")
+	b.WriteString(fmt.Sprintf("  Raw Messages:       %d (%s tokens)\n",
+		info.RawMessageCount, formatTokenCount(info.RawMessageTokens)))
+	b.WriteString(fmt.Sprintf("  Summarized Blocks:  %d (%s tokens)\n",
+		info.SummaryBlockCount, formatTokenCount(info.SummaryBlockTokens)))
+	b.WriteString(fmt.Sprintf("  Goal Batch Blocks:  %d (%s tokens)\n",
+		info.GoalBatchBlockCount, formatTokenCount(info.GoalBatchBlockTokens)))
+	// Show compression ratio if any summarization has occurred
+	if info.SummaryBlockCount > 0 || info.GoalBatchBlockCount > 0 {
+		totalCompressed := info.SummaryBlockTokens + info.GoalBatchBlockTokens
+		totalConv := info.ConversationTokens
+		if totalConv > 0 {
+			compressedPct := float64(totalCompressed) / float64(totalConv) * 100.0
+			b.WriteString(fmt.Sprintf("  Compressed Content: %.1f%% of conversation\n", compressedPct))
+		}
+	}
 	b.WriteString("\n")
 
 	// Current Context section

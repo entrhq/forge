@@ -26,10 +26,6 @@ type ToolCallSummarizationStrategy struct {
 	// If any tool call exceeds this distance, all buffered tool calls are summarized regardless of buffer size.
 	maxToolCallDistance int
 
-	// excludedTools is a set of tool names that should never be summarized.
-	// These are typically loop-breaking tools or tools with high semantic value.
-	excludedTools map[string]bool
-
 	// eventChannel is used to emit progress events during parallel summarization
 	eventChannel chan<- *types.AgentEvent
 }
@@ -39,8 +35,7 @@ type ToolCallSummarizationStrategy struct {
 //   - messagesOldThreshold: Tool calls must be at least this many messages old to enter buffer (default: 20)
 //   - minToolCallsToSummarize: Minimum buffer size before triggering summarization (default: 10)
 //   - maxToolCallDistance: Maximum age before forcing summarization regardless of buffer size (default: 40)
-//   - excludedTools: Optional list of tool names to exclude from summarization (default: loop-breaking tools)
-func NewToolCallSummarizationStrategy(messagesOldThreshold, minToolCallsToSummarize, maxToolCallDistance int, excludedTools ...string) *ToolCallSummarizationStrategy {
+func NewToolCallSummarizationStrategy(messagesOldThreshold, minToolCallsToSummarize, maxToolCallDistance int) *ToolCallSummarizationStrategy {
 	if messagesOldThreshold <= 0 {
 		messagesOldThreshold = 20
 	}
@@ -51,25 +46,10 @@ func NewToolCallSummarizationStrategy(messagesOldThreshold, minToolCallsToSummar
 		maxToolCallDistance = 40
 	}
 
-	// Build exclusion map
-	exclusionMap := make(map[string]bool)
-	if len(excludedTools) == 0 {
-		// Default exclusions: loop-breaking tools that represent important interaction points
-		exclusionMap["task_completion"] = true
-		exclusionMap["ask_question"] = true
-		exclusionMap["converse"] = true
-	} else {
-		// Use provided exclusions
-		for _, toolName := range excludedTools {
-			exclusionMap[toolName] = true
-		}
-	}
-
 	return &ToolCallSummarizationStrategy{
 		messagesOldThreshold:    messagesOldThreshold,
 		minToolCallsToSummarize: minToolCallsToSummarize,
 		maxToolCallDistance:     maxToolCallDistance,
-		excludedTools:           exclusionMap,
 		eventChannel:            nil, // Will be set by Manager
 	}
 }
@@ -99,11 +79,9 @@ func (s *ToolCallSummarizationStrategy) ShouldRun(conv *memory.ConversationMemor
 	// Identify old messages that can enter the buffer
 	oldMessages := messages[:totalMessages-s.messagesOldThreshold]
 
-	// Count unsummarized, non-excluded tool call pairs in the buffer
-	// and track the oldest qualifying position.
+	// Count unsummarized tool call pairs in the buffer and track the oldest qualifying position.
 	bufferCount := 0
 	oldestToolCallPosition := -1
-	skipNextToolResult := false
 
 	for i, msg := range oldMessages {
 		// Skip if already summarized
@@ -113,23 +91,12 @@ func (s *ToolCallSummarizationStrategy) ShouldRun(conv *memory.ConversationMemor
 
 		switch {
 		case msg.Role == types.RoleAssistant && containsToolCallIndicators(msg.Content):
-			if isExcludedToolCall(msg, s.excludedTools) {
-				// Mark the paired tool result for skipping; don't count this pair.
-				skipNextToolResult = true
-				continue
-			}
-			skipNextToolResult = false
 			bufferCount++
 			if oldestToolCallPosition == -1 {
 				oldestToolCallPosition = i
 			}
 
 		case msg.Role == types.RoleTool:
-			if skipNextToolResult {
-				// This is the result of an excluded tool call — skip it.
-				skipNextToolResult = false
-				continue
-			}
 			bufferCount++
 			if oldestToolCallPosition == -1 {
 				oldestToolCallPosition = i
@@ -172,8 +139,8 @@ func (s *ToolCallSummarizationStrategy) Summarize(ctx context.Context, conv *mem
 	oldMessages := messages[:len(messages)-s.messagesOldThreshold]
 	recentMessages := messages[len(messages)-s.messagesOldThreshold:]
 
-	// Group tool calls with their results for summarization, excluding certain tools
-	groups := groupToolCallsAndResults(oldMessages, s.excludedTools)
+	// Group tool calls with their results for summarization
+	groups := groupToolCallsAndResults(oldMessages)
 	if len(groups) == 0 {
 		return 0, nil // Nothing to summarize
 	}
@@ -185,8 +152,8 @@ func (s *ToolCallSummarizationStrategy) Summarize(ctx context.Context, conv *mem
 		return 0, err
 	}
 
-	// Reconstruct: retained system/user/excluded messages + summaries + recent messages
-	retained := retainNonSummarizedMessages(oldMessages, s.excludedTools)
+	// Reconstruct: retained system/user messages + summaries + recent messages
+	retained := retainNonSummarizedMessages(oldMessages)
 	retained = append(retained, summarizedMessages...)
 	retained = append(retained, recentMessages...)
 
@@ -211,43 +178,20 @@ func findNearestUserGoal(messages []*types.Message) string {
 }
 
 // retainNonSummarizedMessages returns the subset of oldMessages that must be
-// preserved verbatim: system messages, user messages, and complete excluded-tool
-// call sequences. Summarizable assistant/tool message pairs are dropped here
-// because they will be replaced by the batch summary.
-func retainNonSummarizedMessages(oldMessages []*types.Message, excludedTools map[string]bool) []*types.Message {
+// preserved verbatim: system messages and user messages. Summarizable
+// assistant/tool message pairs are dropped here because they will be replaced
+// by the batch summary.
+func retainNonSummarizedMessages(oldMessages []*types.Message) []*types.Message {
 	retained := make([]*types.Message, 0)
-	inExcludedGroup := false
-	excludedBuf := make([]*types.Message, 0)
 
 	for _, msg := range oldMessages {
-		switch {
-		case msg.Role == types.RoleSystem:
+		switch msg.Role {
+		case types.RoleSystem:
 			retained = append(retained, msg)
-
-		case msg.Role == types.RoleUser:
+		case types.RoleUser:
 			// Human input must never be lost during summarization
 			retained = append(retained, msg)
-
-		case msg.Role == types.RoleAssistant && containsToolCallIndicators(msg.Content):
-			toolName := extractToolName(msg.Content)
-			if toolName != "" && excludedTools[toolName] {
-				inExcludedGroup = true
-				excludedBuf = append(excludedBuf, msg)
-			}
-
-		case inExcludedGroup:
-			excludedBuf = append(excludedBuf, msg)
-			if msg.Role == types.RoleTool {
-				retained = append(retained, excludedBuf...)
-				excludedBuf = make([]*types.Message, 0)
-				inExcludedGroup = false
-			}
 		}
-	}
-
-	// Flush any incomplete excluded group
-	if len(excludedBuf) > 0 {
-		retained = append(retained, excludedBuf...)
 	}
 
 	return retained
@@ -377,43 +321,6 @@ func containsToolCallIndicators(content string) bool {
 	return strings.Contains(content, "<tool>") && strings.Contains(content, "</tool>")
 }
 
-// extractToolName extracts the tool name from a tool call XML content.
-// The format is: <tool>{"tool_name": "name", ...}</tool>
-// Returns empty string if no tool name is found.
-func extractToolName(content string) string {
-	// Look for "tool_name": "value" pattern in JSON
-	start := strings.Index(content, `"tool_name"`)
-	if start == -1 {
-		return ""
-	}
-
-	// Find the colon after tool_name
-	colonIdx := strings.Index(content[start:], ":")
-	if colonIdx == -1 {
-		return ""
-	}
-	start += colonIdx + 1
-
-	// Skip whitespace
-	for start < len(content) && (content[start] == ' ' || content[start] == '\t' || content[start] == '\n') {
-		start++
-	}
-
-	// Expect opening quote
-	if start >= len(content) || content[start] != '"' {
-		return ""
-	}
-	start++ // Skip opening quote
-
-	// Find closing quote
-	end := strings.Index(content[start:], `"`)
-	if end == -1 {
-		return ""
-	}
-
-	return content[start : start+end]
-}
-
 // shouldSkipMessage returns true if the message should be skipped during grouping.
 func shouldSkipMessage(msg *types.Message) bool {
 	return isSummarized(msg) || msg.Role == types.RoleSystem
@@ -425,44 +332,18 @@ func isToolRelatedMessage(msg *types.Message) bool {
 		(msg.Role == types.RoleAssistant && containsToolCallIndicators(msg.Content))
 }
 
-// isExcludedToolCall checks if an assistant message contains an excluded tool call.
-func isExcludedToolCall(msg *types.Message, excludedTools map[string]bool) bool {
-	if msg.Role != types.RoleAssistant {
-		return false
-	}
-	toolName := extractToolName(msg.Content)
-	return toolName != "" && excludedTools[toolName]
-}
-
-// groupToolCallsAndResults groups related tool calls with their results,
-// excluding tools specified in the excludedTools set.
+// groupToolCallsAndResults groups related tool calls with their results.
 // Returns groups of messages where each group represents a tool call sequence.
-func groupToolCallsAndResults(messages []*types.Message, excludedTools map[string]bool) [][]*types.Message {
+func groupToolCallsAndResults(messages []*types.Message) [][]*types.Message {
 	groups := make([][]*types.Message, 0)
 	currentGroup := make([]*types.Message, 0)
-	skipCurrentGroup := false
 
 	for _, msg := range messages {
 		if shouldSkipMessage(msg) {
 			continue
 		}
 
-		isToolMessage := isToolRelatedMessage(msg)
-
-		if isToolMessage {
-			if isExcludedToolCall(msg, excludedTools) {
-				skipCurrentGroup = true
-				currentGroup = make([]*types.Message, 0)
-				continue
-			}
-
-			if skipCurrentGroup {
-				if msg.Role == types.RoleTool {
-					skipCurrentGroup = false
-				}
-				continue
-			}
-
+		if isToolRelatedMessage(msg) {
 			currentGroup = append(currentGroup, msg)
 
 			if msg.Role == types.RoleTool && len(currentGroup) > 0 {
@@ -472,7 +353,6 @@ func groupToolCallsAndResults(messages []*types.Message, excludedTools map[strin
 		} else if len(currentGroup) > 0 {
 			groups = append(groups, currentGroup)
 			currentGroup = make([]*types.Message, 0)
-			skipCurrentGroup = false
 		}
 	}
 
