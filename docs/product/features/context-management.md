@@ -66,7 +66,7 @@ Context management is fundamental to Forge's effectiveness as an AI coding assis
 - **Cost Estimation**: Show approximate API cost based on token usage
 - **Workspace Statistics**: Display info about accessible files/directories
 - **Historical Trends**: Track context usage over time
-- **Export Capability**: Save context snapshot for debugging
+- **Export Capability**: Save context snapshot for debugging via `/exportcontext`
 
 ## User Experience Flow
 
@@ -322,7 +322,7 @@ Context Information Overlay
 ### Future Considerations
 
 - Message-level token breakdown (detailed view mode)
-- Context export for debugging
+- Context export for debugging (`/exportcontext`)
 - Multi-session context tracking
 - Advanced analytics and trends
 
@@ -376,7 +376,7 @@ Support teams should know:
 - Cost estimation and budgeting
 - Workspace context in overlay
 - Message-level token breakdown
-- Context export capability
+- Context export capability (implemented with `/exportcontext`)
 
 **Phase 3** (6-12 months):
 - Multi-session context tracking
