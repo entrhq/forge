@@ -30,9 +30,9 @@ type completeTurn struct {
 // ToolCallSummarizationStrategy and ThresholdSummarizationStrategy have already
 // cleaned up raw tool call pairs and assistant blocks.
 type GoalBatchCompactionStrategy struct {
-	// minTurnsOldThreshold is how many messages back from the current position
+	// minMessagesOldThreshold is how many messages back from the current position
 	// a turn must be before it is eligible for compaction. Keeps recent history intact.
-	minTurnsOldThreshold int
+	minMessagesOldThreshold int
 
 	// minTurnsToCompact is the minimum number of eligible complete turns required
 	// to trigger compaction. Prevents firing on isolated old turns.
@@ -48,12 +48,12 @@ type GoalBatchCompactionStrategy struct {
 // NewGoalBatchCompactionStrategy creates a new goal-batch compaction strategy.
 //
 // Parameters:
-//   - minTurnsOldThreshold: messages back from current before a turn is eligible (default: 20)
+//   - minMessagesOldThreshold: messages back from current before a turn is eligible (default: 20)
 //   - minTurnsToCompact: minimum eligible complete turns before triggering (default: 3)
 //   - maxTurnsPerBatch: maximum turns to compact per LLM call (default: 6)
-func NewGoalBatchCompactionStrategy(minTurnsOldThreshold, minTurnsToCompact, maxTurnsPerBatch int) *GoalBatchCompactionStrategy {
-	if minTurnsOldThreshold <= 0 {
-		minTurnsOldThreshold = 20
+func NewGoalBatchCompactionStrategy(minMessagesOldThreshold, minTurnsToCompact, maxTurnsPerBatch int) *GoalBatchCompactionStrategy {
+	if minMessagesOldThreshold <= 0 {
+		minMessagesOldThreshold = 20
 	}
 	if minTurnsToCompact <= 0 {
 		minTurnsToCompact = 3
@@ -62,7 +62,7 @@ func NewGoalBatchCompactionStrategy(minTurnsOldThreshold, minTurnsToCompact, max
 		maxTurnsPerBatch = 6
 	}
 	return &GoalBatchCompactionStrategy{
-		minTurnsOldThreshold: minTurnsOldThreshold,
+		minMessagesOldThreshold: minMessagesOldThreshold,
 		minTurnsToCompact:    minTurnsToCompact,
 		maxTurnsPerBatch:     maxTurnsPerBatch,
 	}
@@ -82,11 +82,11 @@ func (s *GoalBatchCompactionStrategy) Name() string {
 // the age and count thresholds for compaction.
 func (s *GoalBatchCompactionStrategy) ShouldRun(conv *memory.ConversationMemory, currentTokens, maxTokens int) bool {
 	messages := conv.GetAll()
-	if len(messages) <= s.minTurnsOldThreshold {
+	if len(messages) <= s.minMessagesOldThreshold {
 		return false
 	}
 
-	eligibleMessages := messages[:len(messages)-s.minTurnsOldThreshold]
+	eligibleMessages := messages[:len(messages)-s.minMessagesOldThreshold]
 	turns := s.collectCompleteTurns(eligibleMessages)
 	return len(turns) >= s.minTurnsToCompact
 }
@@ -95,11 +95,11 @@ func (s *GoalBatchCompactionStrategy) ShouldRun(conv *memory.ConversationMemory,
 // Returns the number of turns compacted.
 func (s *GoalBatchCompactionStrategy) Summarize(ctx context.Context, conv *memory.ConversationMemory, provider llm.Provider) (int, error) {
 	messages := conv.GetAll()
-	if len(messages) <= s.minTurnsOldThreshold {
+	if len(messages) <= s.minMessagesOldThreshold {
 		return 0, nil
 	}
 
-	eligibleMessages := messages[:len(messages)-s.minTurnsOldThreshold]
+	eligibleMessages := messages[:len(messages)-s.minMessagesOldThreshold]
 	allTurns := s.collectCompleteTurns(eligibleMessages)
 	if len(allTurns) == 0 {
 		return 0, nil

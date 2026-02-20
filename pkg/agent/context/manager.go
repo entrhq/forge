@@ -3,6 +3,7 @@ package context
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/entrhq/forge/pkg/agent/memory"
@@ -32,6 +33,7 @@ type Manager struct {
 	tokenizer          *tokenizer.Tokenizer
 	maxTokens          int
 	eventChannel       chan<- *types.AgentEvent
+	mu                 sync.RWMutex // protects llm and summarizationModel
 }
 
 // NewManager creates a new context manager with the given strategies.
@@ -73,6 +75,8 @@ func (m *Manager) SetEventChannel(eventChan chan<- *types.AgentEvent) {
 // SetProvider updates the LLM provider used by this context manager.
 // This is called when the agent's provider is hot-reloaded.
 func (m *Manager) SetProvider(provider llm.Provider) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.llm = provider
 }
 
@@ -80,12 +84,16 @@ func (m *Manager) SetProvider(provider llm.Provider) {
 // If empty, summarization uses the same model as the main provider (m.llm).
 // The provider must implement llm.ModelCloner for this to take effect.
 func (m *Manager) SetSummarizationModel(model string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.summarizationModel = model
 }
 
 // GetSummarizationModel returns the currently configured summarization model override.
 // An empty string means the main provider model is used.
 func (m *Manager) GetSummarizationModel() string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	return m.summarizationModel
 }
 
@@ -93,14 +101,20 @@ func (m *Manager) GetSummarizationModel() string {
 // If a summarization model override is configured and the provider implements
 // llm.ModelCloner, returns a lightweight clone with the override model.
 // Otherwise returns m.llm unchanged.
+// The caller must not hold m.mu.
 func (m *Manager) providerForSummarization() llm.Provider {
-	if m.summarizationModel == "" {
-		return m.llm
+	m.mu.RLock()
+	provider := m.llm
+	model := m.summarizationModel
+	m.mu.RUnlock()
+
+	if model == "" {
+		return provider
 	}
-	if cloner, ok := m.llm.(llm.ModelCloner); ok {
-		return cloner.CloneWithModel(m.summarizationModel)
+	if cloner, ok := provider.(llm.ModelCloner); ok {
+		return cloner.CloneWithModel(model)
 	}
-	return m.llm
+	return provider
 }
 
 // EvaluateAndSummarize evaluates all strategies and performs summarization if needed.

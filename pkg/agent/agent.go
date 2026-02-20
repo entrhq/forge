@@ -87,7 +87,7 @@ type ContextInfo struct {
 	// History composition breakdown
 	RawMessageCount      int // Regular (unsummarized) user/assistant/tool messages
 	RawMessageTokens     int
-	SummaryBlockCount    int // [SUMMARIZED] blocks from tool-call strategy
+	SummaryBlockCount    int // [SUMMARIZED] all non-goal-batch summarized blocks
 	SummaryBlockTokens   int
 	GoalBatchBlockCount  int // [GOAL BATCH] blocks from goal-batch compaction
 	GoalBatchBlockTokens int

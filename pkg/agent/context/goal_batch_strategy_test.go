@@ -27,14 +27,14 @@ func newGoalBatchMsg(content string) *types.Message {
 
 func TestNewGoalBatchCompactionStrategy_Defaults(t *testing.T) {
 	s := NewGoalBatchCompactionStrategy(0, 0, 0)
-	assert.Equal(t, 20, s.minTurnsOldThreshold)
+	assert.Equal(t, 20, s.minMessagesOldThreshold)
 	assert.Equal(t, 3, s.minTurnsToCompact)
 	assert.Equal(t, 6, s.maxTurnsPerBatch)
 }
 
 func TestNewGoalBatchCompactionStrategy_CustomValues(t *testing.T) {
 	s := NewGoalBatchCompactionStrategy(10, 2, 4)
-	assert.Equal(t, 10, s.minTurnsOldThreshold)
+	assert.Equal(t, 10, s.minMessagesOldThreshold)
 	assert.Equal(t, 2, s.minTurnsToCompact)
 	assert.Equal(t, 4, s.maxTurnsPerBatch)
 }
