@@ -68,8 +68,12 @@ func (a *DefaultAgent) processToolResult(tool tools.Tool, toolCall tools.ToolCal
 		return false, ""
 	}
 
-	// For non-breaking tools, add result to memory and continue loop
-	a.memory.Add(types.NewUserMessage(fmt.Sprintf("Tool '%s' result:\n%s", toolCall.ToolName, result)))
+	// For non-breaking tools, add result to memory and continue loop.
+	// RoleTool is used so the context summarization strategies can correctly
+	// identify and group tool call / result pairs. BuildMessages remaps
+	// RoleTool -> RoleUser before sending to the LLM (XML-mode providers
+	// don't have a native tool role).
+	a.memory.Add(types.NewToolMessage(fmt.Sprintf("Tool '%s' result:\n%s", toolCall.ToolName, result)))
 	return true, ""
 }
 

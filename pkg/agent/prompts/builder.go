@@ -1,7 +1,6 @@
 package prompts
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/entrhq/forge/pkg/agent/tools"
@@ -123,6 +122,22 @@ func (pb *PromptBuilder) Build() string {
 	return builder.String()
 }
 
+// normalizeRoleForLLM returns a copy of msg with RoleTool remapped to RoleUser.
+// Tool results are stored in memory as RoleTool so the context summarization
+// strategies can identify and group call/result pairs correctly. XML-mode LLM
+// providers don't have a native tool role, so the mapping happens here at the
+// boundary — just before the payload is sent to the provider.
+// The original pointer is reused when no copy is needed, avoiding allocations.
+func normalizeRoleForLLM(msg *types.Message) *types.Message {
+	if msg.Role != types.RoleTool {
+		return msg
+	}
+	// Shallow-copy the message, remapping only the role.
+	normalized := *msg
+	normalized.Role = types.RoleUser
+	return &normalized
+}
+
 // BuildMessages creates a complete message list including system prompt and conversation history
 // The errorContext parameter allows passing ephemeral error messages to the agent without
 // storing them in permanent memory - useful for self-healing error recovery
@@ -132,10 +147,12 @@ func BuildMessages(systemPrompt string, history []*types.Message, userMessage st
 	// Add system message
 	messages = append(messages, types.NewSystemMessage(systemPrompt))
 
-	// Add conversation history (skip any existing system messages to avoid duplicates)
+	// Add conversation history (skip any existing system messages to avoid duplicates).
+	// RoleTool messages are remapped to RoleUser so XML-mode providers receive the
+	// expected format while memory retains the semantic role.
 	for _, msg := range history {
 		if msg.Role != types.RoleSystem {
-			messages = append(messages, msg)
+			messages = append(messages, normalizeRoleForLLM(msg))
 		}
 	}
 
@@ -153,40 +170,4 @@ func BuildMessages(systemPrompt string, history []*types.Message, userMessage st
 	return messages
 }
 
-// BuildMessagesForIteration creates messages for an agent loop iteration,
-// including tool results and thinking
-func BuildMessagesForIteration(
-	systemPrompt string,
-	history []*types.Message,
-	toolResults []ToolResult,
-) []*types.Message {
-	messages := make([]*types.Message, 0, len(history)+1+len(toolResults))
 
-	// Add system message
-	messages = append(messages, types.NewSystemMessage(systemPrompt))
-
-	// Add conversation history (skip system messages)
-	for _, msg := range history {
-		if msg.Role != types.RoleSystem {
-			messages = append(messages, msg)
-		}
-	}
-
-	// Add tool results as user messages
-	for _, result := range toolResults {
-		resultMsg := fmt.Sprintf("Tool '%s' result:\n%s", result.ToolName, result.Result)
-		if result.Error != nil {
-			resultMsg = fmt.Sprintf("Tool '%s' error:\n%s", result.ToolName, result.Error.Error())
-		}
-		messages = append(messages, types.NewUserMessage(resultMsg))
-	}
-
-	return messages
-}
-
-// ToolResult represents the result of a tool execution
-type ToolResult struct {
-	ToolName string
-	Result   string
-	Error    error
-}
