@@ -439,22 +439,75 @@ func (a *DefaultAgent) GetTools() []interface{} {
 }
 
 // GetContextInfo returns detailed context information for debugging and display
+// classifyMessages partitions messages into raw, summary, and goal-batch buckets
+// and returns the number of user turns.
+func classifyMessages(messages []*types.Message) (raw, summaries, goalBatches []*types.Message, turns int) {
+	for _, msg := range messages {
+		if msg.Role == types.RoleUser {
+			turns++
+		}
+		if msg.Role == types.RoleSystem {
+			continue // system messages tracked separately
+		}
+		summarized, _ := msg.Metadata["summarized"].(bool)
+		if !summarized {
+			raw = append(raw, msg)
+			continue
+		}
+		summaryType, _ := msg.Metadata["summary_type"].(string)
+		if summaryType == "goal_batch" {
+			goalBatches = append(goalBatches, msg)
+		} else {
+			summaries = append(summaries, msg)
+		}
+	}
+	return
+}
+
+// computeMessageTokens calculates token counts for message slices using the
+// tokenizer when available, or a character-based approximation otherwise.
+func (a *DefaultAgent) computeMessageTokens(
+	all, raw, summaries, goalBatches []*types.Message,
+	fullPrompt string,
+) (convTokens, currentTokens, rawTokens, summaryTokens, goalBatchTokens int) {
+	if a.tokenizer != nil {
+		convTokens = a.tokenizer.CountMessagesTokens(all)
+		currentTokens = convTokens + a.tokenizer.CountTokens(fullPrompt)
+		rawTokens = a.tokenizer.CountMessagesTokens(raw)
+		summaryTokens = a.tokenizer.CountMessagesTokens(summaries)
+		goalBatchTokens = a.tokenizer.CountMessagesTokens(goalBatches)
+		return
+	}
+	// Fallback: ~1 token per 4 characters
+	approx := func(msgs []*types.Message) int {
+		total := 0
+		for _, msg := range msgs {
+			total += (len(msg.Content) + len(string(msg.Role)) + 12) / 4
+		}
+		return total
+	}
+	convTokens = approx(all)
+	currentTokens = convTokens + len(fullPrompt)/4
+	rawTokens = approx(raw)
+	summaryTokens = approx(summaries)
+	goalBatchTokens = approx(goalBatches)
+	return
+}
+
 func (a *DefaultAgent) GetContextInfo() *ContextInfo {
 	a.toolsMu.RLock()
 	defer a.toolsMu.RUnlock()
 
-	// Build system prompt without tools and without repository context to calculate base system tokens
+	// Build system prompt sections and calculate per-section token counts
 	baseSystemPrompt := prompts.NewPromptBuilder().
 		WithCustomInstructions(a.customInstructions).
 		Build()
 
-	// Build just the repository context section to calculate repository tokens
 	repositorySection := ""
 	if a.repositoryContext != "" {
 		repositorySection = "<repository_context>\n" + a.repositoryContext + "\n</repository_context>\n\n"
 	}
 
-	// Build just the tools section to calculate tool tokens
 	toolsSection := ""
 	if len(a.tools) > 0 {
 		toolsSection = "<available_tools>\n" +
@@ -462,95 +515,32 @@ func (a *DefaultAgent) GetContextInfo() *ContextInfo {
 			"</available_tools>\n\n"
 	}
 
-	// Calculate token counts for each section
-	systemPromptTokens := 0
-	repositoryTokens := 0
-	toolTokens := 0
+	systemPromptTokens, repositoryTokens, toolTokens := 0, 0, 0
 	if a.tokenizer != nil {
 		systemPromptTokens = a.tokenizer.CountTokens(baseSystemPrompt)
 		repositoryTokens = a.tokenizer.CountTokens(repositorySection)
 		toolTokens = a.tokenizer.CountTokens(toolsSection)
 	}
 
-	// Build full system prompt for current context calculation
 	builder := prompts.NewPromptBuilder().
 		WithTools(a.getToolsList()).
 		WithCustomInstructions(a.customInstructions)
-
 	if a.repositoryContext != "" {
 		builder = builder.WithRepositoryContext(a.repositoryContext)
 	}
-
 	fullSystemPrompt := builder.Build()
 
-	// Get tool names
+	// Collect tool names
 	toolNames := make([]string, 0, len(a.tools))
 	for name := range a.tools {
 		toolNames = append(toolNames, name)
 	}
 
-	// Get message history stats
+	// Classify messages and compute token counts
 	messages := a.memory.GetAll()
-	messageCount := len(messages)
-
-	// Count conversation turns (user messages)
-	conversationTurns := 0
-	for _, msg := range messages {
-		if msg.Role == types.RoleUser {
-			conversationTurns++
-		}
-	}
-
-	// Classify messages into composition buckets
-	var rawMessages, summaryMessages, goalBatchMessages []*types.Message
-	for _, msg := range messages {
-		if msg.Role == types.RoleSystem {
-			continue // system messages tracked separately
-		}
-		summarized, _ := msg.Metadata["summarized"].(bool)
-		if !summarized {
-			rawMessages = append(rawMessages, msg)
-			continue
-		}
-		summaryType, _ := msg.Metadata["summary_type"].(string)
-		if summaryType == "goal_batch" {
-			goalBatchMessages = append(goalBatchMessages, msg)
-		} else {
-			summaryMessages = append(summaryMessages, msg)
-		}
-	}
-
-	// Calculate token counts
-	conversationTokens := 0
-	currentTokens := 0
-	rawMessageTokens := 0
-	summaryBlockTokens := 0
-	goalBatchBlockTokens := 0
-	if a.tokenizer != nil {
-		conversationTokens = a.tokenizer.CountMessagesTokens(messages)
-		// Calculate current context tokens
-		currentTokens = conversationTokens + a.tokenizer.CountTokens(fullSystemPrompt)
-		// Per-category token counts
-		rawMessageTokens = a.tokenizer.CountMessagesTokens(rawMessages)
-		summaryBlockTokens = a.tokenizer.CountMessagesTokens(summaryMessages)
-		goalBatchBlockTokens = a.tokenizer.CountMessagesTokens(goalBatchMessages)
-	} else {
-		// Fallback: approximate token counting when tokenizer is unavailable
-		// Use rough estimate of 1 token ≈ 4 characters
-		for _, msg := range messages {
-			conversationTokens += (len(msg.Content) + len(string(msg.Role)) + 12) / 4 // +12 for message overhead
-		}
-		currentTokens = conversationTokens + len(fullSystemPrompt)/4
-		for _, msg := range rawMessages {
-			rawMessageTokens += (len(msg.Content) + len(string(msg.Role)) + 12) / 4
-		}
-		for _, msg := range summaryMessages {
-			summaryBlockTokens += (len(msg.Content) + len(string(msg.Role)) + 12) / 4
-		}
-		for _, msg := range goalBatchMessages {
-			goalBatchBlockTokens += (len(msg.Content) + len(string(msg.Role)) + 12) / 4
-		}
-	}
+	rawMessages, summaryMessages, goalBatchMessages, conversationTurns := classifyMessages(messages)
+	conversationTokens, currentTokens, rawMessageTokens, summaryBlockTokens, goalBatchBlockTokens :=
+		a.computeMessageTokens(messages, rawMessages, summaryMessages, goalBatchMessages, fullSystemPrompt)
 
 	// Get max tokens from context manager
 	maxTokens := 0
@@ -576,7 +566,7 @@ func (a *DefaultAgent) GetContextInfo() *ContextInfo {
 		ToolCount:               len(a.tools),
 		ToolTokens:              toolTokens,
 		ToolNames:               toolNames,
-		MessageCount:            messageCount,
+		MessageCount:            len(messages),
 		ConversationTurns:       conversationTurns,
 		ConversationTokens:      conversationTokens,
 		RawMessageCount:         len(rawMessages),
@@ -589,7 +579,7 @@ func (a *DefaultAgent) GetContextInfo() *ContextInfo {
 		MaxContextTokens:        maxTokens,
 		FreeTokens:              freeTokens,
 		UsagePercent:            usagePercent,
-		TotalPromptTokens:       0, // These will be filled by the executor from its tracking
+		TotalPromptTokens:       0, // filled by executor from its tracking
 		TotalCompletionTokens:   0,
 		TotalTokens:             0,
 	}
