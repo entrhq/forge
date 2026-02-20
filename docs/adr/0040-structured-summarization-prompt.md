@@ -155,15 +155,21 @@ All eligible tool call groups are sent to the LLM in a single call (`summarizeBa
 - **Fewer API calls**: N tool calls → 1 LLM call regardless of batch size.
 - **Cross-call context**: The summarizer sees the full operation sequence and can infer connecting intent across calls — something per-call summarization cannot do.
 
-The prompt produces a structured three-section output:
+When a preceding user message is available it is prepended as a `## User Goal` section so the summarizer can evaluate strategy success relative to what was actually requested.
+
+The prompt then produces a structured output with up to seven sections (sections with nothing meaningful to report are omitted):
 
 | Section | Content |
 |---|---|
-| **Intent** | One sentence — the overall goal the agent was pursuing across all operations |
-| **Operations** | One line per tool call: `tool_name | Inputs: <exact values> | Outcome: <success/failure + result data>` |
-| **Net Result** | What was ultimately achieved: artifacts created/modified, errors, or partial progress |
+| **Strategy** | One sentence — the approach taken to address the goal |
+| **Operations** | One line per tool call: `**tool_name** \| Inputs: <exact values> \| Outcome: <success/failure + key result data>` |
+| **Discoveries** | Facts confirmed or found: file contents, API behaviour, test results, existing code structure (exact values required) |
+| **Dead Ends** | Approaches tried and abandoned, written as personal lessons: "I tried X — abandoned because Y" |
+| **What Worked** | The approach that succeeded, with enough detail to build on |
+| **Critical Artifacts** | Exact file paths, function names, error strings, command outputs, line numbers, test names — one item per line |
+| **Status** | One of `COMPLETE \| PARTIAL \| BLOCKED` followed by one sentence on current state |
 
-The numbered raw message blocks (`--- Operation N ---`) give the LLM a stable reference for each group while keeping the output concise. The same artifact-preservation and no-filler rules apply, with an additional instruction to strip XML markup and role labels.
+The numbered raw message blocks (`--- Operation N ---`) give the LLM a stable reference for each group while keeping the output concise. The same artifact-preservation and no-filler rules apply, with additional instructions to strip XML markup and role labels and to use strict first-person voice throughout ("I tried", "I found" — never "the agent").
 
 ### Files Changed
 

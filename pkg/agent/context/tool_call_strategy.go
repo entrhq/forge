@@ -101,6 +101,8 @@ func (s *ToolCallSummarizationStrategy) ShouldRun(conv *memory.ConversationMemor
 			if oldestToolCallPosition == -1 {
 				oldestToolCallPosition = i
 			}
+			// Tool result messages are not counted; the paired assistant message
+			// already represents this call+result pair in bufferCount.
 		}
 	}
 
@@ -197,8 +199,6 @@ func findNearestUserGoal(messages []*types.Message) string {
 	}
 	return ""
 }
-
-
 
 // summarizeBatch compresses all eligible tool call groups into a single LLM call,
 // producing one structured operation-batch summary message. Batching rather than
@@ -309,15 +309,6 @@ func (s *ToolCallSummarizationStrategy) summarizeBatch(ctx context.Context, grou
 }
 
 // Helper functions
-
-// isSummarized checks if a message has already been summarized.
-func isSummarized(msg *types.Message) bool {
-	if msg.Metadata == nil {
-		return false
-	}
-	summarized, ok := msg.Metadata["summarized"].(bool)
-	return ok && summarized
-}
 
 // containsToolCallIndicators checks if the message content contains tool call XML tags.
 func containsToolCallIndicators(content string) bool {
