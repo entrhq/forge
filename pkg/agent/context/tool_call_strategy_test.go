@@ -238,3 +238,94 @@ func TestSummarize_PreservesUserMessages(t *testing.T) {
 	assert.True(t, foundUser1, "First user message must be preserved after tool call summarization")
 	assert.True(t, foundUser2, "Second user message must be preserved after tool call summarization")
 }
+
+// TestSummarize_SummariesAccumulateAcrossMultipleRuns is the core regression test for the
+// "only one [SUMMARIZED] block ever visible" bug.
+//
+// Previously, retainNonSummarizedMessages kept only system+user messages, silently
+// dropping any existing [SUMMARIZED] blocks. Every subsequent Summarize call would
+// therefore overwrite all prior summaries with a single new one.
+//
+// After the fix, the pointer-set walk preserves existing [SUMMARIZED] blocks in place,
+// so N summarization runs produce N accumulated summary blocks, interleaved correctly
+// with user messages.
+func TestSummarize_SummariesAccumulateAcrossMultipleRuns(t *testing.T) {
+	// Use a low threshold so we can exercise two distinct summarization passes easily.
+	strategy := NewToolCallSummarizationStrategy(4, 2, 20)
+	conv := memory.NewConversationMemory()
+
+	ctx := context.Background()
+	callN := 0
+	mockLLM := new(MockLLMProvider)
+	mockLLM.On("Complete", mock.Anything, mock.Anything).
+		Return(types.NewAssistantMessage("summary"), nil).
+		Run(func(args mock.Arguments) { callN++ })
+
+	// --- Round 1: populate old tool calls and summarize ---
+	conv.Add(types.NewUserMessage("First task"))
+	conv.Add(toolCallMsg("read_file"))
+	conv.Add(types.NewToolMessage("file contents"))
+	conv.Add(toolCallMsg("write_file"))
+	conv.Add(types.NewToolMessage("written ok"))
+
+	// Push these into "old" territory with padding.
+	for i := 0; i < 5; i++ {
+		conv.Add(types.NewAssistantMessage("thinking..."))
+	}
+
+	_, err := strategy.Summarize(ctx, conv, mockLLM)
+	assert.NoError(t, err)
+
+	// After round 1 there should be exactly one [SUMMARIZED] block.
+	msgsAfterRound1 := conv.GetAll()
+	summarizedCount := 0
+	for _, m := range msgsAfterRound1 {
+		if isSummarized(m) {
+			summarizedCount++
+		}
+	}
+	assert.Equal(t, 1, summarizedCount, "Round 1: expected exactly 1 [SUMMARIZED] block")
+
+	// --- Round 2: add a new batch of old tool calls and summarize again ---
+	// Clear the padding, add a second user turn + tool calls, then re-pad.
+	conv.Clear()
+	for _, m := range msgsAfterRound1 {
+		conv.Add(m)
+	}
+	conv.Add(types.NewUserMessage("Second task"))
+	conv.Add(toolCallMsg("execute_command"))
+	conv.Add(types.NewToolMessage("exit 0"))
+	conv.Add(toolCallMsg("list_files"))
+	conv.Add(types.NewToolMessage("a.go b.go"))
+
+	// Push second batch into old territory.
+	for i := 0; i < 5; i++ {
+		conv.Add(types.NewAssistantMessage("thinking..."))
+	}
+
+	_, err = strategy.Summarize(ctx, conv, mockLLM)
+	assert.NoError(t, err)
+
+	// After round 2 there must be TWO [SUMMARIZED] blocks — the first must not have been dropped.
+	msgsAfterRound2 := conv.GetAll()
+	summarizedCount = 0
+	for _, m := range msgsAfterRound2 {
+		if isSummarized(m) {
+			summarizedCount++
+		}
+	}
+	assert.Equal(t, 2, summarizedCount, "Round 2: expected 2 accumulated [SUMMARIZED] blocks, not 1 (the old bug)")
+
+	// Both user messages must still be present.
+	foundFirst, foundSecond := false, false
+	for _, m := range msgsAfterRound2 {
+		if m.Role == types.RoleUser && m.Content == "First task" {
+			foundFirst = true
+		}
+		if m.Role == types.RoleUser && m.Content == "Second task" {
+			foundSecond = true
+		}
+	}
+	assert.True(t, foundFirst, "First user message must survive both summarization rounds")
+	assert.True(t, foundSecond, "Second user message must survive both summarization rounds")
+}

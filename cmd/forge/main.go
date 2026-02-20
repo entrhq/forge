@@ -35,16 +35,18 @@ const (
 	// Context management defaults for coding sessions
 	// These are tuned for long coding sessions with many file operations
 	defaultMaxTokens        = 100000 // Conservative limit with headroom for 128K context
-	defaultThresholdPercent = 80.0   // Start summarizing at 80% (80K tokens)
-	defaultToolCallAge      = 20     // Tool calls must be 20+ messages old to enter buffer
-	defaultMinToolCalls     = 10     // Minimum 10 tool calls in buffer before summarizing
-	defaultMaxToolCallDist  = 40     // Force summarization if any tool call is 40+ messages old
-	defaultSummaryBatchSize = 10     // Summarize 10 messages at a time
+	defaultToolCallAge     = 20 // Tool calls must be 20+ messages old to enter buffer
+	defaultMinToolCalls    = 10 // Minimum 10 tool calls in buffer before summarizing
+	defaultMaxToolCallDist = 40 // Force summarization if any tool call is 40+ messages old
 
 	// Goal-batch compaction defaults (strategy 3: compact old completed turns into goal-batch blocks)
 	defaultGoalBatchTurnsOld = 20 // Turns must be 20+ messages old to be eligible for compaction
 	defaultGoalBatchMinTurns = 3  // Minimum 3 complete turns before triggering compaction
 	defaultGoalBatchMaxTurns = 6  // Compact at most 6 turns per LLM call
+
+	// Threshold summarization defaults (strategy 2: half-compaction when context is near full)
+	// Summarizes the older half of the conversation into a single summary, keeping the recent half verbatim.
+	defaultThresholdTrigger = 80.0 // Fire when context usage reaches 80% of the token limit
 )
 
 // Config holds the application configuration
@@ -220,7 +222,11 @@ func runTUI(ctx context.Context, config *Config) error {
 		defaultMaxToolCallDist,
 	)
 
-	// Strategy 2 (threshold) is disabled - see threshold_strategy.go (gets stuck in a loop)
+	// Strategy 2: Collapse the older half of the conversation into a single summary when
+	// context usage crosses the threshold. The recent half is always kept verbatim.
+	thresholdStrategy := agentcontext.NewThresholdSummarizationStrategy(
+		defaultThresholdTrigger,
+	)
 
 	// Strategy 3: Compact old completed turns (user message + summaries) into goal-batch blocks
 	goalBatchStrategy := agentcontext.NewGoalBatchCompactionStrategy(
@@ -235,6 +241,7 @@ func runTUI(ctx context.Context, config *Config) error {
 		provider,
 		defaultMaxTokens,
 		toolCallStrategy,
+		thresholdStrategy,
 		goalBatchStrategy,
 	)
 	if err != nil {

@@ -63,7 +63,10 @@ func runHeadless(ctx context.Context, config *Config) error {
 		defaultMaxToolCallDist,
 	)
 
-	// thresholdStrategy is disabled - see threshold_strategy.go (gets stuck in a loop)
+	// Strategy 2: Half-compaction when context crosses the token threshold.
+	thresholdStrategy := agentcontext.NewThresholdSummarizationStrategy(
+		defaultThresholdTrigger,
+	)
 
 	goalBatchStrategy := agentcontext.NewGoalBatchCompactionStrategy(
 		defaultGoalBatchTurnsOld,
@@ -75,6 +78,7 @@ func runHeadless(ctx context.Context, config *Config) error {
 		provider,
 		defaultMaxTokens,
 		toolCallStrategy,
+		thresholdStrategy,
 		goalBatchStrategy,
 	)
 	if err != nil {

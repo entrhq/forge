@@ -127,40 +127,61 @@ func (s *ToolCallSummarizationStrategy) ShouldRun(conv *memory.ConversationMemor
 }
 
 // Summarize compresses buffered tool calls and their results using LLM-based summarization.
-// All tool calls that are >= messagesOldThreshold old will be summarized when triggered,
-// except for tools in the exclusion list.
+// It replaces grouped tool call pairs with a single [SUMMARIZED] block inserted at the
+// position of the first grouped message, preserving all other messages (system, user,
+// existing [SUMMARIZED] blocks, recent messages) in their original order.
+//
+// This ensures that on repeated runs summaries accumulate correctly:
+//   [user1] [SUMMARIZED_A] [user2] [SUMMARIZED_B] [user3] [live messages...]
+// rather than collapsing all history into a single ever-rewritten summary block.
 func (s *ToolCallSummarizationStrategy) Summarize(ctx context.Context, conv *memory.ConversationMemory, llm llm.Provider) (int, error) {
 	messages := conv.GetAll()
 	if len(messages) <= s.messagesOldThreshold {
 		return 0, nil
 	}
 
-	// Identify old messages that can be summarized
+	// Only consider tool calls from the "old" portion of the conversation.
 	oldMessages := messages[:len(messages)-s.messagesOldThreshold]
-	recentMessages := messages[len(messages)-s.messagesOldThreshold:]
 
-	// Group tool calls with their results for summarization
+	// Group unsummarized tool call pairs eligible for compression.
 	groups := groupToolCallsAndResults(oldMessages)
 	if len(groups) == 0 {
-		return 0, nil // Nothing to summarize
+		return 0, nil
 	}
 
-	// Summarize all groups in a single batched LLM call, anchored to the
-	// user's original goal so the summarizer can reason about strategy.
-	summarizedMessages, err := s.summarizeBatch(ctx, groups, llm, findNearestUserGoal(oldMessages))
+	// Single batched LLM call covers all groups.
+	summaries, err := s.summarizeBatch(ctx, groups, llm, findNearestUserGoal(oldMessages))
 	if err != nil {
 		return 0, err
 	}
 
-	// Reconstruct: retained system/user messages + summaries + recent messages
-	retained := retainNonSummarizedMessages(oldMessages)
-	retained = append(retained, summarizedMessages...)
-	retained = append(retained, recentMessages...)
+	// Build a set of all message pointers belonging to the groups being replaced.
+	groupSet := make(map[*types.Message]bool, len(groups)*2)
+	for _, group := range groups {
+		for _, msg := range group {
+			groupSet[msg] = true
+		}
+	}
+
+	// Walk the full conversation in order. At the position of the first grouped
+	// message, insert the summary block(s). Drop all other grouped messages.
+	// Everything else — system, user, existing [SUMMARIZED] blocks, recent
+	// messages — passes through unchanged, preserving interleaved order.
+	newMessages := make([]*types.Message, 0, len(messages)-len(groupSet)+len(summaries))
+	inserted := false
+	for _, msg := range messages {
+		if groupSet[msg] {
+			if !inserted {
+				newMessages = append(newMessages, summaries...)
+				inserted = true
+			}
+			continue // drop — content is captured in the summary
+		}
+		newMessages = append(newMessages, msg)
+	}
 
 	conv.Clear()
-	for _, msg := range retained {
-		conv.Add(msg)
-	}
+	conv.AddMultiple(newMessages)
 
 	return len(groups), nil
 }
@@ -177,25 +198,7 @@ func findNearestUserGoal(messages []*types.Message) string {
 	return ""
 }
 
-// retainNonSummarizedMessages returns the subset of oldMessages that must be
-// preserved verbatim: system messages and user messages. Summarizable
-// assistant/tool message pairs are dropped here because they will be replaced
-// by the batch summary.
-func retainNonSummarizedMessages(oldMessages []*types.Message) []*types.Message {
-	retained := make([]*types.Message, 0)
 
-	for _, msg := range oldMessages {
-		switch msg.Role {
-		case types.RoleSystem:
-			retained = append(retained, msg)
-		case types.RoleUser:
-			// Human input must never be lost during summarization
-			retained = append(retained, msg)
-		}
-	}
-
-	return retained
-}
 
 // summarizeBatch compresses all eligible tool call groups into a single LLM call,
 // producing one structured operation-batch summary message. Batching rather than
