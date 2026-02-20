@@ -58,22 +58,29 @@ func (cp *CommandPalette) UpdateFilter(filter string) {
 	}
 }
 
-// updateFiltered updates the list of filtered commands based on current filter
+// updateFiltered updates the list of filtered commands based on current filter.
+// Name matches are ranked before description-only matches so that typing a
+// command prefix always surfaces the intended command at the top.
 func (cp *CommandPalette) updateFiltered() {
 	if cp.filter == "" {
 		cp.filteredCommands = cp.commands
 		return
 	}
 
-	filtered := make([]CommandItem, 0)
+	var nameMatches, descMatches []CommandItem
 	for _, cmd := range cp.commands {
-		// Match on command name or description
-		if strings.Contains(strings.ToLower(cmd.Name), cp.filter) ||
-			strings.Contains(strings.ToLower(cmd.Description), cp.filter) {
-			filtered = append(filtered, cmd)
+		nameMatch := strings.Contains(strings.ToLower(cmd.Name), cp.filter)
+		descMatch := strings.Contains(strings.ToLower(cmd.Description), cp.filter)
+		switch {
+		case nameMatch:
+			nameMatches = append(nameMatches, cmd)
+		case descMatch:
+			descMatches = append(descMatches, cmd)
 		}
 	}
-	cp.filteredCommands = filtered
+	nameMatches = append(nameMatches, descMatches...)
+	cp.filteredCommands = nameMatches
+
 
 	// Ensure selected index is valid after filtering
 	switch {
