@@ -49,6 +49,14 @@ import (
 	"github.com/entrhq/forge/pkg/types"
 )
 
+// ModelCloner is an optional interface that LLM providers can implement to
+// support lightweight per-call model overrides without constructing a full
+// second provider. The returned provider shares credentials and transport with
+// the original but directs calls to the given model.
+type ModelCloner interface {
+	CloneWithModel(model string) Provider
+}
+
 // Provider defines the interface for LLM integrations.
 //
 // Providers handle API communication with LLM services and return simple

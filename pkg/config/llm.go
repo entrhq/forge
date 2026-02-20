@@ -11,18 +11,20 @@ const (
 
 // LLMSection manages LLM provider configuration settings.
 type LLMSection struct {
-	Model   string
-	BaseURL string
-	APIKey  string
-	mu      sync.RWMutex
+	Model              string
+	BaseURL            string
+	APIKey             string
+	SummarizationModel string // optional; if empty, summarization uses Model
+	mu                 sync.RWMutex
 }
 
 // NewLLMSection creates a new LLM section with default settings.
 func NewLLMSection() *LLMSection {
 	return &LLMSection{
-		Model:   "",
-		BaseURL: "",
-		APIKey:  "",
+		Model:              "",
+		BaseURL:            "",
+		APIKey:             "",
+		SummarizationModel: "",
 	}
 }
 
@@ -38,7 +40,7 @@ func (s *LLMSection) Title() string {
 
 // Description returns the section description.
 func (s *LLMSection) Description() string {
-	return "Configure LLM provider settings including model, base URL, and API key. CLI flags and environment variables take precedence."
+	return "Configure LLM provider settings. summarization_model is optional — if set, context summarization uses this model instead of model."
 }
 
 // Data returns the current configuration data.
@@ -46,9 +48,10 @@ func (s *LLMSection) Data() map[string]any {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return map[string]any{
-		"model":    s.Model,
-		"base_url": s.BaseURL,
-		"api_key":  s.APIKey,
+		"model":               s.Model,
+		"base_url":            s.BaseURL,
+		"api_key":             s.APIKey,
+		"summarization_model": s.SummarizationModel,
 	}
 }
 
@@ -73,6 +76,10 @@ func (s *LLMSection) SetData(data map[string]any) error {
 		s.APIKey = apiKey
 	}
 
+	if summarizationModel, ok := data["summarization_model"].(string); ok {
+		s.SummarizationModel = summarizationModel
+	}
+
 	return nil
 }
 
@@ -93,6 +100,7 @@ func (s *LLMSection) Reset() {
 	s.Model = ""
 	s.BaseURL = ""
 	s.APIKey = ""
+	s.SummarizationModel = ""
 }
 
 // GetModel returns the configured model name.
@@ -135,4 +143,20 @@ func (s *LLMSection) SetAPIKey(apiKey string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.APIKey = apiKey
+}
+
+// GetSummarizationModel returns the configured summarization model name.
+// An empty string means use the main model for summarization.
+func (s *LLMSection) GetSummarizationModel() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.SummarizationModel
+}
+
+// SetSummarizationModel sets the summarization model name.
+// Pass an empty string to revert to using the main model.
+func (s *LLMSection) SetSummarizationModel(model string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.SummarizationModel = model
 }

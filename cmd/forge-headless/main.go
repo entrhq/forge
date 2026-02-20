@@ -213,6 +213,13 @@ func run(ctx context.Context, cliConfig *CLIConfig) error {
 		return fmt.Errorf("failed to create context manager: %w", err)
 	}
 
+	// Apply summarization model override from config (no-op if not configured)
+	if llmCfg := appconfig.GetLLM(); llmCfg != nil {
+		if summarizationModel := llmCfg.GetSummarizationModel(); summarizationModel != "" {
+			contextManager.SetSummarizationModel(summarizationModel)
+		}
+	}
+
 	// Create workspace security guard
 	guard, err := workspace.NewGuard(execConfig.WorkspaceDir)
 	if err != nil {

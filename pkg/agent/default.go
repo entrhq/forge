@@ -577,3 +577,12 @@ func (a *DefaultAgent) SetProvider(provider llm.Provider) error {
 
 	return nil
 }
+
+// SetSummarizationModel updates the model used for context summarization calls.
+// Pass an empty string to revert to using the main provider model.
+// This is called during hot-reload when the summarization model setting changes.
+func (a *DefaultAgent) SetSummarizationModel(model string) {
+	if a.contextManager != nil {
+		a.contextManager.SetSummarizationModel(model)
+	}
+}
