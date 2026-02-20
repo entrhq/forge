@@ -3,6 +3,7 @@ package context
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/entrhq/forge/pkg/agent/memory"
@@ -26,11 +27,13 @@ func init() {
 // Manager orchestrates multiple context summarization strategies,
 // evaluating them in order and emitting events for TUI feedback.
 type Manager struct {
-	strategies   []Strategy
-	llm          llm.Provider
-	tokenizer    *tokenizer.Tokenizer
-	maxTokens    int
-	eventChannel chan<- *types.AgentEvent
+	strategies         []Strategy
+	llm                llm.Provider
+	summarizationModel string // optional model override for summarization calls
+	tokenizer          *tokenizer.Tokenizer
+	maxTokens          int
+	eventChannel       chan<- *types.AgentEvent
+	mu                 sync.RWMutex // protects llm and summarizationModel
 }
 
 // NewManager creates a new context manager with the given strategies.
@@ -72,7 +75,46 @@ func (m *Manager) SetEventChannel(eventChan chan<- *types.AgentEvent) {
 // SetProvider updates the LLM provider used by this context manager.
 // This is called when the agent's provider is hot-reloaded.
 func (m *Manager) SetProvider(provider llm.Provider) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.llm = provider
+}
+
+// SetSummarizationModel sets the model name to use for summarization LLM calls.
+// If empty, summarization uses the same model as the main provider (m.llm).
+// The provider must implement llm.ModelCloner for this to take effect.
+func (m *Manager) SetSummarizationModel(model string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.summarizationModel = model
+}
+
+// GetSummarizationModel returns the currently configured summarization model override.
+// An empty string means the main provider model is used.
+func (m *Manager) GetSummarizationModel() string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.summarizationModel
+}
+
+// providerForSummarization returns the provider to use for summarization calls.
+// If a summarization model override is configured and the provider implements
+// llm.ModelCloner, returns a lightweight clone with the override model.
+// Otherwise returns m.llm unchanged.
+// The caller must not hold m.mu.
+func (m *Manager) providerForSummarization() llm.Provider {
+	m.mu.RLock()
+	provider := m.llm
+	model := m.summarizationModel
+	m.mu.RUnlock()
+
+	if model == "" {
+		return provider
+	}
+	if cloner, ok := provider.(llm.ModelCloner); ok {
+		return cloner.CloneWithModel(model)
+	}
+	return provider
 }
 
 // EvaluateAndSummarize evaluates all strategies and performs summarization if needed.
@@ -102,7 +144,7 @@ func (m *Manager) EvaluateAndSummarize(ctx context.Context, conv *memory.Convers
 
 		// Execute summarization (blocking operation)
 		debugLog.Printf("Executing Summarize() for strategy %s", strategy.Name())
-		summarizedCount, err := strategy.Summarize(ctx, conv, m.llm)
+		summarizedCount, err := strategy.Summarize(ctx, conv, m.providerForSummarization())
 		if err != nil {
 			debugLog.Printf("Strategy %s failed with error: %v", strategy.Name(), err)
 			// Emit error event

@@ -63,9 +63,15 @@ func runHeadless(ctx context.Context, config *Config) error {
 		defaultMaxToolCallDist,
 	)
 
+	// Strategy 2: Half-compaction when context crosses the token threshold.
 	thresholdStrategy := agentcontext.NewThresholdSummarizationStrategy(
-		defaultThresholdPercent,
-		defaultSummaryBatchSize,
+		defaultThresholdTrigger,
+	)
+
+	goalBatchStrategy := agentcontext.NewGoalBatchCompactionStrategy(
+		defaultGoalBatchTurnsOld,
+		defaultGoalBatchMinTurns,
+		defaultGoalBatchMaxTurns,
 	)
 
 	contextManager, err := agentcontext.NewManager(
@@ -73,9 +79,17 @@ func runHeadless(ctx context.Context, config *Config) error {
 		defaultMaxTokens,
 		toolCallStrategy,
 		thresholdStrategy,
+		goalBatchStrategy,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create context manager: %w", err)
+	}
+
+	// Apply summarization model override from config (no-op if not configured)
+	if llmCfg := appconfig.GetLLM(); llmCfg != nil {
+		if summarizationModel := llmCfg.GetSummarizationModel(); summarizationModel != "" {
+			contextManager.SetSummarizationModel(summarizationModel)
+		}
 	}
 
 	// Create workspace security guard

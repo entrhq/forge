@@ -55,208 +55,121 @@ func (m *MockLLMProvider) GetAPIKey() string {
 	return args.String(0)
 }
 
-// TestExtractToolName tests the extractToolName helper function
-func TestExtractToolName(t *testing.T) {
-	tests := []struct {
-		name     string
-		content  string
-		expected string
-	}{
-		{
-			name:     "valid tool name",
-			content:  `{"tool_name": "read_file", "arguments": {}}`,
-			expected: "read_file",
-		},
-		{
-			name:     "tool name with whitespace",
-			content:  `{"tool_name":  "execute_command"  , "arguments": {}}`,
-			expected: "execute_command",
-		},
-		{
-			name:     "tool name in full tool call",
-			content:  `<tool>{"server_name": "local", "tool_name": "ask_question", "arguments": {"question": "What?"}}</tool>`,
-			expected: "ask_question",
-		},
-		{
-			name:     "no tool name",
-			content:  "Just some content",
-			expected: "",
-		},
-		{
-			name:     "incomplete JSON",
-			content:  `{"tool_name": "incomplete`,
-			expected: "",
-		},
-		{
-			name:     "empty tool name",
-			content:  `{"tool_name": "", "arguments": {}}`,
-			expected: "",
-		},
-		{
-			name:     "tool name with server_name",
-			content:  `{"server_name": "mcp", "tool_name": "task_completion", "arguments": {"result": "done"}}`,
-			expected: "task_completion",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := extractToolName(tt.content)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
+// toolCallMsg returns an assistant message containing an XML tool call for the given tool name.
+func toolCallMsg(toolName string) *types.Message {
+	return types.NewAssistantMessage(
+		"<tool><server_name>local</server_name><tool_name>" + toolName + "</tool_name><arguments></arguments></tool>",
+	)
 }
 
-// TestGroupToolCallsAndResults_WithExclusions tests that excluded tools are not grouped
-func TestGroupToolCallsAndResults_WithExclusions(t *testing.T) {
-	// Create test messages with mix of regular and excluded tools
+// TestGroupToolCallsAndResults_AllToolsGrouped verifies that every tool call pair
+// (including formerly-excluded loop-breaking tools) is grouped for summarization.
+func TestGroupToolCallsAndResults_AllToolsGrouped(t *testing.T) {
 	messages := []*types.Message{
-		types.NewAssistantMessage(`<tool>{"tool_name": "read_file", "arguments": {"path": "test.go"}}</tool>`),
+		toolCallMsg("read_file"),
 		types.NewToolMessage("File content here"),
-		types.NewAssistantMessage(`<tool>{"tool_name": "ask_question", "arguments": {"question": "Continue?"}}</tool>`),
+		toolCallMsg("ask_question"),
 		types.NewToolMessage("User answered: yes"),
-		types.NewAssistantMessage(`<tool>{"tool_name": "execute_command", "arguments": {"command": "ls"}}</tool>`),
+		toolCallMsg("execute_command"),
 		types.NewToolMessage("Command output"),
-		types.NewAssistantMessage(`<tool>{"tool_name": "task_completion", "arguments": {"result": "done"}}</tool>`),
+		toolCallMsg("task_completion"),
 		types.NewToolMessage("Task completed"),
 	}
 
-	// Exclude ask_question and task_completion
-	excludedTools := map[string]bool{
-		"ask_question":    true,
-		"task_completion": true,
-	}
+	groups := groupToolCallsAndResults(messages)
 
-	groups := groupToolCallsAndResults(messages, excludedTools)
-
-	// Should have only 2 groups (read_file and execute_command)
-	// ask_question and task_completion should be excluded
-	assert.Len(t, groups, 2, "Should have 2 groups (excluded tools should not be grouped)")
-
-	// Verify first group is read_file
+	// All 4 tool call pairs should be grouped — no exclusions anymore.
+	assert.Len(t, groups, 4, "All tool call pairs should be grouped")
 	assert.Contains(t, groups[0][0].Content, "read_file")
-	assert.Equal(t, types.RoleTool, groups[0][1].Role)
-
-	// Verify second group is execute_command
-	assert.Contains(t, groups[1][0].Content, "execute_command")
-	assert.Equal(t, types.RoleTool, groups[1][1].Role)
+	assert.Contains(t, groups[1][0].Content, "ask_question")
+	assert.Contains(t, groups[2][0].Content, "execute_command")
+	assert.Contains(t, groups[3][0].Content, "task_completion")
 }
 
-// TestGroupToolCallsAndResults_NoExclusions tests that all tools are grouped when no exclusions
-func TestGroupToolCallsAndResults_NoExclusions(t *testing.T) {
-	messages := []*types.Message{
-		types.NewAssistantMessage(`<tool>{"tool_name": "read_file", "arguments": {}}</tool>`),
-		types.NewToolMessage("File content"),
-		types.NewAssistantMessage(`<tool>{"tool_name": "ask_question", "arguments": {}}</tool>`),
-		types.NewToolMessage("User answered"),
-	}
-
-	// No exclusions
-	excludedTools := map[string]bool{}
-
-	groups := groupToolCallsAndResults(messages, excludedTools)
-
-	// Should have 2 groups (both tools included)
-	assert.Len(t, groups, 2, "Should have 2 groups when no exclusions")
-}
-
-// TestGroupToolCallsAndResults_SkipsSummarized tests that already summarized messages are skipped
+// TestGroupToolCallsAndResults_SkipsSummarized tests that already summarized messages are skipped.
 func TestGroupToolCallsAndResults_SkipsSummarized(t *testing.T) {
 	messages := []*types.Message{
-		types.NewAssistantMessage(`<tool>{"tool_name": "read_file", "arguments": {}}</tool>`),
+		toolCallMsg("read_file"),
 		types.NewToolMessage("File content"),
 	}
 
-	// Mark first message as summarized
+	// Mark the assistant message as already summarized.
 	messages[0].WithMetadata("summarized", true)
 
-	excludedTools := map[string]bool{}
+	groups := groupToolCallsAndResults(messages)
 
-	groups := groupToolCallsAndResults(messages, excludedTools)
-
-	// Should have 1 group with just the tool result (assistant message skipped)
-	// This is acceptable behavior - incomplete groups are still added
+	// Only the orphaned tool result should form a group.
 	assert.Len(t, groups, 1, "Should have 1 group with remaining tool result")
 	assert.Len(t, groups[0], 1, "Group should have 1 message (tool result only)")
 	assert.Equal(t, types.RoleTool, groups[0][0].Role, "Should be tool result message")
 }
 
-// TestGroupToolCallsAndResults_PreservesSystemMessages tests that system messages are not grouped
-func TestGroupToolCallsAndResults_PreservesSystemMessages(t *testing.T) {
+// TestGroupToolCallsAndResults_SkipsSystemMessages tests that system messages are never grouped.
+func TestGroupToolCallsAndResults_SkipsSystemMessages(t *testing.T) {
 	messages := []*types.Message{
 		types.NewSystemMessage("System instruction"),
-		types.NewAssistantMessage(`<tool>{"tool_name": "read_file", "arguments": {}}</tool>`),
+		toolCallMsg("read_file"),
 		types.NewToolMessage("File content"),
 		types.NewSystemMessage("Another system message"),
 	}
 
-	excludedTools := map[string]bool{}
+	groups := groupToolCallsAndResults(messages)
 
-	groups := groupToolCallsAndResults(messages, excludedTools)
-
-	// Should have 1 group (system messages excluded)
-	assert.Len(t, groups, 1, "Should have 1 group, system messages excluded")
-
-	// Verify no system messages in groups
+	assert.Len(t, groups, 1, "Should have 1 group; system messages excluded")
 	for _, group := range groups {
 		for _, msg := range group {
-			assert.NotEqual(t, types.RoleSystem, msg.Role, "System messages should not be in groups")
+			assert.NotEqual(t, types.RoleSystem, msg.Role, "System messages must not appear in groups")
 		}
 	}
 }
 
-// TestNewToolCallSummarizationStrategy_DefaultExclusions tests default exclusions
-func TestNewToolCallSummarizationStrategy_DefaultExclusions(t *testing.T) {
-	strategy := NewToolCallSummarizationStrategy(20, 10, 40)
+// TestNewToolCallSummarizationStrategy_Constructor tests constructor parameter defaults.
+func TestNewToolCallSummarizationStrategy_Constructor(t *testing.T) {
+	tests := []struct {
+		name                    string
+		threshold, min, maxDist int
+		wantThreshold           int
+		wantMin                 int
+		wantMax                 int
+	}{
+		{"valid params", 20, 10, 40, 20, 10, 40},
+		{"zero threshold uses default", 0, 10, 40, 20, 10, 40},
+		{"zero min uses default", 20, 0, 40, 20, 10, 40},
+		{"zero maxDist uses default", 20, 10, 0, 20, 10, 40},
+		{"all zeros use defaults", 0, 0, 0, 20, 10, 40},
+	}
 
-	// Verify default exclusions
-	assert.True(t, strategy.excludedTools["task_completion"], "task_completion should be excluded by default")
-	assert.True(t, strategy.excludedTools["ask_question"], "ask_question should be excluded by default")
-	assert.True(t, strategy.excludedTools["converse"], "converse should be excluded by default")
-	assert.Len(t, strategy.excludedTools, 3, "Should have exactly 3 default exclusions")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := NewToolCallSummarizationStrategy(tt.threshold, tt.min, tt.maxDist)
+			assert.Equal(t, tt.wantThreshold, s.messagesOldThreshold)
+			assert.Equal(t, tt.wantMin, s.minToolCallsToSummarize)
+			assert.Equal(t, tt.wantMax, s.maxToolCallDistance)
+		})
+	}
 }
 
-// TestNewToolCallSummarizationStrategy_CustomExclusions tests custom exclusions
-func TestNewToolCallSummarizationStrategy_CustomExclusions(t *testing.T) {
-	strategy := NewToolCallSummarizationStrategy(20, 10, 40, "custom_tool", "another_tool")
-
-	// Verify custom exclusions (should replace defaults)
-	assert.True(t, strategy.excludedTools["custom_tool"], "custom_tool should be excluded")
-	assert.True(t, strategy.excludedTools["another_tool"], "another_tool should be excluded")
-	assert.False(t, strategy.excludedTools["task_completion"], "task_completion should not be excluded when custom list provided")
-	assert.Len(t, strategy.excludedTools, 2, "Should have exactly 2 custom exclusions")
-}
-
-// TestNewToolCallSummarizationStrategy_EmptyExclusions tests empty exclusion list
-func TestNewToolCallSummarizationStrategy_EmptyExclusions(t *testing.T) {
-	// Passing empty slice should use defaults
-	strategy := NewToolCallSummarizationStrategy(20, 10, 40)
-
-	assert.Len(t, strategy.excludedTools, 3, "Empty exclusion list should use defaults")
-}
-
-// TestSummarize_ExcludesLoopBreakingTools tests end-to-end summarization with exclusions
-func TestSummarize_ExcludesLoopBreakingTools(t *testing.T) {
-	strategy := NewToolCallSummarizationStrategy(5, 2, 20) // Lower thresholds for testing
+// TestSummarize_AllToolCallsSummarized verifies that all tool call types
+// (including formerly-excluded tools) are included in summarization.
+func TestSummarize_AllToolCallsSummarized(t *testing.T) {
+	strategy := NewToolCallSummarizationStrategy(5, 2, 20)
 	conv := memory.NewConversationMemory()
 
-	// Add messages: mix of regular tools and excluded tools
-	conv.Add(types.NewAssistantMessage(`<tool>{"tool_name": "read_file", "arguments": {}}</tool>`))
+	conv.Add(toolCallMsg("read_file"))
 	conv.Add(types.NewToolMessage("File content here"))
-	conv.Add(types.NewAssistantMessage(`<tool>{"tool_name": "ask_question", "arguments": {}}</tool>`))
+	conv.Add(toolCallMsg("ask_question"))
 	conv.Add(types.NewToolMessage("User said yes"))
-	conv.Add(types.NewAssistantMessage(`<tool>{"tool_name": "execute_command", "arguments": {}}</tool>`))
+	conv.Add(toolCallMsg("execute_command"))
 	conv.Add(types.NewToolMessage("Command executed"))
 
-	// Add recent messages to stay above threshold
+	// Add recent messages to push the above into "old" territory.
 	for i := 0; i < 6; i++ {
 		conv.Add(types.NewUserMessage("Recent message"))
 	}
 
-	// Mock LLM
 	mockLLM := new(MockLLMProvider)
 	mockLLM.On("Complete", mock.Anything, mock.Anything).Return(
-		types.NewAssistantMessage("Summary of tool call"),
+		types.NewAssistantMessage("Summary of tool calls"),
 		nil,
 	)
 
@@ -264,28 +177,24 @@ func TestSummarize_ExcludesLoopBreakingTools(t *testing.T) {
 	count, err := strategy.Summarize(ctx, conv, mockLLM)
 
 	assert.NoError(t, err)
-	assert.Equal(t, 2, count, "Should summarize 2 groups (read_file and execute_command, excluding ask_question)")
+	assert.Equal(t, 3, count, "Should summarize all 3 tool call groups")
 
-	// Verify ask_question is still in conversation (not summarized)
+	// After summarization, no raw tool call messages should remain in the old window.
 	messages := conv.GetAll()
-	foundAskQuestion := false
 	for _, msg := range messages {
-		if msg.Role == types.RoleAssistant && containsToolCallIndicators(msg.Content) {
-			toolName := extractToolName(msg.Content)
-			if toolName == "ask_question" {
-				foundAskQuestion = true
-				// Verify it's NOT summarized
-				summarized, _ := msg.Metadata["summarized"].(bool)
-				assert.False(t, summarized, "ask_question should not be summarized")
-			}
+		if isSummarized(msg) {
+			continue
 		}
+		assert.False(
+			t,
+			msg.Role == types.RoleAssistant && containsToolCallIndicators(msg.Content),
+			"No raw tool call messages should survive summarization: %q", msg.Content,
+		)
 	}
-	assert.True(t, foundAskQuestion, "ask_question should still be in conversation")
 }
 
 // TestSummarize_PreservesUserMessages verifies that user (human) messages in the
 // "old" portion of the conversation are never dropped during tool call summarization.
-// This is the core regression test for the user-message-loss bug.
 func TestSummarize_PreservesUserMessages(t *testing.T) {
 	strategy := NewToolCallSummarizationStrategy(5, 2, 20)
 	conv := memory.NewConversationMemory()
@@ -293,15 +202,14 @@ func TestSummarize_PreservesUserMessages(t *testing.T) {
 	userMsg1 := "Please read the config file"
 	userMsg2 := "Now show me the tests"
 
-	// Interleave user messages with tool calls in the "old" window
 	conv.Add(types.NewUserMessage(userMsg1))
-	conv.Add(types.NewAssistantMessage(`<tool>{"tool_name": "read_file", "arguments": {}}</tool>`))
+	conv.Add(toolCallMsg("read_file"))
 	conv.Add(types.NewToolMessage("config file content"))
 	conv.Add(types.NewUserMessage(userMsg2))
-	conv.Add(types.NewAssistantMessage(`<tool>{"tool_name": "execute_command", "arguments": {}}</tool>`))
+	conv.Add(toolCallMsg("execute_command"))
 	conv.Add(types.NewToolMessage("test output"))
 
-	// Add recent messages to push the above into "old" territory
+	// Add recent messages to push the above into "old" territory.
 	for i := 0; i < 6; i++ {
 		conv.Add(types.NewAssistantMessage("Working on it..."))
 	}
@@ -317,7 +225,6 @@ func TestSummarize_PreservesUserMessages(t *testing.T) {
 	assert.NoError(t, err)
 
 	messages := conv.GetAll()
-
 	foundUser1, foundUser2 := false, false
 	for _, msg := range messages {
 		if msg.Role == types.RoleUser && msg.Content == userMsg1 {
@@ -330,4 +237,95 @@ func TestSummarize_PreservesUserMessages(t *testing.T) {
 
 	assert.True(t, foundUser1, "First user message must be preserved after tool call summarization")
 	assert.True(t, foundUser2, "Second user message must be preserved after tool call summarization")
+}
+
+// TestSummarize_SummariesAccumulateAcrossMultipleRuns is the core regression test for the
+// "only one [SUMMARIZED] block ever visible" bug.
+//
+// Previously, retainNonSummarizedMessages kept only system+user messages, silently
+// dropping any existing [SUMMARIZED] blocks. Every subsequent Summarize call would
+// therefore overwrite all prior summaries with a single new one.
+//
+// After the fix, the pointer-set walk preserves existing [SUMMARIZED] blocks in place,
+// so N summarization runs produce N accumulated summary blocks, interleaved correctly
+// with user messages.
+func TestSummarize_SummariesAccumulateAcrossMultipleRuns(t *testing.T) {
+	// Use a low threshold so we can exercise two distinct summarization passes easily.
+	strategy := NewToolCallSummarizationStrategy(4, 2, 20)
+	conv := memory.NewConversationMemory()
+
+	ctx := context.Background()
+	callN := 0
+	mockLLM := new(MockLLMProvider)
+	mockLLM.On("Complete", mock.Anything, mock.Anything).
+		Return(types.NewAssistantMessage("summary"), nil).
+		Run(func(args mock.Arguments) { callN++ })
+
+	// --- Round 1: populate old tool calls and summarize ---
+	conv.Add(types.NewUserMessage("First task"))
+	conv.Add(toolCallMsg("read_file"))
+	conv.Add(types.NewToolMessage("file contents"))
+	conv.Add(toolCallMsg("write_file"))
+	conv.Add(types.NewToolMessage("written ok"))
+
+	// Push these into "old" territory with padding.
+	for i := 0; i < 5; i++ {
+		conv.Add(types.NewAssistantMessage("thinking..."))
+	}
+
+	_, err := strategy.Summarize(ctx, conv, mockLLM)
+	assert.NoError(t, err)
+
+	// After round 1 there should be exactly one [SUMMARIZED] block.
+	msgsAfterRound1 := conv.GetAll()
+	summarizedCount := 0
+	for _, m := range msgsAfterRound1 {
+		if isSummarized(m) {
+			summarizedCount++
+		}
+	}
+	assert.Equal(t, 1, summarizedCount, "Round 1: expected exactly 1 [SUMMARIZED] block")
+
+	// --- Round 2: add a new batch of old tool calls and summarize again ---
+	// Clear the padding, add a second user turn + tool calls, then re-pad.
+	conv.Clear()
+	for _, m := range msgsAfterRound1 {
+		conv.Add(m)
+	}
+	conv.Add(types.NewUserMessage("Second task"))
+	conv.Add(toolCallMsg("execute_command"))
+	conv.Add(types.NewToolMessage("exit 0"))
+	conv.Add(toolCallMsg("list_files"))
+	conv.Add(types.NewToolMessage("a.go b.go"))
+
+	// Push second batch into old territory.
+	for i := 0; i < 5; i++ {
+		conv.Add(types.NewAssistantMessage("thinking..."))
+	}
+
+	_, err = strategy.Summarize(ctx, conv, mockLLM)
+	assert.NoError(t, err)
+
+	// After round 2 there must be TWO [SUMMARIZED] blocks — the first must not have been dropped.
+	msgsAfterRound2 := conv.GetAll()
+	summarizedCount = 0
+	for _, m := range msgsAfterRound2 {
+		if isSummarized(m) {
+			summarizedCount++
+		}
+	}
+	assert.Equal(t, 2, summarizedCount, "Round 2: expected 2 accumulated [SUMMARIZED] blocks, not 1 (the old bug)")
+
+	// Both user messages must still be present.
+	foundFirst, foundSecond := false, false
+	for _, m := range msgsAfterRound2 {
+		if m.Role == types.RoleUser && m.Content == "First task" {
+			foundFirst = true
+		}
+		if m.Role == types.RoleUser && m.Content == "Second task" {
+			foundSecond = true
+		}
+	}
+	assert.True(t, foundFirst, "First user message must survive both summarization rounds")
+	assert.True(t, foundSecond, "Second user message must survive both summarization rounds")
 }

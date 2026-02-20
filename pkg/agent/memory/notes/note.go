@@ -3,8 +3,13 @@ package notes
 import (
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"time"
 )
+
+// idCounter is used alongside the timestamp in GenerateID to guarantee
+// uniqueness when multiple notes are created within the same nanosecond.
+var idCounter atomic.Int64
 
 const (
 	// MaxContentLength is the maximum number of characters allowed in note content
@@ -99,9 +104,12 @@ func ValidateTags(tags []string) error {
 	return nil
 }
 
-// GenerateID creates a unique note ID using the current timestamp with nanosecond precision
+// GenerateID creates a unique note ID using the current timestamp combined with
+// a monotonically increasing counter to guarantee uniqueness even when multiple
+// notes are created within the same nanosecond (e.g. under concurrent load).
 func GenerateID() string {
-	return fmt.Sprintf("%s%d", IDPrefix, time.Now().UnixNano())
+	seq := idCounter.Add(1)
+	return fmt.Sprintf("%s%d_%d", IDPrefix, time.Now().UnixNano(), seq)
 }
 
 // normalizeTags trims whitespace and converts tags to lowercase for consistency

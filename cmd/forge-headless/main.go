@@ -32,12 +32,18 @@ const (
 	defaultModel = "anthropic/claude-sonnet-4.5"
 
 	// Context management defaults for headless execution
-	defaultMaxTokens        = 100000 // Conservative limit with headroom for 128K context
-	defaultThresholdPercent = 80.0   // Start summarizing at 80% (80K tokens)
-	defaultToolCallAge      = 20     // Tool calls must be 20+ messages old to enter buffer
-	defaultMinToolCalls     = 10     // Minimum 10 tool calls in buffer before summarizing
-	defaultMaxToolCallDist  = 40     // Force summarization if any tool call is 40+ messages old
-	defaultSummaryBatchSize = 10     // Summarize 10 messages at a time
+	defaultMaxTokens       = 100000 // Conservative limit with headroom for 128K context
+	defaultToolCallAge     = 20     // Tool calls must be 20+ messages old to enter buffer
+	defaultMinToolCalls   = 10     // Minimum 10 tool calls in buffer before summarizing
+	defaultMaxToolCallDist = 40    // Force summarization if any tool call is 40+ messages old
+
+	// Threshold summarization defaults (strategy 2: half-compaction when context is near full)
+	defaultThresholdTrigger = 80.0 // Fire when context usage reaches 80% of the token limit
+
+	// Goal-batch compaction defaults (strategy 3: compact old completed turns into goal-batch blocks)
+	defaultGoalBatchTurnsOld = 20 // Turns must be 20+ messages old to be eligible for compaction
+	defaultGoalBatchMinTurns = 3  // Minimum 3 complete turns before triggering compaction
+	defaultGoalBatchMaxTurns = 6  // Compact at most 6 turns per LLM call
 )
 
 // CLIConfig holds command-line configuration
@@ -186,9 +192,15 @@ func run(ctx context.Context, cliConfig *CLIConfig) error {
 		defaultMaxToolCallDist,
 	)
 
+	// Strategy 2: Half-compaction when context crosses the token threshold.
 	thresholdStrategy := agentcontext.NewThresholdSummarizationStrategy(
-		defaultThresholdPercent,
-		defaultSummaryBatchSize,
+		defaultThresholdTrigger,
+	)
+
+	goalBatchStrategy := agentcontext.NewGoalBatchCompactionStrategy(
+		defaultGoalBatchTurnsOld,
+		defaultGoalBatchMinTurns,
+		defaultGoalBatchMaxTurns,
 	)
 
 	contextManager, err := agentcontext.NewManager(
@@ -196,9 +208,17 @@ func run(ctx context.Context, cliConfig *CLIConfig) error {
 		defaultMaxTokens,
 		toolCallStrategy,
 		thresholdStrategy,
+		goalBatchStrategy,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create context manager: %w", err)
+	}
+
+	// Apply summarization model override from config (no-op if not configured)
+	if llmCfg := appconfig.GetLLM(); llmCfg != nil {
+		if summarizationModel := llmCfg.GetSummarizationModel(); summarizationModel != "" {
+			contextManager.SetSummarizationModel(summarizationModel)
+		}
 	}
 
 	// Create workspace security guard

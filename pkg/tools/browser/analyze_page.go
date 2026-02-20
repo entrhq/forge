@@ -194,10 +194,15 @@ func (t *AnalyzePageTool) GeneratePreview(ctx context.Context, argsXML []byte) (
 }
 
 // callLLMForAnalysis calls the LLM provider to analyze the page.
+// If a browser_analysis_model override is configured, the call is directed to
+// that model via a lightweight provider clone (same credentials, different model).
 func (t *AnalyzePageTool) callLLMForAnalysis(ctx context.Context, prompt string) (string, error) {
 	if t.provider == nil {
 		return "", fmt.Errorf("LLM provider not available")
 	}
+
+	// Resolve which provider to use — check config for a per-call model override.
+	provider := t.providerForAnalysis()
 
 	// Create messages for the LLM
 	messages := []*types.Message{
@@ -205,12 +210,28 @@ func (t *AnalyzePageTool) callLLMForAnalysis(ctx context.Context, prompt string)
 	}
 
 	// Call the provider
-	response, err := t.provider.Complete(ctx, messages)
+	response, err := provider.Complete(ctx, messages)
 	if err != nil {
 		return "", fmt.Errorf("LLM call failed: %w", err)
 	}
 
 	return response.Content, nil
+}
+
+// providerForAnalysis returns the provider to use for page analysis calls.
+// If browser_analysis_model is configured and the provider supports ModelCloner,
+// returns a lightweight clone directed at that model. Otherwise returns t.provider.
+func (t *AnalyzePageTool) providerForAnalysis() llm.Provider {
+	if config.IsInitialized() {
+		if llmCfg := config.GetLLM(); llmCfg != nil {
+			if model := llmCfg.GetBrowserAnalysisModel(); model != "" {
+				if cloner, ok := t.provider.(llm.ModelCloner); ok {
+					return cloner.CloneWithModel(model)
+				}
+			}
+		}
+	}
+	return t.provider
 }
 
 // ShouldShow returns whether this tool should be visible.

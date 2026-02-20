@@ -158,6 +158,20 @@ func NewProvider(apiKey string, opts ...ProviderOption) (*Provider, error) {
 	return p, nil
 }
 
+// CloneWithModel returns a shallow copy of p configured to use the given model.
+// The clone shares the same HTTP client, API key, and base URL as the original,
+// making it very cheap to create. It implements llm.ModelCloner.
+func (p *Provider) CloneWithModel(model string) llm.Provider {
+	clone := *p // shallow copy — shares httpClient (connection pool), apiKey, baseURL
+	clone.model = model
+	if p.modelInfo != nil {
+		mi := *p.modelInfo // copy modelInfo so Name mutation doesn't affect original
+		mi.Name = model
+		clone.modelInfo = &mi
+	}
+	return &clone
+}
+
 // StreamCompletion sends messages to the OpenAI API and streams back response chunks.
 //
 // The returned channel emits StreamChunk instances as the response is generated.

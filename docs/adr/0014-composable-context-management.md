@@ -256,7 +256,15 @@ Provide a 2-3 sentence summary that captures the essential information.
 
 #### 2. ThresholdSummarizationStrategy
 
-Triggers when token usage exceeds a percentage threshold (default: 80% of max).
+Triggers when token usage exceeds a percentage threshold (default: 80% of max). This strategy is designed to perform a "half-compaction," reducing token count to a target percentage (e.g., 50%) to create headroom without fully summarizing the entire history.
+
+It was temporarily disabled due to a bug causing infinite loops but has been re-enabled and refactored.
+
+#### 3. GoalBatchCompactionStrategy
+
+Summarizes old, completed turns into episodic memory blocks. A "turn" is defined as a user message followed by one or more `[SUMMARIZED]` blocks from the other strategies. This strategy addresses the "implicit floor" problem where the context fills with user messages and summary blocks that other strategies cannot compress further.
+
+It fires proactively based on the age and count of completed turns, not reactively based on token pressure. See [ADR-0041](0041-goal-batch-compaction-strategy.md) for full details.
 
 ```go
 type ThresholdSummarizationStrategy struct {
@@ -544,6 +552,9 @@ This ensures targeted optimizations happen before general pruning.
 - [ADR-0005](0005-channel-based-agent-communication.md) - Channel-based communication enables event streaming for summarization status
 - [ADR-0007](0007-memory-system-design.md) - Memory system design provides foundation for conversation management
 - [ADR-0013](0013-streaming-command-execution.md) - Established pattern for blocking operations with event-based TUI updates
+- [ADR-0040](0040-structured-summarization-prompt.md) - Defines the shift to structured, first-person episodic memory prompts used by all summarization strategies.
+- [ADR-0041](0041-goal-batch-compaction-strategy.md) - Details the `GoalBatchCompactionStrategy`.
+- [ADR-0042](0042-summarization-model-override.md) - Documents the ability to use a separate model for summarization tasks.
 - Future ADR - Vector database integration could enhance strategy selection
 
 ---
@@ -573,15 +584,13 @@ This architecture prioritizes **correctness** (agent loop) while maintaining **u
 
 ### Strategy Execution Order
 
-Strategies execute in the order they're added to the Context Manager. For the initial implementation:
+Strategies execute in the order they are registered with the Context Manager. The recommended order is:
 
-1. **ToolCallSummarizationStrategy** - Runs first to compress old tool calls
-2. **ThresholdSummarizationStrategy** - Runs second if tokens still too high
+1.  **`ToolCallSummarizationStrategy`**: Compresses raw tool call/result pairs into `[SUMMARIZED]` blocks. This is the most granular and frequently-run strategy.
+2.  **`ThresholdSummarizationStrategy`**: When total token count exceeds a high-water mark, it compacts older assistant message blocks into `[SUMMARIZED]` blocks. This acts as a primary defense against token overflow.
+3.  **`GoalBatchCompactionStrategy`**: After many turns, the context can fill with `user` messages and `[SUMMARIZED]` blocks. This strategy compacts these completed "turns" into higher-level `[GOAL BATCH]` summaries, ensuring long-session stability.
 
-This ordering ensures:
-- Specific, targeted summarization happens before broad summarization
-- Old tool calls are always compressed first (most compressible content)
-- Threshold strategy acts as safety net if tool call strategy insufficient
+This order ensures that low-level noise is cleaned up first, followed by reactive compaction, and finally proactive, long-term memory management.
 
 ### Summarization Prompt Design Principles
 

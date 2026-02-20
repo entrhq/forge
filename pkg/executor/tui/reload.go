@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 
+	"github.com/entrhq/forge/pkg/agent"
 	"github.com/entrhq/forge/pkg/config"
 	"github.com/entrhq/forge/pkg/llm/openai"
 )
@@ -51,6 +52,12 @@ func (m *model) reloadLLMProvider() error {
 
 	// Update the model's provider reference so settings overlay gets fresh values
 	m.provider = provider
+
+	// Apply summarization model override (empty string reverts to main model)
+	summarizationModel := llmConfig.GetSummarizationModel()
+	if defaultAgent, ok := m.agent.(*agent.DefaultAgent); ok {
+		defaultAgent.SetSummarizationModel(summarizationModel)
+	}
 
 	return nil
 }
