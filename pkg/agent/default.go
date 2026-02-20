@@ -446,7 +446,7 @@ func (a *DefaultAgent) GetMessages() []*types.Message {
 }
 
 // GetSystemPrompt returns the current system prompt as it would be sent to the LLM.
-// It is synthesised fresh on every call (same as at the start of each agent turn).
+// It is synthesized fresh on every call (same as at the start of each agent turn).
 func (a *DefaultAgent) GetSystemPrompt() string {
 	a.toolsMu.RLock()
 	defer a.toolsMu.RUnlock()

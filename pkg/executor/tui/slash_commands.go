@@ -127,10 +127,10 @@ func init() {
 	})
 
 	registerCommand(&SlashCommand{
-		Name:        "exportcontext",
+		Name:        "snapshot",
 		Description: "Export full context snapshot to .forge/context/ for debugging",
 		Type:        CommandTypeTUI,
-		Handler:     handleExportContextCommand,
+		Handler:     handleSnapshotCommand,
 		MinArgs:     0,
 		MaxArgs:     0,
 	})
@@ -599,9 +599,9 @@ type contextSnapshot struct {
 	Messages     []contextSnapshotMessage `json:"messages"`
 }
 
-// handleExportContextCommand exports the full conversation payload to a timestamped
+// handleSnapshotCommand exports the full conversation payload to a timestamped
 // JSON file in <workspace>/.forge/context/ and shows a toast with the output path.
-func handleExportContextCommand(m *model, args []string) interface{} {
+func handleSnapshotCommand(m *model, args []string) interface{} {
 	if m.agent == nil {
 		m.showToast("Error", "Agent not available", "❌", true)
 		return nil
@@ -611,7 +611,7 @@ func handleExportContextCommand(m *model, args []string) interface{} {
 
 	// Ensure the output directory exists.
 	outDir := filepath.Join(m.workspaceDir, ".forge", "context")
-	if err := os.MkdirAll(outDir, 0o755); err != nil {
+	if err := os.MkdirAll(outDir, 0o750); err != nil {
 		m.showToast("Export failed", fmt.Sprintf("Could not create directory: %v", err), "❌", true)
 		return nil
 	}
@@ -626,7 +626,7 @@ func handleExportContextCommand(m *model, args []string) interface{} {
 		return nil
 	}
 
-	if err := os.WriteFile(outPath, data, 0o644); err != nil {
+	if err := os.WriteFile(outPath, data, 0o600); err != nil {
 		m.showToast("Export failed", fmt.Sprintf("Could not write file: %v", err), "❌", true)
 		return nil
 	}
@@ -648,7 +648,7 @@ func buildContextSnapshot(m *model) *contextSnapshot {
 	// Reserve capacity for the system prompt entry + all conversation messages.
 	msgEntries := make([]contextSnapshotMessage, 0, 1+len(messages))
 
-	// Index 0 is always the system prompt, synthesised fresh (not in memory).
+	// Index 0 is always the system prompt, synthesized fresh (not in memory).
 	sysTokens := (len(systemPrompt) + len("system") + 12) / 4
 	msgEntries = append(msgEntries, contextSnapshotMessage{
 		Index:   0,

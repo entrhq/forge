@@ -1,4 +1,4 @@
-# 0043. Context Snapshot Export (`/exportcontext`)
+# 0043. Context Snapshot Export (`/snapshot`)
 
 **Status:** Accepted
 **Date:** 2025-07-15
@@ -25,7 +25,7 @@ There is currently no way to dump the live conversation payload to disk for offl
 
 ### Goals
 
-- Provide a single TUI slash command (`/exportcontext`) that writes the full conversation payload to a JSON file in the workspace.
+- Provide a single TUI slash command (`/snapshot`) that writes the full conversation payload to a JSON file in the workspace.
 - The exported file must be self-contained and human-readable enough for engineers to `jq`-filter, diff, or load into tooling.
 - The command must be non-blocking and synchronous — no round-trip to the agent is required.
 - Saved files must be timestamped and accumulate (never overwrite) so engineers can compare snapshots before and after summarization events.
@@ -103,7 +103,7 @@ The core operation (read a copy of in-memory messages) is already thread-safe an
 
 ### Positive
 
-- Engineers can snapshot context at any point in a session with `/exportcontext`.
+- Engineers can snapshot context at any point in a session with `/snapshot`.
 - Snapshots accumulate in `.forge/context/` and can be compared across time.
 - No new channels, events, or goroutines required.
 - The `GetMessages()` method is generally useful (tests, introspection, future features).
@@ -128,7 +128,7 @@ The core operation (read a copy of in-memory messages) is already thread-safe an
 |------|--------|
 | `pkg/agent/agent.go` | Add `GetMessages() []*types.Message` and `GetSystemPrompt() string` to `Agent` interface |
 | `pkg/agent/default.go` | Implement `GetMessages()` returning `a.memory.GetAll()`; implement `GetSystemPrompt()` delegating to `buildSystemPrompt()` |
-| `pkg/executor/tui/slash_commands.go` | Register `/exportcontext` command; implement `handleExportContextCommand` and `buildContextSnapshot` helpers |
+| `pkg/executor/tui/slash_commands.go` | Register `/snapshot` command; implement `handleSnapshotCommand` and `buildContextSnapshot` helpers |
 
 ### Exported JSON schema
 
@@ -174,7 +174,7 @@ The core operation (read a copy of in-memory messages) is already thread-safe an
 ### Handler pseudocode
 
 ```go
-func handleExportContextCommand(m *model, args []string) interface{} {
+func handleSnapshotCommand(m *model, args []string) interface{} {
     if m.agent == nil {
         m.showToast("Error", "Agent not available", "❌", true)
         return nil
@@ -198,8 +198,8 @@ func handleExportContextCommand(m *model, args []string) interface{} {
 
 ### Data flow
 
-1. User types `/exportcontext` in TUI input.
-2. TUI parses the slash command and calls `handleExportContextCommand(m, args)`.
+1. User types `/snapshot` in TUI input.
+2. TUI parses the slash command and calls `handleSnapshotCommand(m, args)`.
 3. Handler calls `m.agent.GetSystemPrompt()` → synthesises the full system prompt (tools, custom instructions, repository context) — this is **never** stored in conversation memory.
 4. Handler calls `m.agent.GetMessages()` → `a.memory.GetAll()` (mutex-protected copy of conversation history).
 5. Handler calls `m.agent.GetContextInfo()` for aggregate token statistics.
@@ -215,7 +215,7 @@ func handleExportContextCommand(m *model, args []string) interface{} {
 
 ### Success Metrics
 
-- `/exportcontext` produces a valid JSON file in `.forge/context/` within 100 ms on sessions up to 200 messages.
+- `/snapshot` produces a valid JSON file in `.forge/context/` within 100 ms on sessions up to 200 messages.
 - `messages[0]` in the exported JSON is always the system message (role `"system"`) containing the full system prompt.
 - `messages[1..N]` match exactly what `m.agent.GetMessages()` returns, in order.
 - Token counts in `token_summary` match those shown by `/context`.

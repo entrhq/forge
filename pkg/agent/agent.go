@@ -68,7 +68,7 @@ type Agent interface {
 
 	// GetSystemPrompt returns the current system prompt exactly as it would be sent to
 	// the LLM on the next turn (including tool schemas, custom instructions, and
-	// repository context). This is synthesised on every call and is not cached.
+	// repository context). This is synthesized on every call and is not cached.
 	GetSystemPrompt() string
 
 	// SetProvider updates the LLM provider used by the agent.
