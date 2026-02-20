@@ -15,11 +15,12 @@ import (
 
 const (
 	// Section and field names
-	llmSection              = "llm"
-	modelField              = "model"
-	summarizationModelField = "summarization_model"
-	baseURLField            = "base_url"
-	apiKeyField             = "api_key"
+	llmSection                = "llm"
+	modelField                = "model"
+	summarizationModelField   = "summarization_model"
+	browserAnalysisModelField = "browser_analysis_model"
+	baseURLField              = "base_url"
+	apiKeyField               = "api_key"
 )
 
 // SettingsOverlay provides a full interactive settings editor
@@ -227,6 +228,7 @@ func (s *SettingsOverlay) loadSettings() {
 			}{
 				{modelField, "Model"},
 				{summarizationModelField, "Summarization Model"},
+				{browserAnalysisModelField, "Browser Analysis Model"},
 				{baseURLField, "Base URL"},
 				{apiKeyField, "API Key"},
 			}
@@ -262,6 +264,11 @@ func (s *SettingsOverlay) loadSettings() {
 
 				// For summarization_model: default to the main model if not explicitly set.
 				if value == "" && field.key == summarizationModelField && s.provider != nil {
+					value = s.provider.GetModel()
+				}
+
+				// For browser_analysis_model: default to the main model if not explicitly set.
+				if value == "" && field.key == browserAnalysisModelField && s.provider != nil {
 					value = s.provider.GetModel()
 				}
 

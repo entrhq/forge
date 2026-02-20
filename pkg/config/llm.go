@@ -11,20 +11,22 @@ const (
 
 // LLMSection manages LLM provider configuration settings.
 type LLMSection struct {
-	Model              string
-	BaseURL            string
-	APIKey             string
-	SummarizationModel string // optional; if empty, summarization uses Model
-	mu                 sync.RWMutex
+	Model                string
+	BaseURL              string
+	APIKey               string
+	SummarizationModel   string // optional; if empty, summarization uses Model
+	BrowserAnalysisModel string // optional; if empty, browser page analysis uses Model
+	mu                   sync.RWMutex
 }
 
 // NewLLMSection creates a new LLM section with default settings.
 func NewLLMSection() *LLMSection {
 	return &LLMSection{
-		Model:              "",
-		BaseURL:            "",
-		APIKey:             "",
-		SummarizationModel: "",
+		Model:                "",
+		BaseURL:              "",
+		APIKey:               "",
+		SummarizationModel:   "",
+		BrowserAnalysisModel: "",
 	}
 }
 
@@ -40,7 +42,7 @@ func (s *LLMSection) Title() string {
 
 // Description returns the section description.
 func (s *LLMSection) Description() string {
-	return "Configure LLM provider settings. summarization_model is optional — if set, context summarization uses this model instead of model."
+	return "Configure LLM provider settings. summarization_model and browser_analysis_model are optional — if set, those operations use the specified model instead of the main model."
 }
 
 // Data returns the current configuration data.
@@ -48,10 +50,11 @@ func (s *LLMSection) Data() map[string]any {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return map[string]any{
-		"model":               s.Model,
-		"base_url":            s.BaseURL,
-		"api_key":             s.APIKey,
-		"summarization_model": s.SummarizationModel,
+		"model":                  s.Model,
+		"base_url":               s.BaseURL,
+		"api_key":                s.APIKey,
+		"summarization_model":    s.SummarizationModel,
+		"browser_analysis_model": s.BrowserAnalysisModel,
 	}
 }
 
@@ -80,6 +83,10 @@ func (s *LLMSection) SetData(data map[string]any) error {
 		s.SummarizationModel = summarizationModel
 	}
 
+	if browserAnalysisModel, ok := data["browser_analysis_model"].(string); ok {
+		s.BrowserAnalysisModel = browserAnalysisModel
+	}
+
 	return nil
 }
 
@@ -101,6 +108,7 @@ func (s *LLMSection) Reset() {
 	s.BaseURL = ""
 	s.APIKey = ""
 	s.SummarizationModel = ""
+	s.BrowserAnalysisModel = ""
 }
 
 // GetModel returns the configured model name.
@@ -159,4 +167,20 @@ func (s *LLMSection) SetSummarizationModel(model string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.SummarizationModel = model
+}
+
+// GetBrowserAnalysisModel returns the configured browser analysis model name.
+// An empty string means use the main model for browser page analysis.
+func (s *LLMSection) GetBrowserAnalysisModel() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.BrowserAnalysisModel
+}
+
+// SetBrowserAnalysisModel sets the browser analysis model name.
+// Pass an empty string to revert to using the main model.
+func (s *LLMSection) SetBrowserAnalysisModel(model string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.BrowserAnalysisModel = model
 }
