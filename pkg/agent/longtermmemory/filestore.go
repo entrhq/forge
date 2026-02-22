@@ -14,7 +14,7 @@ var ErrNotFound = errors.New("longtermmemory: memory not found")
 var ErrAlreadyExists = errors.New("longtermmemory: memory already exists")
 
 // FileStore is a local file-system implementation of MemoryStore.
-// It stores memory files as Markdown files with YAML front-matter 
+// It stores memory files as Markdown files with YAML front-matter
 // separated across repository and user scopes.
 type FileStore struct {
 	repoDir string
@@ -63,8 +63,8 @@ func (fs *FileStore) pathForID(id string, scope Scope) (string, error) {
 	return resolved, nil
 }
 
-// Write persists a new memory file to disk. It writes atomically via a 
-// temporary file, ensuring append-only behavior by returning ErrAlreadyExists 
+// Write persists a new memory file to disk. It writes atomically via a
+// temporary file, ensuring append-only behavior by returning ErrAlreadyExists
 // if the given ID is already present on disk. It must be safe for concurrent use.
 func (fs *FileStore) Write(_ context.Context, m *MemoryFile) error {
 	b, err := Serialize(m)
@@ -89,7 +89,7 @@ func (fs *FileStore) Write(_ context.Context, m *MemoryFile) error {
 	return nil
 }
 
-// Read attempts to retrieve a memory file by ID, searching first in 
+// Read attempts to retrieve a memory file by ID, searching first in
 // ScopeRepo, then ScopeUser. It returns ErrNotFound if it does not exist.
 func (fs *FileStore) Read(_ context.Context, id string) (*MemoryFile, error) {
 	for _, scope := range []Scope{ScopeRepo, ScopeUser} {

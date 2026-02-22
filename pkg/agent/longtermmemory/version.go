@@ -13,7 +13,7 @@ var timeNow = time.Now // injected for testability
 func NewVersion(predecessor *MemoryFile, sessionID string, trigger Trigger) *MemoryFile {
 	now := timeNow()
 	predecessorID := predecessor.Meta.ID
-	
+
 	related := make([]RelatedMemory, len(predecessor.Meta.Related))
 	copy(related, predecessor.Meta.Related)
 
@@ -68,7 +68,7 @@ func LatestVersion(ctx context.Context, store MemoryStore, id string) (string, e
 	visited := make(map[string]bool)
 	for !visited[current] {
 		visited[current] = true
-		
+
 		next, ok := successor[current]
 		if !ok {
 			return current, nil
