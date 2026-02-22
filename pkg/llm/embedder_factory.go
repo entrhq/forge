@@ -22,6 +22,6 @@ func NewEmbedder(cfg *config.MemorySection, apiKey string, opts ...embedding.Pro
 	return embedding.NewProvider(
 		apiKey,
 		cfg.GetEmbeddingModel(),
-		opts...
+		opts...,
 	)
 }

@@ -94,7 +94,7 @@ func runHeadless(ctx context.Context, config *Config) error {
 		}
 	}
 
-	// Initialise the embedding provider for long-term memory retrieval.
+	// Initialize the embedding provider for long-term memory retrieval.
 	// NewEmbedder returns (nil, nil) when embedding is unconfigured — the agent
 	// treats a nil embedder as "retrieval disabled" and continues normally.
 	var embedder llm.Embedder

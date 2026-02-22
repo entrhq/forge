@@ -70,6 +70,20 @@ func (s *MemorySection) Data() map[string]any {
 	}
 }
 
+// intFromAny converts a map value (int or float64) to int, returning false if
+// the value is absent or not a numeric type. JSON/YAML unmarshal produces
+// float64 for numbers, so both types must be handled.
+func intFromAny(v any) (int, bool) {
+	switch n := v.(type) {
+	case int:
+		return n, true
+	case float64:
+		return int(n), true
+	default:
+		return 0, false
+	}
+}
+
 // SetData updates the configuration from the provided data.
 func (s *MemorySection) SetData(data map[string]any) error {
 	if data == nil {
@@ -82,53 +96,29 @@ func (s *MemorySection) SetData(data map[string]any) error {
 	if enabled, ok := data["enabled"].(bool); ok {
 		s.Enabled = enabled
 	}
-
 	if model, ok := data["classifier_model"].(string); ok {
 		s.ClassifierModel = model
 	}
-
 	if hypothesis, ok := data["hypothesis_model"].(string); ok {
 		s.HypothesisModel = hypothesis
 	}
-
 	if embedding, ok := data["embedding_model"].(string); ok {
 		s.EmbeddingModel = embedding
 	}
-
 	if url, ok := data["embedding_base_url"].(string); ok {
 		s.EmbeddingBaseURL = url
 	}
-
-	if k, ok := data["retrieval_top_k"]; ok {
-		if v, ok := k.(int); ok {
-			s.RetrievalTopK = v
-		} else if v, ok := k.(float64); ok {
-			s.RetrievalTopK = int(v)
-		}
+	if v, ok := intFromAny(data["retrieval_top_k"]); ok {
+		s.RetrievalTopK = v
 	}
-
-	if depth, ok := data["retrieval_hop_depth"]; ok {
-		if v, ok := depth.(int); ok {
-			s.RetrievalHopDepth = v
-		} else if v, ok := depth.(float64); ok {
-			s.RetrievalHopDepth = int(v)
-		}
+	if v, ok := intFromAny(data["retrieval_hop_depth"]); ok {
+		s.RetrievalHopDepth = v
 	}
-
-	if hc, ok := data["retrieval_hypothesis_count"]; ok {
-		if v, ok := hc.(int); ok {
-			s.RetrievalHypothesisCount = v
-		} else if v, ok := hc.(float64); ok {
-			s.RetrievalHypothesisCount = int(v)
-		}
+	if v, ok := intFromAny(data["retrieval_hypothesis_count"]); ok {
+		s.RetrievalHypothesisCount = v
 	}
-
-	if tb, ok := data["injection_token_budget"]; ok {
-		if v, ok := tb.(int); ok {
-			s.InjectionTokenBudget = v
-		} else if v, ok := tb.(float64); ok {
-			s.InjectionTokenBudget = int(v)
-		}
+	if v, ok := intFromAny(data["injection_token_budget"]); ok {
+		s.InjectionTokenBudget = v
 	}
 
 	return nil

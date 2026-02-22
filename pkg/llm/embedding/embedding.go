@@ -118,5 +118,3 @@ func (p *Provider) Embed(ctx context.Context, inputs []string) ([][]float32, err
 	}
 	return out, nil
 }
-
-
