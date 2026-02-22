@@ -63,12 +63,12 @@ func TestThresholdStrategy_ShouldRun(t *testing.T) {
 	}
 
 	tests := []struct {
-		name            string
-		threshold       float64
-		currentTokens   int
-		maxTokens       int
-		nonSystemMsgs   int
-		want            bool
+		name          string
+		threshold     float64
+		currentTokens int
+		maxTokens     int
+		nonSystemMsgs int
+		want          bool
 	}{
 		{"above threshold, enough messages", 80, 850, 1000, 6, true},
 		{"at threshold, enough messages", 80, 800, 1000, 6, true},

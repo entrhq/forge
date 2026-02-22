@@ -34,10 +34,10 @@ const (
 
 	// Context management defaults for coding sessions
 	// These are tuned for long coding sessions with many file operations
-	defaultMaxTokens        = 100000 // Conservative limit with headroom for 128K context
-	defaultToolCallAge     = 20 // Tool calls must be 20+ messages old to enter buffer
-	defaultMinToolCalls    = 10 // Minimum 10 tool calls in buffer before summarizing
-	defaultMaxToolCallDist = 40 // Force summarization if any tool call is 40+ messages old
+	defaultMaxTokens       = 100000 // Conservative limit with headroom for 128K context
+	defaultToolCallAge     = 20     // Tool calls must be 20+ messages old to enter buffer
+	defaultMinToolCalls    = 10     // Minimum 10 tool calls in buffer before summarizing
+	defaultMaxToolCallDist = 40     // Force summarization if any tool call is 40+ messages old
 
 	// Goal-batch compaction defaults (strategy 3: compact old completed turns into goal-batch blocks)
 	defaultGoalBatchTurnsOld = 20 // Turns must be 20+ messages old to be eligible for compaction

@@ -34,8 +34,8 @@ const (
 	// Context management defaults for headless execution
 	defaultMaxTokens       = 100000 // Conservative limit with headroom for 128K context
 	defaultToolCallAge     = 20     // Tool calls must be 20+ messages old to enter buffer
-	defaultMinToolCalls   = 10     // Minimum 10 tool calls in buffer before summarizing
-	defaultMaxToolCallDist = 40    // Force summarization if any tool call is 40+ messages old
+	defaultMinToolCalls    = 10     // Minimum 10 tool calls in buffer before summarizing
+	defaultMaxToolCallDist = 40     // Force summarization if any tool call is 40+ messages old
 
 	// Threshold summarization defaults (strategy 2: half-compaction when context is near full)
 	defaultThresholdTrigger = 80.0 // Fire when context usage reaches 80% of the token limit

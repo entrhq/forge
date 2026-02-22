@@ -63,8 +63,8 @@ func NewGoalBatchCompactionStrategy(minMessagesOldThreshold, minTurnsToCompact, 
 	}
 	return &GoalBatchCompactionStrategy{
 		minMessagesOldThreshold: minMessagesOldThreshold,
-		minTurnsToCompact:    minTurnsToCompact,
-		maxTurnsPerBatch:     maxTurnsPerBatch,
+		minTurnsToCompact:       minTurnsToCompact,
+		maxTurnsPerBatch:        maxTurnsPerBatch,
 	}
 }
 

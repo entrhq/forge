@@ -81,7 +81,6 @@ func (cp *CommandPalette) updateFiltered() {
 	nameMatches = append(nameMatches, descMatches...)
 	cp.filteredCommands = nameMatches
 
-
 	// Ensure selected index is valid after filtering
 	switch {
 	case len(cp.filteredCommands) == 0:
