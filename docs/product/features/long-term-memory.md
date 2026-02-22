@@ -2,9 +2,9 @@
 
 **Feature:** Autonomous Cross-Session Memory  
 **Version:** 1.0  
-**Status:** Draft  
+**Status:** Accepted  
 **Owner:** Core Team  
-**Last Updated:** January 2025
+**Last Updated:** 22 February 2025
 
 ---
 
@@ -117,22 +117,24 @@ The agent made the same mistake (over-use of goroutines without proper lifecycle
 - Both the user (for auditing) and the agent (for reasoning) are first-class consumers of graph structure and version history
 
 **Memory Retrieval**
-- RAG engine runs autonomously at the start of each turn, before the agent responds; it is on the critical path and must complete before the agent begins composing its response
+- RAG engine triggers once per **user message**, not on every agent sub-turn; the retrieved memory context is cached and held for the lifetime of that user turn (covering all subsequent agent responses and tool calls within the same turn)
+- This is on the critical path — retrieval must complete before the agent composes its first response to the user message; subsequent tool-call/agent-response cycles within the same turn reuse the cached context at zero additional cost
 - Uses a two-stage retrieval strategy: a pre-RAG hypothesis generation hook followed by embedding-based semantic search (HyDE — Hypothetical Document Embeddings)
 - **Conversation window**: all user and assistant messages since the last summarisation event; if no summarisation has occurred yet, the entire conversation history is used; tool call content is excluded in all cases
 - **Stage 1 — Pre-RAG Hook**: the conversation window is sent to a lightweight LLM (configurable, defaults to a fast/flash-class model) which generates N hypothetical sentences that a relevant memory *might* contain — these hypotheses are semantically closer to stored memory files than raw conversation text, dramatically improving retrieval precision
-- **Stage 2 — Embedding Search**: each hypothesis is independently embedded and used to query both memory stores; result sets from all hypotheses are unioned and deduplicated by memory UUID, retaining the highest similarity score per candidate across all hypothesis seeds
+- **Stage 2 — Embedding Search**: each hypothesis is independently embedded via API call (N short sentences — cheap) and compared against the **in-memory vector map** using cosine similarity; this is pure CPU — no disk I/O, no API calls against the memory store at retrieval time; result sets from all hypotheses are unioned and deduplicated by memory UUID, retaining the highest similarity score per candidate across all hypothesis seeds
 - From the deduplicated result set, traverse the configured number of graph hops to surface related neighbouring memories
 - Retrieved memories and their full version history are injected into the system context before the agent responds
 - Agent can reason over version chains (e.g. "this preference has changed 3 times — it may still be evolving")
 - **Graceful degradation**: if the pre-RAG hook LLM call times out or fails, retrieval is skipped entirely for that turn; there is no keyword fallback; the session continues without injected memories and no error is surfaced to the user
+- **In-memory vector map**: embeddings are never persisted to disk; the map is built **asynchronously at agent startup** (non-blocking — the agent is ready immediately); a read/write lock guards the map so that if the first user message arrives before the build completes, retrieval waits on the lock until the map is ready; subsequent turns are zero-wait; the map is also rebuilt asynchronously (on the capture goroutine) after each capture event; no sidecar files, no migration tooling — changing `memory.embedding_model` triggers automatic full re-embed on next startup
 
 **Configuration**
 - `memory.enabled` — global on/off (default: true)
 - `memory.cadence_turns` — turns between cadence-triggered capture passes (default: 5, range: 1–10)
 - `memory.classifier_model` — LLM model for the capture classifier; intended for a higher-reasoning model for accurate memory formation, relationship detection, scope assignment, and category assignment (default: inherits summarization model from ADR-0042)
 - `memory.retrieval_model` — LLM model for the pre-RAG hypothesis generation hook; must be a lightweight/flash-class model to minimise turn latency since this call is on the critical path (no default — if unset, retrieval is disabled even if embedding model is configured)
-- `memory.embedding_model` — embedding model for semantic similarity search (same provider as configured LLM, no default — must be explicitly configured; retrieval is disabled until set)
+- `memory.embedding_model` — embedding model used to build the in-memory vector map at startup and after each capture event (same provider as configured LLM, no default — must be explicitly configured; retrieval is disabled until set; changing this value causes a full re-embed on next startup, old vectors are discarded)
 - `memory.retrieval_top_k` — number of candidate memories to retrieve per hypothesis seed before deduplication (default: 10)
 - `memory.retrieval_hop_depth` — how many graph hops to traverse from the deduplicated retrieved set when pulling graph neighbours (default: 1, range: 1–3)
 - `memory.retrieval_hypothesis_count` — number of hypothetical sentences the pre-RAG hook generates per turn to use as retrieval seeds (default: 5, range: 1–10)
@@ -256,7 +258,7 @@ but why, and what alternatives were considered.
 ### Memory Retrieval Flow
 
 ```
-[New Turn Begins]
+[User Message Received]
       ↓
 [RAG Engine: build conversation window]
   → All user+assistant messages since last summarisation
@@ -268,9 +270,10 @@ but why, and what alternatives were considered.
   → LLM generates N hypothetical sentences a relevant memory might contain
   → If hook times out or fails → skip retrieval entirely, session continues unaffected
       ↓
-[Stage 2 — Embedding Search]
-  → Embed each hypothesis independently using embedding_model
-  → Query .forge/memory/ + ~/.forge/memory/ for top-k per hypothesis
+[Stage 2 — In-Memory Cosine Search]
+  → Embed each hypothesis independently via API (N short sentences — cheap)
+  → Compute cosine similarity against in-memory vector map (pure CPU, no I/O)
+  → In-memory map covers both .forge/memory/ + ~/.forge/memory/
   → Union all result sets, deduplicate by memory UUID
   → Retain highest similarity score per memory across all hypothesis seeds
       ↓
@@ -278,10 +281,15 @@ but why, and what alternatives were considered.
   → From deduplicated result set, traverse up to retrieval_hop_depth hops
   → Collect neighbour memories via typed graph edges in YAML front-matter
       ↓
-[Context Injection]
+[Context Injection + Cache]
   → Inject retrieved memories + full version chains into system context
+  → Cache result set for duration of this user turn
       ↓
 [Agent responds with full memory context available]
+      ↓
+[Agent↔Tool sub-turns within same user turn]
+  → Reuse cached memory context — no additional retrieval calls
+  → Cache is invalidated on next user message
 ```
 
 ### Version Chain Example
@@ -312,6 +320,8 @@ performance issue; optimistic locking is current preference."
 
 - **Retrieval model not configured** — retrieval is silently disabled for all turns; capture still runs; memories accumulate for when retrieval is later configured; user sees a one-time warning at session start
 - **Embedding model not configured** — retrieval is silently disabled; capture still runs (memories accumulate for when embedding is later configured); user sees a one-time warning in config
+- **Startup embedding failure** — if the async startup embedding build fails, the in-memory map remains empty; any turn that waits on the lock unblocks immediately with an empty map; retrieval returns no results for all turns in that session; capture still runs; user sees a one-time warning; map is retried on next startup
+- **Post-capture re-embed failure** — async re-embed after capture fails silently; in-memory map remains at previous state; new memories are not searchable until the next successful re-embed (next startup or next successful capture event)
 - **Pre-RAG hook LLM failure or timeout** — retrieval is skipped entirely for that turn; no fallback is attempted; session continues normally without injected memories; no error is surfaced to the user
 - **Classifier LLM failure** — capture pass is silently skipped for that trigger; no impact on session; retried on next trigger
 - **Corrupt memory file** — file is skipped during retrieval; warning logged at debug level; no session impact
@@ -356,7 +366,7 @@ Memories are organised across three dimensions:
 - **80% of stated user preferences** are applied correctly in the session immediately following their capture
 - **Zero instances** of the agent contradicting a past architectural decision that has been captured as a memory
 - **Capture latency** — classifier completes within 5 seconds of trigger; never delays user interaction
-- **Retrieval latency** — end-to-end RAG pipeline (pre-RAG hook + embedding search + graph traversal + injection) completes within 2 seconds per turn; the pre-RAG hook LLM call is the dominant cost and must use a flash-class model to meet this budget
+- **Retrieval latency** — end-to-end RAG pipeline (pre-RAG hook + embedding search + graph traversal + injection) completes within 2 seconds per user message; subsequent agent sub-turns within the same user turn are zero-cost (cached); the pre-RAG hook LLM call is the dominant cost and must use a flash-class model to meet this budget
 
 ---
 
@@ -471,6 +481,14 @@ Both are assumed to be available from the user's already-configured LLM provider
 **Decision**: HyDE (Hypothetical Document Embeddings) as the retrieval query strategy, not direct conversation embedding  
 **Rationale**: There is a fundamental semantic asymmetry between raw conversation text (verbose, noisy, dialogue-style) and stored memory files (terse, declarative, distilled). Directly embedding a conversation window produces low-precision retrieval because the query and the document live in very different semantic registers. Generating N hypothetical sentences that a relevant memory *might* contain bridges this gap — the hypothesis and the stored memory are both written in the same compressed, declarative style and are far more semantically proximate in embedding space. This improves retrieval precision without adding a new architectural component; it reuses the existing LLM provider abstraction.  
 **Trade-off**: The pre-RAG hook is an LLM call on the critical path, introducing latency that direct conversation embedding would not. Mitigated by: (a) mandating a flash-class model for `memory.retrieval_model`, (b) a 2-second retrieval budget with graceful skip-on-failure, (c) no degraded fallback — a complete skip is preferable to noisy low-precision results.
+
+**Decision**: Embeddings are never persisted to disk; all stored-memory vectors live in an in-memory map rebuilt on two triggers: agent startup (asynchronous, non-blocking) and after each capture event (asynchronous, on the capture goroutine); a read/write lock serialises access so retrieval always sees a consistent map  
+**Rationale**: Persisting embeddings introduces a sidecar file format, a migration story when the embedding model changes, and a consistency problem between the file and the model version that produced it. In-memory vectors sidestep all three: the map is always authoritative, always consistent with the current `memory.embedding_model`, and the cost of rebuilding is paid once at startup rather than on every retrieval. Building asynchronously means agent startup is instant — the first turn may wait on the lock if the store is large, but this is preferable to blocking the entire startup sequence. Memory is least critical at turn one (the user hasn't asked anything yet); by turn two the map is guaranteed to be ready.  
+**Trade-off**: The first user message may experience additional latency proportional to store size if the startup build is still in progress. This is an accepted and known trade-off. A second edge case: during the async re-embed window after a capture event, retrieval reads from the previous (slightly stale) in-memory map — the newly written memories are not yet searchable. This is acceptable; they will be available on the next user message after the re-embed completes.
+
+**Decision**: Retrieval triggers once per user message, not on every agent sub-turn; result set is cached for the duration of the user turn  
+**Rationale**: Within a single user turn, the conversation window does not meaningfully change — tool call content is already excluded from the window, and intermediate agent responses do not represent new user intent. Re-running the full HyDE pipeline on every agent sub-turn would produce near-identical hypothesis sets at significant flash LLM cost with zero retrieval benefit. Triggering on user message is the natural alignment: retrieval contextualises *the user's intent* at the moment it is expressed, and that context is stable for the whole turn.  
+**Trade-off**: If a long multi-tool turn surfaces genuinely new information (e.g. a file read that reveals an unexpected architectural pattern), that information will not trigger a fresh retrieval until the next user message. This is an acceptable trade-off — mid-turn discoveries are transient context; they will influence the next user message, which will trigger fresh retrieval at that point.
 
 **Decision**: `memory.classifier_model` and `memory.retrieval_model` are separate config keys targeting different model classes  
 **Rationale**: The capture classifier does heavy reasoning — assessing memory-worthiness, assigning categories, detecting relationships, drawing graph edges — and benefits from a capable model. The retrieval hook generates simple hypothetical sentences and runs on the critical path; it must be fast and cheap. A single shared model config forces an irreconcilable trade-off between capture quality and retrieval latency.  
