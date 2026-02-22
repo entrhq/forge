@@ -94,7 +94,10 @@ func (p *Provider) Embed(ctx context.Context, inputs []string) ([][]float32, err
 	}
 	defer resp.Body.Close()
 
-	raw, _ := io.ReadAll(resp.Body)
+	raw, readErr := io.ReadAll(resp.Body)
+	if readErr != nil {
+		return nil, fmt.Errorf("embedding: read response body: %w", readErr)
+	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("embedding: provider returned %d: %s", resp.StatusCode, raw)
 	}
@@ -109,11 +112,27 @@ func (p *Provider) Embed(ctx context.Context, inputs []string) ([][]float32, err
 		return nil, fmt.Errorf("embedding: decode response: %w", err)
 	}
 
-	// Re-order by index — OpenAI guarantees order but be defensive
+	// Validate the provider returned exactly one embedding per input.
+	if len(result.Data) != len(inputs) {
+		return nil, fmt.Errorf("embedding: provider returned %d embeddings for %d inputs", len(result.Data), len(inputs))
+	}
+
+	// Re-order by index — OpenAI guarantees order but be defensive.
 	out := make([][]float32, len(inputs))
+	seen := make([]bool, len(inputs))
 	for _, d := range result.Data {
-		if d.Index >= 0 && d.Index < len(out) {
-			out[d.Index] = d.Embedding
+		if d.Index < 0 || d.Index >= len(out) {
+			return nil, fmt.Errorf("embedding: provider returned out-of-range index %d", d.Index)
+		}
+		if seen[d.Index] {
+			return nil, fmt.Errorf("embedding: provider returned duplicate embedding for index %d", d.Index)
+		}
+		out[d.Index] = d.Embedding
+		seen[d.Index] = true
+	}
+	for i, ok := range seen {
+		if !ok {
+			return nil, fmt.Errorf("embedding: provider response missing embedding for index %d", i)
 		}
 	}
 	return out, nil

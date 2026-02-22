@@ -8,7 +8,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -75,7 +74,8 @@ func main() {
 
 	// Validate configuration
 	if err := config.validate(); err != nil {
-		log.Fatalf("Configuration error: %v", err)
+		cmdLog.Errorf("Configuration error: %v", err)
+		os.Exit(1)
 	}
 
 	// Create context with signal handling for graceful shutdown
@@ -93,7 +93,8 @@ func main() {
 	// Run the application
 	if runErr := run(ctx, config); runErr != nil {
 		cancel()
-		log.Fatalf("Application error: %v", runErr)
+		cmdLog.Errorf("Application error: %v", runErr)
+		os.Exit(1)
 	}
 }
 
@@ -261,21 +262,21 @@ func runTUI(ctx context.Context, config *Config) error {
 	// NewEmbedder returns (nil, nil) when embedding is unconfigured — the agent
 	// treats a nil embedder as "retrieval disabled" and continues normally.
 	var embedder llm.Embedder
-	if memoryCfg := appconfig.GetMemory(); memoryCfg != nil {
+	if memoryCfg := appconfig.GetMemory(); memoryCfg != nil && memoryCfg.IsEnabled() {
 		// Warn when exactly one of hypothesis_model / embedding_model is configured,
 		// since both are required for retrieval to function.
 		hypothesisModel := memoryCfg.GetHypothesisModel()
 		embeddingModel := memoryCfg.GetEmbeddingModel()
 		if hypothesisModel != "" && embeddingModel == "" {
-			log.Println("warning: memory.hypothesis_model is set but memory.embedding_model is empty — retrieval is disabled")
+			cmdLog.Warnf("memory.hypothesis_model is set but memory.embedding_model is empty — retrieval is disabled")
 		} else if embeddingModel != "" && hypothesisModel == "" {
-			log.Println("warning: memory.embedding_model is set but memory.hypothesis_model is empty — retrieval is disabled")
+			cmdLog.Warnf("memory.embedding_model is set but memory.hypothesis_model is empty — retrieval is disabled")
 		}
 
 		var embedErr error
 		embedder, embedErr = llm.NewEmbedder(memoryCfg, provider.GetAPIKey())
 		if embedErr != nil {
-			log.Printf("warning: memory retrieval disabled: embedding provider error: %v", embedErr)
+			cmdLog.Warnf("memory retrieval disabled: embedding provider error: %v", embedErr)
 			embedder = nil
 		}
 	}

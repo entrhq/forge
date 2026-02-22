@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"time"
@@ -98,21 +97,21 @@ func runHeadless(ctx context.Context, config *Config) error {
 	// NewEmbedder returns (nil, nil) when embedding is unconfigured — the agent
 	// treats a nil embedder as "retrieval disabled" and continues normally.
 	var embedder llm.Embedder
-	if memoryCfg := appconfig.GetMemory(); memoryCfg != nil {
+	if memoryCfg := appconfig.GetMemory(); memoryCfg != nil && memoryCfg.IsEnabled() {
 		// Warn when exactly one of hypothesis_model / embedding_model is configured,
 		// since both are required for retrieval to function.
 		hypothesisModel := memoryCfg.GetHypothesisModel()
 		embeddingModel := memoryCfg.GetEmbeddingModel()
 		if hypothesisModel != "" && embeddingModel == "" {
-			log.Println("warning: memory.hypothesis_model is set but memory.embedding_model is empty — retrieval is disabled")
+			cmdLog.Warnf("memory.hypothesis_model is set but memory.embedding_model is empty — retrieval is disabled")
 		} else if embeddingModel != "" && hypothesisModel == "" {
-			log.Println("warning: memory.embedding_model is set but memory.hypothesis_model is empty — retrieval is disabled")
+			cmdLog.Warnf("memory.embedding_model is set but memory.hypothesis_model is empty — retrieval is disabled")
 		}
 
 		var embedErr error
 		embedder, embedErr = llm.NewEmbedder(memoryCfg, provider.GetAPIKey())
 		if embedErr != nil {
-			log.Printf("warning: memory retrieval disabled: embedding provider error: %v", embedErr)
+			cmdLog.Warnf("memory retrieval disabled: embedding provider error: %v", embedErr)
 			embedder = nil
 		}
 	}
@@ -289,10 +288,10 @@ func runExecutor(ctx context.Context, ag *agent.DefaultAgent, execConfig *headle
 	}
 
 	// Run execution
-	log.Printf("Starting headless execution...")
-	log.Printf("Task: %s", execConfig.Task)
-	log.Printf("Mode: %s", execConfig.Mode)
-	log.Printf("Workspace: %s", execConfig.WorkspaceDir)
+	cmdLog.Infof("Starting headless execution...")
+	cmdLog.Infof("Task: %s", execConfig.Task)
+	cmdLog.Infof("Mode: %s", execConfig.Mode)
+	cmdLog.Infof("Workspace: %s", execConfig.WorkspaceDir)
 
 	startTime := time.Now()
 	if runErr := executor.Run(ctx); runErr != nil {
@@ -300,7 +299,7 @@ func runExecutor(ctx context.Context, ag *agent.DefaultAgent, execConfig *headle
 	}
 
 	duration := time.Since(startTime)
-	log.Printf("Execution completed successfully in %s", duration)
+	cmdLog.Infof("Execution completed successfully in %s", duration)
 	return nil
 }
 

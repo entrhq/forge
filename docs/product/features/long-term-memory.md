@@ -134,7 +134,7 @@ The agent made the same mistake (over-use of goroutines without proper lifecycle
 - `memory.cadence_turns` — turns between cadence-triggered capture passes (default: 5, range: 1–10)
 - `memory.classifier_model` — LLM model for the capture classifier; intended for a higher-reasoning model for accurate memory formation, relationship detection, scope assignment, and category assignment (default: inherits summarization model from ADR-0042)
 - `memory.hypothesis_model` — LLM model for the pre-RAG hypothesis generation hook; must be a lightweight/flash-class model to minimise turn latency since this call is on the critical path (no default — if unset, retrieval is disabled even if embedding model is configured)
-- `memory.embedding_model` — embedding model used to build the in-memory vector map at startup and after each capture event (same provider as configured LLM, no default — must be explicitly configured; retrieval is disabled until set; changing this value causes a full re-embed on next startup, old vectors are discarded)
+- `memory.embedding_model` — embedding model used to build the in-memory vector map at startup and after each capture event (no default — must be explicitly configured; retrieval is disabled until set; changing this value causes a full re-embed on next startup, old vectors are discarded); the API key is shared with the main LLM provider, but the endpoint can be overridden independently via `memory.embedding_base_url` — this allows the embedding model to target a different service (e.g. Ollama locally, a dedicated Mistral endpoint) while the main LLM continues to use a different provider
 - `memory.retrieval_top_k` — number of candidate memories to retrieve per hypothesis seed before deduplication (default: 10)
 - `memory.retrieval_hop_depth` — how many graph hops to traverse from the deduplicated retrieved set when pulling graph neighbours (default: 1, range: 1–3)
 - `memory.retrieval_hypothesis_count` — number of hypothetical sentences the pre-RAG hook generates per turn to use as retrieval seeds (default: 5, range: 1–10)
@@ -388,7 +388,7 @@ Users who want to control memory behaviour configure it via the standard setting
 - Set the embedding model — both stored memories and retrieval hypotheses are embedded through this model (`memory.embedding_model`)
 - Tune retrieval parameters: top-k candidates per hypothesis, graph hop depth, hypothesis count (`memory.retrieval_top_k`, `memory.retrieval_hop_depth`, `memory.retrieval_hypothesis_count`)
 
-**Minimum configuration to activate retrieval:** `memory.hypothesis_model` and `memory.embedding_model` must both be set. Capture runs regardless.
+**Minimum configuration to activate retrieval:** both `memory.hypothesis_model` and `memory.embedding_model` must be set — if either is absent, retrieval is disabled entirely for the session (capture still runs regardless, so memories continue to accumulate even when retrieval is off).
 
 ---
 

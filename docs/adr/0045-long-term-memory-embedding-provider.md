@@ -321,6 +321,7 @@ Memory settings are implemented as a dedicated `MemorySection` registered with t
 // Access via appconfig.GetMemory() after appconfig.Initialize().
 type MemorySection struct {
     Enabled                  bool   // yaml:"enabled"
+    ClassifierModel          string // yaml:"classifier_model"  high-reasoning model for capture; inherits summarisation model if unset
     EmbeddingModel           string // yaml:"embedding_model"
     EmbeddingBaseURL         string // yaml:"embedding_base_url"  optional; defaults to OpenAI
     HypothesisModel          string // yaml:"hypothesis_model"
