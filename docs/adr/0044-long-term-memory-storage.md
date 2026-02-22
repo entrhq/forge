@@ -28,7 +28,7 @@ Cross-session memories need a storage representation that is:
 
 - Define the canonical memory file format (YAML front-matter + markdown body)
 - Define all schema fields, category constants, and relationship edge types
-- Define the `MemoryFile` Go struct and its serialisation/deserialisation
+- Define the `MemoryFile` Go struct and its serialization/parsing
 - Define the `MemoryStore` interface and a `FileStore` implementation
 - Establish version chain semantics (supersedes, never-delete)
 - Implement UUID-based file naming and directory initialisation
@@ -46,7 +46,7 @@ Cross-session memories need a storage representation that is:
 
 * Human auditability — users must be able to read, edit, and delete memories using only a text editor and their filesystem
 * Agent reasoning — the agent must be able to traverse version chains and understand relationship types programmatically
-* Simplicity of implementation — the format must be parseable with standard Go libraries, no bespoke serialisation
+* Simplicity of implementation — the format must be parseable with standard Go libraries, no bespoke serialization
 * Durability — memories must survive agent crashes, restarts, and concurrent writes without corruption
 * Extensibility — the schema must accommodate future fields without breaking existing files
 
@@ -271,9 +271,9 @@ type MemoryFile struct {
 }
 ```
 
-### Serialisation
+### Serialization
 
-The parser splits on the `---` front-matter delimiter, unmarshals the YAML block, and returns the remaining content as the markdown body. The serialiser writes YAML front-matter followed by the markdown body.
+The parser splits on the `---` front-matter delimiter, unmarshals the YAML block, and returns the remaining content as the markdown body. The serializer writes YAML front-matter followed by the markdown body.
 
 ```go
 // pkg/agent/longtermmemory/parse.go
@@ -288,7 +288,7 @@ import (
 
 const frontMatterDelimiter = "---"
 
-// Parse deserialises a raw memory file byte slice into a MemoryFile.
+// Parse deserializes a raw memory file byte slice into a MemoryFile.
 // Returns an error if the front-matter block is missing or malformed.
 func Parse(raw []byte) (*MemoryFile, error) {
     s := string(raw)
@@ -302,7 +302,13 @@ func Parse(raw []byte) (*MemoryFile, error) {
         return nil, fmt.Errorf("longtermmemory: unclosed front-matter block")
     }
     yamlBlock := rest[:idx]
-    body := strings.TrimPrefix(rest[idx+len("\n"+frontMatterDelimiter):], "\n")
+    
+    // Support parsing bodies with single or double newline spacing after the YAML block
+    bodyRaw := rest[idx+len("\n"+frontMatterDelimiter):]
+    body := strings.TrimPrefix(bodyRaw, "\n")
+    if strings.HasPrefix(body, "\n") {
+        body = body[1:]
+    }
 
     var meta MemoryMeta
     if err := yaml.Unmarshal([]byte(yamlBlock), &meta); err != nil {
@@ -311,11 +317,11 @@ func Parse(raw []byte) (*MemoryFile, error) {
     return &MemoryFile{Meta: meta, Content: body}, nil
 }
 
-// Serialise renders a MemoryFile back to its on-disk byte representation.
-func Serialise(m *MemoryFile) ([]byte, error) {
+// Serialize renders a MemoryFile back to its on-disk byte representation.
+func Serialize(m *MemoryFile) ([]byte, error) {
     yamlBytes, err := yaml.Marshal(&m.Meta)
     if err != nil {
-        return nil, fmt.Errorf("longtermmemory: serialise error: %w", err)
+        return nil, fmt.Errorf("longtermmemory: serialize error: %w", err)
     }
     var sb strings.Builder
     sb.WriteString(frontMatterDelimiter + "\n")
@@ -372,6 +378,9 @@ import (
 // ErrNotFound is returned when a requested memory ID does not exist.
 var ErrNotFound = errors.New("longtermmemory: memory not found")
 
+// ErrAlreadyExists is returned when trying to overwrite an existing memory ID.
+var ErrAlreadyExists = errors.New("longtermmemory: memory already exists")
+
 // FileStore is a MemoryStore backed by the local filesystem.
 type FileStore struct {
     repoDir string // absolute path to .forge/memory/
@@ -382,18 +391,22 @@ type FileStore struct {
 // creating them if they do not exist.
 func NewFileStore(repoDir, userDir string) (*FileStore, error) {
     for _, dir := range []string{repoDir, userDir} {
-        if err := os.MkdirAll(dir, 0o755); err != nil {
+        if err := os.MkdirAll(dir, 0o750); err != nil {
             return nil, fmt.Errorf("longtermmemory: init directory %s: %w", dir, err)
         }
     }
     return &FileStore{repoDir: repoDir, userDir: userDir}, nil
 }
 
-func (fs *FileStore) dirForScope(scope Scope) string {
-    if scope == ScopeUser {
-        return fs.userDir
+func (fs *FileStore) dirForScope(scope Scope) (string, error) {
+    switch scope {
+    case ScopeRepo:
+        return fs.repoDir, nil
+    case ScopeUser:
+        return fs.userDir, nil
+    default:
+        return "", fmt.Errorf("longtermmemory: unknown scope %q", scope)
     }
-    return fs.repoDir
 }
 
 // pathForID returns the absolute path for the given memory ID within the
@@ -401,7 +414,14 @@ func (fs *FileStore) dirForScope(scope Scope) string {
 // falls inside the expected directory, guarding against path traversal from
 // user-edited or classifier-generated IDs containing `../` sequences.
 func (fs *FileStore) pathForID(id string, scope Scope) (string, error) {
-    dir, err := filepath.Abs(fs.dirForScope(scope))
+    if id == "" {
+        return "", fmt.Errorf("longtermmemory: invalid memory id (empty)")
+    }
+    scopeDir, err := fs.dirForScope(scope)
+    if err != nil {
+        return "", err
+    }
+    dir, err := filepath.Abs(scopeDir)
     if err != nil {
         return "", fmt.Errorf("longtermmemory: abs dir: %w", err)
     }
@@ -416,8 +436,9 @@ func (fs *FileStore) pathForID(id string, scope Scope) (string, error) {
     return resolved, nil
 }
 
+// Write persists a new MemoryFile atomically if one does not already exist.
 func (fs *FileStore) Write(_ context.Context, m *MemoryFile) error {
-    b, err := Serialise(m)
+    b, err := Serialize(m)
     if err != nil {
         return err
     }
@@ -425,12 +446,19 @@ func (fs *FileStore) Write(_ context.Context, m *MemoryFile) error {
     if err != nil {
         return err
     }
+    if _, err := os.Stat(path); err == nil {
+        return ErrAlreadyExists // append-only safety guard
+    }
     // Write atomically via temp file + rename
     tmp := path + ".tmp"
-    if err := os.WriteFile(tmp, b, 0o644); err != nil {
+    if err := os.WriteFile(tmp, b, 0o600); err != nil {
         return fmt.Errorf("longtermmemory: write temp file: %w", err)
     }
-    return os.Rename(tmp, path)
+    if err := os.Rename(tmp, path); err != nil {
+        _ = os.Remove(tmp) // best-effort cleanup
+        return fmt.Errorf("longtermmemory: atomic rename %s: %w", path, err)
+    }
+    return nil
 }
 
 func (fs *FileStore) Read(_ context.Context, id string) (*MemoryFile, error) {
@@ -465,7 +493,10 @@ func (fs *FileStore) List(ctx context.Context) ([]*MemoryFile, error) {
 }
 
 func (fs *FileStore) ListByScope(_ context.Context, scope Scope) ([]*MemoryFile, error) {
-    dir := fs.dirForScope(scope)
+    dir, err := fs.dirForScope(scope)
+    if err != nil {
+        return nil, err
+    }
     entries, err := os.ReadDir(dir)
     if err != nil {
         return nil, fmt.Errorf("longtermmemory: list %s: %w", dir, err)
@@ -570,13 +601,16 @@ func LatestVersion(ctx context.Context, store MemoryStore, id string) (string, e
         }
     }
     current := id
-    for {
+    visited := make(map[string]bool)
+    for !visited[current] {
+        visited[current] = true
         next, ok := successor[current]
         if !ok {
             return current, nil
         }
         current = next
     }
+    return current, nil
 }
 ```
 
@@ -607,7 +641,7 @@ This ADR is the prerequisite for ADR-0045 (embedding provider), ADR-0046 (captur
 
 ### Success Metrics
 
-- `Parse(Serialise(m))` round-trip is lossless for all field types
+- `Parse(Serialize(m))` round-trip is lossless for all field types
 - `FileStore.Write` is atomic (temp file + rename, no partial writes visible to readers)
 - `FileStore.Read` returns `ErrNotFound` (not a generic error) for missing IDs
 - `FileStore.ListByScope` skips corrupt files rather than failing the whole list
@@ -616,7 +650,7 @@ This ADR is the prerequisite for ADR-0045 (embedding provider), ADR-0046 (captur
 ### Monitoring
 
 - Debug-level log on corrupt file skip in `ListByScope`
-- Unit tests cover: round-trip serialisation, missing delimiter, unclosed front-matter, atomic write, all scope combinations, version chain traversal, cycle guard
+- Unit tests cover: round-trip serialization, missing delimiter, unclosed front-matter, atomic write, all scope combinations, version chain traversal, cycle guard
 
 ---
 
