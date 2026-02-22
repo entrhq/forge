@@ -75,5 +75,5 @@ func LatestVersion(ctx context.Context, store MemoryStore, id string) (string, e
 		}
 		current = next
 	}
-	return current, nil
+	return "", fmt.Errorf("longtermmemory: cycle detected in version chain at id %q", current)
 }

@@ -118,6 +118,8 @@ func TestFileStore(t *testing.T) {
 			Version:   1,
 			Scope:     ScopeRepo,
 			Category:  CategoryCodingPreferences,
+			SessionID: "sess_1",
+			Trigger:   TriggerCadence,
 		},
 		Content: "repo memory",
 	}
@@ -149,6 +151,8 @@ func TestFileStore(t *testing.T) {
 			Version:   1,
 			Scope:     ScopeUser,
 			Category:  CategoryCodingPreferences,
+			SessionID: "sess_1",
+			Trigger:   TriggerCadence,
 		},
 		Content: "user memory",
 	}
@@ -208,6 +212,9 @@ func TestVersionChain(t *testing.T) {
 			UpdatedAt: t1,
 			Version:   1,
 			Scope:     ScopeRepo,
+			Category:  CategoryCodingPreferences,
+			SessionID: "sess_1",
+			Trigger:   TriggerCadence,
 		},
 		Content: "version 1",
 	}
@@ -220,13 +227,20 @@ func TestVersionChain(t *testing.T) {
 			UpdatedAt:  t2,
 			Version:    2,
 			Scope:      ScopeRepo,
+			Category:   CategoryCodingPreferences,
+			SessionID:  "sess_1",
+			Trigger:    TriggerCadence,
 			Supersedes: &v1ID,
 		},
 		Content: "version 2",
 	}
 
-	_ = fs.Write(ctx, m1)
-	_ = fs.Write(ctx, m2)
+	if err := fs.Write(ctx, m1); err != nil {
+		t.Fatalf("Write v1 failed: %v", err)
+	}
+	if err := fs.Write(ctx, m2); err != nil {
+		t.Fatalf("Write v2 failed: %v", err)
+	}
 
 	chain, err := VersionChain(ctx, fs, "mem_v2", 10)
 	if err != nil {
@@ -267,6 +281,9 @@ func TestCycleDetection(t *testing.T) {
 			ID:         id1,
 			Version:    1,
 			Scope:      ScopeRepo,
+			Category:   CategoryArchitecturalDecisions,
+			SessionID:  "sess",
+			Trigger:    TriggerCadence,
 			Supersedes: &id2,
 		},
 		Content: "node 1",
@@ -277,21 +294,28 @@ func TestCycleDetection(t *testing.T) {
 			ID:         id2,
 			Version:    2,
 			Scope:      ScopeRepo,
+			Category:   CategoryArchitecturalDecisions,
+			SessionID:  "sess",
+			Trigger:    TriggerCadence,
 			Supersedes: &id1,
 		},
 		Content: "node 2",
 	}
 
-	_ = fs.Write(ctx, m1)
-	_ = fs.Write(ctx, m2)
+	if err := fs.Write(ctx, m1); err != nil {
+		t.Fatalf("Write m1 failed: %v", err)
+	}
+	if err := fs.Write(ctx, m2); err != nil {
+		t.Fatalf("Write m2 failed: %v", err)
+	}
 
 	// Test LatestVersion cycle breaking
-	latest, err := LatestVersion(ctx, fs, id1)
-	if err != nil {
-		t.Fatalf("LatestVersion failed on cycle: %v", err)
+	_, err := LatestVersion(ctx, fs, id1)
+	if err == nil {
+		t.Fatalf("LatestVersion expected cycle error, got nil")
 	}
-	if latest != id1 && latest != id2 {
-		t.Errorf("LatestVersion should return a valid node in the cycle, got %s", latest)
+	if !strings.Contains(err.Error(), "cycle detected") {
+		t.Errorf("LatestVersion unexpected error message: %v", err)
 	}
 
 	// Test VersionChain loop limit via maxDepth
@@ -362,13 +386,18 @@ func TestConcurrentWrite(t *testing.T) {
 			defer wg.Done()
 			m := &MemoryFile{
 				Meta: MemoryMeta{
-					ID:      fmt.Sprintf("mem_conc_%d", i),
-					Version: 1,
-					Scope:   ScopeRepo,
+					ID:        fmt.Sprintf("mem_conc_%d", i),
+					Version:   1,
+					Scope:     ScopeRepo,
+					Category:  CategoryCodingPreferences,
+					SessionID: "sess_1",
+					Trigger:   TriggerCadence,
 				},
 				Content: "concurrent write test",
 			}
-			_ = fs.Write(ctx, m)
+			if err := fs.Write(ctx, m); err != nil {
+				t.Errorf("Concurrent write failed for %d: %v", i, err)
+			}
 		}(i)
 	}
 	wg.Wait()

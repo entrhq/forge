@@ -56,7 +56,7 @@ func (fs *FileStore) pathForID(id string, scope Scope) (string, error) {
 	if strings.ContainsAny(id, "/\\") {
 		return "", fmt.Errorf("longtermmemory: invalid memory id %q (contains path separator)", id)
 	}
-	resolved := filepath.Join(dir, id+".md")
+	resolved := filepath.Clean(filepath.Join(dir, id+".md"))
 	if !strings.HasPrefix(resolved, dir+string(filepath.Separator)) {
 		return "", fmt.Errorf("longtermmemory: path traversal detected for id %q", id)
 	}
@@ -75,12 +75,27 @@ func (fs *FileStore) Write(_ context.Context, m *MemoryFile) error {
 	if err != nil {
 		return err
 	}
-	if _, err := os.Stat(path); err == nil {
+	if _, statErr := os.Stat(path); statErr == nil {
 		return ErrAlreadyExists
 	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, b, 0o600); err != nil {
-		return fmt.Errorf("longtermmemory: write temp file: %w", err)
+	f, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+"-*.tmp")
+	if err != nil {
+		return fmt.Errorf("longtermmemory: create temp file: %w", err)
+	}
+	tmp := f.Name()
+	if err := f.Chmod(0o600); err != nil {
+		_ = f.Close()
+		_ = os.Remove(tmp)
+		return fmt.Errorf("longtermmemory: chmod temp file: %w", err)
+	}
+	_, writeErr := f.Write(b)
+	closeErr := f.Close()
+	if writeErr != nil || closeErr != nil {
+		_ = os.Remove(tmp)
+		if writeErr != nil {
+			return fmt.Errorf("longtermmemory: write temp file: %w", writeErr)
+		}
+		return fmt.Errorf("longtermmemory: close temp file: %w", closeErr)
 	}
 	if err := os.Rename(tmp, path); err != nil {
 		_ = os.Remove(tmp) // best-effort cleanup
@@ -104,7 +119,12 @@ func (fs *FileStore) Read(_ context.Context, id string) (*MemoryFile, error) {
 		if err != nil {
 			return nil, fmt.Errorf("longtermmemory: read %s: %w", path, err)
 		}
-		return Parse(b)
+		m, err := Parse(b)
+		if err != nil {
+			slog.Debug("longtermmemory: skipping corrupt memory file during Read", "path", path, "err", err)
+			continue
+		}
+		return m, nil
 	}
 	return nil, ErrNotFound
 }

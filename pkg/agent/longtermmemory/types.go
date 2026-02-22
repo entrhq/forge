@@ -1,6 +1,9 @@
 package longtermmemory
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 // Scope determines where a memory file is stored.
 type Scope string
@@ -58,6 +61,29 @@ type MemoryMeta struct {
 	Related    []RelatedMemory `yaml:"related,omitempty"`
 	SessionID  string          `yaml:"session_id"`
 	Trigger    Trigger         `yaml:"trigger"`
+}
+
+// Validate ensures all required memory metadata fields are populated.
+func (m *MemoryMeta) Validate() error {
+	if m.ID == "" {
+		return fmt.Errorf("longtermmemory: missing ID")
+	}
+	if m.Scope == "" {
+		return fmt.Errorf("longtermmemory: missing Scope")
+	}
+	if m.Category == "" {
+		return fmt.Errorf("longtermmemory: missing Category")
+	}
+	if m.SessionID == "" {
+		return fmt.Errorf("longtermmemory: missing SessionID")
+	}
+	if m.Trigger == "" {
+		return fmt.Errorf("longtermmemory: missing Trigger")
+	}
+	if m.Version <= 0 {
+		return fmt.Errorf("longtermmemory: invalid Version")
+	}
+	return nil
 }
 
 // MemoryFile is the fully parsed in-memory representation of a memory file.
