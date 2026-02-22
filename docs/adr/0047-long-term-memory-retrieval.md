@@ -710,7 +710,7 @@ retrievalEngine := retrieval.NewEngine(
     store,
     embedder,
     retrievalProvider,
-    cfg.Memory.RetrievalModel,
+    cfg.Memory.HypothesisModel,
     cfg.Memory.RetrievalHypothesisCount,
     cfg.Memory.RetrievalTopK,
     cfg.Memory.RetrievalHopDepth,
@@ -729,9 +729,9 @@ if !cfg.Memory.Enabled {
     return
 }
 
-// Warn once if only one of retrieval_model / embedding_model is set
-if (cfg.Memory.RetrievalModel == "") != (cfg.Memory.EmbeddingModel == "") {
-    log.Warn("longtermmemory: both memory.retrieval_model and memory.embedding_model must be set for retrieval; retrieval disabled")
+// Warn once if only one of hypothesis_model / embedding_model is set
+if (cfg.Memory.HypothesisModel == "") != (cfg.Memory.EmbeddingModel == "") {
+    log.Warn("longtermmemory: both memory.hypothesis_model and memory.embedding_model must be set for retrieval; retrieval disabled")
 }
 ```
 

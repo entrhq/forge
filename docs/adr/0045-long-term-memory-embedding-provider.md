@@ -283,54 +283,55 @@ func (p *Provider) Embed(ctx context.Context, inputs []string) ([][]float32, err
 package llm
 
 import (
-    "fmt"
-
     "github.com/entrhq/forge/pkg/config"
     "github.com/entrhq/forge/pkg/llm/embedding"
 )
 
-// NewEmbedder constructs an Embedder from the memory config.
+// NewEmbedder constructs an Embedder from the memory section config.
 //
-// Returns (nil, nil) when memory.embedding_model is empty — this is not an
-// error; callers treat a nil Embedder as "retrieval disabled".
+// The signature accepts *config.MemorySection directly (rather than the root
+// *config.Config) to reduce coupling and improve testability. The resolved API
+// key must be provided by the caller — typically provider.GetAPIKey() from the
+// already-constructed LLM provider so the same key is reused without duplication.
+//
+// Returns (nil, nil) when cfg is nil, memory is disabled, or
+// memory.embedding_model is empty — this is not an error; callers treat a nil
+// Embedder as "retrieval disabled".
 //
 // The base URL defaults to DefaultBaseURL (OpenAI). Set memory.embedding_base_url
 // to target any OpenAI-compatible embedding endpoint (Gemini, Mistral, Ollama, …).
-func NewEmbedder(cfg *config.Config) (Embedder, error) {
-    model := cfg.Memory.EmbeddingModel
-    if model == "" {
-        return nil, nil // retrieval disabled; not an error
+func NewEmbedder(cfg *config.MemorySection, apiKey string, opts ...embedding.ProviderOption) (Embedder, error) {
+    if cfg == nil || !cfg.IsEnabled() || cfg.GetEmbeddingModel() == "" {
+        return nil, nil // gracefully disabled
     }
-    var opts []embedding.ProviderOption
-    if cfg.Memory.EmbeddingBaseURL != "" {
-        opts = append(opts, embedding.WithBaseURL(cfg.Memory.EmbeddingBaseURL))
+    if baseURL := cfg.GetEmbeddingBaseURL(); baseURL != "" {
+        opts = append(opts, embedding.WithBaseURL(baseURL))
     }
-    p, err := embedding.NewProvider(cfg.APIKey, model, opts...)
-    if err != nil {
-        return nil, fmt.Errorf("llm: embedding provider: %w", err)
-    }
-    return p, nil
+    return embedding.NewProvider(apiKey, cfg.GetEmbeddingModel(), opts...)
 }
 ```
 
 ### Configuration
 
-New fields added to `MemoryConfig`:
+Memory settings are implemented as a dedicated `MemorySection` registered with the global config manager (rather than a field on the root `Config` struct). This follows the same section-based pattern used by `LLMSection` and `UISection`.
 
 ```go
-// pkg/config/config.go (addition)
-type MemoryConfig struct {
-    Enabled                  bool   `yaml:"enabled"`
-    ClassifierModel          string `yaml:"classifier_model"`
-    RetrievalModel           string `yaml:"retrieval_model"`
-    EmbeddingModel           string `yaml:"embedding_model"`
-    EmbeddingBaseURL         string `yaml:"embedding_base_url"`   // optional; defaults to OpenAI
-    RetrievalTopK            int    `yaml:"retrieval_top_k"`
-    RetrievalHopDepth        int    `yaml:"retrieval_hop_depth"`
-    RetrievalHypothesisCount int    `yaml:"retrieval_hypothesis_count"`
-    InjectionTokenBudget     int    `yaml:"injection_token_budget"` // P1; 0 = unlimited
+// pkg/config/memory.go
+// MemorySection holds all long-term memory configuration.
+// Access via appconfig.GetMemory() after appconfig.Initialize().
+type MemorySection struct {
+    Enabled                  bool   // yaml:"enabled"
+    EmbeddingModel           string // yaml:"embedding_model"
+    EmbeddingBaseURL         string // yaml:"embedding_base_url"  optional; defaults to OpenAI
+    HypothesisModel          string // yaml:"hypothesis_model"
+    RetrievalTopK            int    // yaml:"retrieval_top_k"
+    RetrievalHopDepth        int    // yaml:"retrieval_hop_depth"
+    RetrievalHypothesisCount int    // yaml:"retrieval_hypothesis_count"
+    InjectionTokenBudget     int    // yaml:"injection_token_budget"  0 = unlimited
 }
 ```
+
+Retrieve the section at runtime with `appconfig.GetMemory()`.
 
 Defaults applied at config load time:
 
@@ -338,7 +339,7 @@ Defaults applied at config load time:
 |---|---|---|
 | `memory.enabled` | `true` | |
 | `memory.classifier_model` | inherits summarisation model | high-reasoning model recommended |
-| `memory.retrieval_model` | `""` | empty disables retrieval |
+| `memory.hypothesis_model` | `""` | empty disables retrieval |
 | `memory.embedding_model` | `""` | empty disables retrieval |
 | `memory.embedding_base_url` | `""` | falls back to `https://api.openai.com/v1` |
 | `memory.retrieval_top_k` | `10` | |
@@ -359,21 +360,36 @@ This ensures the most relevant memories always make it into context, and the age
 
 ### Wiring at Agent Startup
 
+The embedder is constructed in both CLI entrypoints (`cmd/forge/main.go` and `cmd/forge/headless.go`) and injected into the agent via the `WithEmbedder` option. The resolved API key is taken from the already-constructed LLM provider so no second credential lookup is needed.
+
 ```go
-// In agent initialisation (pkg/agent/agent.go or equivalent)
-embedder, err := llm.NewEmbedder(cfg)
-if err != nil {
-    // Provider construction failed (bad API key, unknown base URL format, etc.)
-    // Warn and disable retrieval — do not abort startup.
-    slog.Warn("memory retrieval disabled: embedding provider error", "err", err)
-    embedder = nil
+// cmd/forge/main.go (and headless.go) — after provider and appconfig.Initialize()
+var embedder llm.Embedder
+if memoryCfg := appconfig.GetMemory(); memoryCfg != nil {
+    // Warn when exactly one of the two required models is missing.
+    if memoryCfg.GetHypothesisModel() != "" && memoryCfg.GetEmbeddingModel() == "" {
+        log.Println("warning: memory.hypothesis_model is set but memory.embedding_model is empty — retrieval is disabled")
+    } else if memoryCfg.GetEmbeddingModel() != "" && memoryCfg.GetHypothesisModel() == "" {
+        log.Println("warning: memory.embedding_model is set but memory.hypothesis_model is empty — retrieval is disabled")
+    }
+
+    var embedErr error
+    embedder, embedErr = llm.NewEmbedder(memoryCfg, provider.GetAPIKey())
+    if embedErr != nil {
+        log.Printf("warning: memory retrieval disabled: embedding provider error: %v", embedErr)
+        embedder = nil
+    }
 }
-// embedder may be nil — pass to retrieval engine which checks for nil before use
+
+// Pass into the agent — nil embedder means retrieval is silently disabled.
+agentOptions = append(agentOptions, agent.WithEmbedder(embedder))
 ```
+
+`DefaultAgent` stores the embedder as `embedder llm.Embedder` and exposes it via the `WithEmbedder(llm.Embedder) AgentOption` functional option, consistent with the `WithContextManager` / `WithNotesManager` pattern.
 
 ### Graceful Degradation
 
-`NewEmbedder` returns `(nil, nil)` when `memory.embedding_model` is unset. The retrieval engine checks for a nil embedder at construction time and disables retrieval silently. A one-time warning is emitted at session start if exactly one of `memory.retrieval_model` / `memory.embedding_model` is set, since both are required for retrieval.
+`NewEmbedder` returns `(nil, nil)` when `memory.embedding_model` is unset. The retrieval engine checks for a nil embedder at construction time and disables retrieval silently. A one-time warning is emitted at session start if exactly one of `memory.hypothesis_model` / `memory.embedding_model` is set, since both are required for retrieval.
 
 ### Mock for Testing
 

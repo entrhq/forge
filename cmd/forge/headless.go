@@ -14,6 +14,8 @@ import (
 	"github.com/entrhq/forge/pkg/agent/tools"
 	appconfig "github.com/entrhq/forge/pkg/config"
 	"github.com/entrhq/forge/pkg/executor/headless"
+	"github.com/entrhq/forge/pkg/llm"
+	"github.com/entrhq/forge/pkg/llm/openai"
 	"github.com/entrhq/forge/pkg/security/workspace"
 	"github.com/entrhq/forge/pkg/tools/browser"
 	"github.com/entrhq/forge/pkg/tools/coding"
@@ -51,7 +53,7 @@ func runHeadless(ctx context.Context, config *Config) error {
 	}
 
 	// Build the LLM provider, respecting config file and CLI flag precedence
-	provider, err := appconfig.BuildProvider(cliModel, cliBaseURL, cliAPIKey, defaultModel)
+	provider, err := openai.BuildProvider(cliModel, cliBaseURL, cliAPIKey, defaultModel)
 	if err != nil {
 		return err
 	}
@@ -89,6 +91,29 @@ func runHeadless(ctx context.Context, config *Config) error {
 	if llmCfg := appconfig.GetLLM(); llmCfg != nil {
 		if summarizationModel := llmCfg.GetSummarizationModel(); summarizationModel != "" {
 			contextManager.SetSummarizationModel(summarizationModel)
+		}
+	}
+
+	// Initialise the embedding provider for long-term memory retrieval.
+	// NewEmbedder returns (nil, nil) when embedding is unconfigured — the agent
+	// treats a nil embedder as "retrieval disabled" and continues normally.
+	var embedder llm.Embedder
+	if memoryCfg := appconfig.GetMemory(); memoryCfg != nil {
+		// Warn when exactly one of hypothesis_model / embedding_model is configured,
+		// since both are required for retrieval to function.
+		hypothesisModel := memoryCfg.GetHypothesisModel()
+		embeddingModel := memoryCfg.GetEmbeddingModel()
+		if hypothesisModel != "" && embeddingModel == "" {
+			log.Println("warning: memory.hypothesis_model is set but memory.embedding_model is empty — retrieval is disabled")
+		} else if embeddingModel != "" && hypothesisModel == "" {
+			log.Println("warning: memory.embedding_model is set but memory.hypothesis_model is empty — retrieval is disabled")
+		}
+
+		var embedErr error
+		embedder, embedErr = llm.NewEmbedder(memoryCfg, provider.GetAPIKey())
+		if embedErr != nil {
+			log.Printf("warning: memory retrieval disabled: embedding provider error: %v", embedErr)
+			embedder = nil
 		}
 	}
 
@@ -131,6 +156,7 @@ func runHeadless(ctx context.Context, config *Config) error {
 		agent.WithCustomInstructions(systemPrompt),
 		agent.WithDisabledTools("ask_question", "converse"),
 		agent.WithContextManager(contextManager),
+		agent.WithEmbedder(embedder),
 	}
 
 	// Add repository context if available
