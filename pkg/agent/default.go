@@ -78,6 +78,9 @@ type DefaultAgent struct {
 
 	// Browser session management
 	browserManager *browser.SessionManager
+
+	// Embedding provider for long-term memory retrieval (may be nil — means retrieval disabled)
+	embedder llm.Embedder
 }
 
 // AgentOption is a function that configures an agent
@@ -146,6 +149,15 @@ func WithApprovalTimeout(timeout time.Duration) AgentOption {
 func WithContextManager(manager *agentcontext.Manager) AgentOption {
 	return func(a *DefaultAgent) {
 		a.contextManager = manager
+	}
+}
+
+// WithEmbedder sets the embedding provider for long-term memory retrieval.
+// A nil embedder is valid and means retrieval is disabled — the agent will
+// function normally without embedding capability.
+func WithEmbedder(e llm.Embedder) AgentOption {
+	return func(a *DefaultAgent) {
+		a.embedder = e
 	}
 }
 

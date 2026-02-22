@@ -1,13 +1,14 @@
 //go:build testing
 // +build testing
 
-package config
+package config_test
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/entrhq/forge/pkg/config"
 	"github.com/entrhq/forge/pkg/llm/openai"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -74,10 +75,10 @@ func TestBuildProvider(t *testing.T) {
 			err := os.WriteFile(configPath, []byte(tc.fileContent), 0600)
 			require.NoError(t, err)
 
-			err = Initialize(configPath)
+			err = config.Initialize(configPath)
 			require.NoError(t, err)
 
-			provider, err := BuildProvider(tc.cliConfig.Model, tc.cliConfig.BaseURL, tc.cliConfig.APIKey, defaultTestModel)
+			provider, err := openai.BuildProvider(tc.cliConfig.Model, tc.cliConfig.BaseURL, tc.cliConfig.APIKey, defaultTestModel)
 
 			if tc.expectError {
 				require.Error(t, err)
@@ -90,7 +91,7 @@ func TestBuildProvider(t *testing.T) {
 				// A proper integration test would make a real API call.
 			}
 
-			ResetGlobalManager()
+			config.ResetGlobalManager()
 		})
 	}
 }

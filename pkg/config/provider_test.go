@@ -1,8 +1,10 @@
-package config
+package config_test
 
 import (
 	"os"
 	"testing"
+
+	"github.com/entrhq/forge/pkg/llm/openai"
 )
 
 func TestBuildProvider(t *testing.T) {
@@ -114,7 +116,7 @@ func TestBuildProvider(t *testing.T) {
 			}
 
 			// Call BuildProvider
-			provider, err := BuildProvider(tt.cliModel, tt.cliBaseURL, tt.cliAPIKey, tt.defaultModel)
+			provider, err := openai.BuildProvider(tt.cliModel, tt.cliBaseURL, tt.cliAPIKey, tt.defaultModel)
 
 			// Check error expectation
 			if tt.expectError {

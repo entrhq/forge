@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"time"
@@ -14,6 +13,8 @@ import (
 	"github.com/entrhq/forge/pkg/agent/tools"
 	appconfig "github.com/entrhq/forge/pkg/config"
 	"github.com/entrhq/forge/pkg/executor/headless"
+	"github.com/entrhq/forge/pkg/llm"
+	"github.com/entrhq/forge/pkg/llm/openai"
 	"github.com/entrhq/forge/pkg/security/workspace"
 	"github.com/entrhq/forge/pkg/tools/browser"
 	"github.com/entrhq/forge/pkg/tools/coding"
@@ -51,7 +52,7 @@ func runHeadless(ctx context.Context, config *Config) error {
 	}
 
 	// Build the LLM provider, respecting config file and CLI flag precedence
-	provider, err := appconfig.BuildProvider(cliModel, cliBaseURL, cliAPIKey, defaultModel)
+	provider, err := openai.BuildProvider(cliModel, cliBaseURL, cliAPIKey, defaultModel)
 	if err != nil {
 		return err
 	}
@@ -89,6 +90,29 @@ func runHeadless(ctx context.Context, config *Config) error {
 	if llmCfg := appconfig.GetLLM(); llmCfg != nil {
 		if summarizationModel := llmCfg.GetSummarizationModel(); summarizationModel != "" {
 			contextManager.SetSummarizationModel(summarizationModel)
+		}
+	}
+
+	// Initialize the embedding provider for long-term memory retrieval.
+	// NewEmbedder returns (nil, nil) when embedding is unconfigured — the agent
+	// treats a nil embedder as "retrieval disabled" and continues normally.
+	var embedder llm.Embedder
+	if memoryCfg := appconfig.GetMemory(); memoryCfg != nil && memoryCfg.IsEnabled() {
+		// Warn when exactly one of hypothesis_model / embedding_model is configured,
+		// since both are required for retrieval to function.
+		hypothesisModel := memoryCfg.GetHypothesisModel()
+		embeddingModel := memoryCfg.GetEmbeddingModel()
+		if hypothesisModel != "" && embeddingModel == "" {
+			cmdLog.Warnf("memory.hypothesis_model is set but memory.embedding_model is empty — retrieval is disabled")
+		} else if embeddingModel != "" && hypothesisModel == "" {
+			cmdLog.Warnf("memory.embedding_model is set but memory.hypothesis_model is empty — retrieval is disabled")
+		}
+
+		var embedErr error
+		embedder, embedErr = llm.NewEmbedder(memoryCfg, provider.GetAPIKey())
+		if embedErr != nil {
+			cmdLog.Warnf("memory retrieval disabled: embedding provider error: %v", embedErr)
+			embedder = nil
 		}
 	}
 
@@ -131,6 +155,7 @@ func runHeadless(ctx context.Context, config *Config) error {
 		agent.WithCustomInstructions(systemPrompt),
 		agent.WithDisabledTools("ask_question", "converse"),
 		agent.WithContextManager(contextManager),
+		agent.WithEmbedder(embedder),
 	}
 
 	// Add repository context if available
@@ -263,10 +288,10 @@ func runExecutor(ctx context.Context, ag *agent.DefaultAgent, execConfig *headle
 	}
 
 	// Run execution
-	log.Printf("Starting headless execution...")
-	log.Printf("Task: %s", execConfig.Task)
-	log.Printf("Mode: %s", execConfig.Mode)
-	log.Printf("Workspace: %s", execConfig.WorkspaceDir)
+	cmdLog.Infof("Starting headless execution...")
+	cmdLog.Infof("Task: %s", execConfig.Task)
+	cmdLog.Infof("Mode: %s", execConfig.Mode)
+	cmdLog.Infof("Workspace: %s", execConfig.WorkspaceDir)
 
 	startTime := time.Now()
 	if runErr := executor.Run(ctx); runErr != nil {
@@ -274,7 +299,7 @@ func runExecutor(ctx context.Context, ag *agent.DefaultAgent, execConfig *headle
 	}
 
 	duration := time.Since(startTime)
-	log.Printf("Execution completed successfully in %s", duration)
+	cmdLog.Infof("Execution completed successfully in %s", duration)
 	return nil
 }
 

@@ -19,12 +19,10 @@ func setupTestDir(t *testing.T) (cleanup func()) {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 
-	// Save original state
+	// Save original state (sync.Once cannot be copied by value; always reset to fresh)
 	origLogDir := logDir
 	origInitErr := initErr
-	origInitOnce := initOnce
 	origSessionID := sessionID
-	origSessionIDOnce := sessionIDOnce
 
 	// Reset global state
 	logDir = tempDir
@@ -35,12 +33,12 @@ func setupTestDir(t *testing.T) (cleanup func()) {
 
 	// Return cleanup function
 	return func() {
-		// Restore original state
+		// Restore original state; reset sync.Once fields to fresh instances
 		logDir = origLogDir
 		initErr = origInitErr
-		initOnce = origInitOnce
+		initOnce = sync.Once{}
 		sessionID = origSessionID
-		sessionIDOnce = origSessionIDOnce
+		sessionIDOnce = sync.Once{}
 
 		// Remove temp directory
 		os.RemoveAll(tempDir)

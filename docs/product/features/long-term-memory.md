@@ -133,8 +133,8 @@ The agent made the same mistake (over-use of goroutines without proper lifecycle
 - `memory.enabled` — global on/off (default: true)
 - `memory.cadence_turns` — turns between cadence-triggered capture passes (default: 5, range: 1–10)
 - `memory.classifier_model` — LLM model for the capture classifier; intended for a higher-reasoning model for accurate memory formation, relationship detection, scope assignment, and category assignment (default: inherits summarization model from ADR-0042)
-- `memory.retrieval_model` — LLM model for the pre-RAG hypothesis generation hook; must be a lightweight/flash-class model to minimise turn latency since this call is on the critical path (no default — if unset, retrieval is disabled even if embedding model is configured)
-- `memory.embedding_model` — embedding model used to build the in-memory vector map at startup and after each capture event (same provider as configured LLM, no default — must be explicitly configured; retrieval is disabled until set; changing this value causes a full re-embed on next startup, old vectors are discarded)
+- `memory.hypothesis_model` — LLM model for the pre-RAG hypothesis generation hook; must be a lightweight/flash-class model to minimise turn latency since this call is on the critical path (no default — if unset, retrieval is disabled even if embedding model is configured)
+- `memory.embedding_model` — embedding model used to build the in-memory vector map at startup and after each capture event (no default — must be explicitly configured; retrieval is disabled until set; changing this value causes a full re-embed on next startup, old vectors are discarded); the API key is shared with the main LLM provider, but the endpoint can be overridden independently via `memory.embedding_base_url` — this allows the embedding model to target a different service (e.g. Ollama locally, a dedicated Mistral endpoint) while the main LLM continues to use a different provider
 - `memory.retrieval_top_k` — number of candidate memories to retrieve per hypothesis seed before deduplication (default: 10)
 - `memory.retrieval_hop_depth` — how many graph hops to traverse from the deduplicated retrieved set when pulling graph neighbours (default: 1, range: 1–3)
 - `memory.retrieval_hypothesis_count` — number of hypothetical sentences the pre-RAG hook generates per turn to use as retrieval seeds (default: 5, range: 1–10)
@@ -266,7 +266,7 @@ but why, and what alternatives were considered.
   → Tool call content excluded in all cases
       ↓
 [Stage 1 — Pre-RAG Hook (on critical path)]
-  → Send conversation window to retrieval_model (flash-class LLM)
+  → Send conversation window to hypothesis_model (flash-class LLM)
   → LLM generates N hypothetical sentences a relevant memory might contain
   → If hook times out or fails → skip retrieval entirely, session continues unaffected
       ↓
@@ -384,11 +384,11 @@ Users who want to control memory behaviour configure it via the standard setting
 - Enable/disable globally (`memory.enabled`)
 - Set capture cadence — more frequent means finer-grained memories and more classifier calls (`memory.cadence_turns`)
 - Choose the capture classifier model — use a capable reasoning model for high-quality memory formation (`memory.classifier_model`)
-- Choose the retrieval model — must be a flash-class model; this call is on the critical path (`memory.retrieval_model`)
+- Choose the hypothesis model — must be a flash-class model; this call is on the critical path (`memory.hypothesis_model`)
 - Set the embedding model — both stored memories and retrieval hypotheses are embedded through this model (`memory.embedding_model`)
 - Tune retrieval parameters: top-k candidates per hypothesis, graph hop depth, hypothesis count (`memory.retrieval_top_k`, `memory.retrieval_hop_depth`, `memory.retrieval_hypothesis_count`)
 
-**Minimum configuration to activate retrieval:** `memory.retrieval_model` and `memory.embedding_model` must both be set. Capture runs regardless.
+**Minimum configuration to activate retrieval:** both `memory.hypothesis_model` and `memory.embedding_model` must be set — if either is absent, retrieval is disabled entirely for the session (capture still runs regardless, so memories continue to accumulate even when retrieval is off).
 
 ---
 
@@ -441,14 +441,14 @@ Users who want to control memory behaviour configure it via the standard setting
 ### System Integration
 
 - **Provider Abstraction Layer** (ADR-0003) — both embedding model calls and pre-RAG hook LLM calls must go through the provider abstraction
-- **Settings System** (ADR-0017) — memory configuration added to existing settings schema; two new model config keys (`memory.retrieval_model`, `memory.embedding_model`) require explicit user configuration before retrieval activates
+- **Settings System** (ADR-0017) — memory configuration added to existing settings schema; two new model config keys (`memory.hypothesis_model`, `memory.embedding_model`) require explicit user configuration before retrieval activates
 - **Agent Loop** — observer hooks into turn counting (capture, async); retrieval pipeline hooks into turn start and is on the critical path (must complete before agent responds); capture is fully async and never blocks the loop
 - **Summarisation System** — the retrieval engine reads the last summarisation boundary to determine the conversation window; it must subscribe to summarisation events to maintain an accurate window pointer
 
 ### External Dependencies
 
 - **Embedding model** — requires a configured embedding model from the user's LLM provider (e.g. `text-embedding-3-small` for OpenAI users); used to embed both stored memories at write time and generated hypotheses at retrieval time
-- **Retrieval model (flash LLM)** — requires a configured fast/lightweight LLM from the user's provider for the pre-RAG hypothesis generation hook (e.g. `gemini-2.0-flash`, `gpt-4o-mini`); this is a separate model from the classifier and must be explicitly set in `memory.retrieval_model`
+- **Hypothesis model (flash LLM)** — requires a configured fast/lightweight LLM from the user's provider for the pre-RAG hypothesis generation hook (e.g. `gemini-2.0-flash`, `gpt-4o-mini`); this is a separate model from the classifier and must be explicitly set in `memory.hypothesis_model`
 
 Both are assumed to be available from the user's already-configured LLM provider. No new provider integrations are required.
 
@@ -480,7 +480,7 @@ Both are assumed to be available from the user's already-configured LLM provider
 
 **Decision**: HyDE (Hypothetical Document Embeddings) as the retrieval query strategy, not direct conversation embedding  
 **Rationale**: There is a fundamental semantic asymmetry between raw conversation text (verbose, noisy, dialogue-style) and stored memory files (terse, declarative, distilled). Directly embedding a conversation window produces low-precision retrieval because the query and the document live in very different semantic registers. Generating N hypothetical sentences that a relevant memory *might* contain bridges this gap — the hypothesis and the stored memory are both written in the same compressed, declarative style and are far more semantically proximate in embedding space. This improves retrieval precision without adding a new architectural component; it reuses the existing LLM provider abstraction.  
-**Trade-off**: The pre-RAG hook is an LLM call on the critical path, introducing latency that direct conversation embedding would not. Mitigated by: (a) mandating a flash-class model for `memory.retrieval_model`, (b) a 2-second retrieval budget with graceful skip-on-failure, (c) no degraded fallback — a complete skip is preferable to noisy low-precision results.
+**Trade-off**: The pre-RAG hook is an LLM call on the critical path, introducing latency that direct conversation embedding would not. Mitigated by: (a) mandating a flash-class model for `memory.hypothesis_model`, (b) a 2-second retrieval budget with graceful skip-on-failure, (c) no degraded fallback — a complete skip is preferable to noisy low-precision results.
 
 **Decision**: Embeddings are never persisted to disk; all stored-memory vectors live in an in-memory map rebuilt on two triggers: agent startup (asynchronous, non-blocking) and after each capture event (asynchronous, on the capture goroutine); a read/write lock serialises access so retrieval always sees a consistent map  
 **Rationale**: Persisting embeddings introduces a sidecar file format, a migration story when the embedding model changes, and a consistency problem between the file and the model version that produced it. In-memory vectors sidestep all three: the map is always authoritative, always consistent with the current `memory.embedding_model`, and the cost of rebuilding is paid once at startup rather than on every retrieval. Building asynchronously means agent startup is instant — the first turn may wait on the lock if the store is large, but this is preferable to blocking the entire startup sequence. Memory is least critical at turn one (the user hasn't asked anything yet); by turn two the map is guaranteed to be ready.  
@@ -490,7 +490,7 @@ Both are assumed to be available from the user's already-configured LLM provider
 **Rationale**: Within a single user turn, the conversation window does not meaningfully change — tool call content is already excluded from the window, and intermediate agent responses do not represent new user intent. Re-running the full HyDE pipeline on every agent sub-turn would produce near-identical hypothesis sets at significant flash LLM cost with zero retrieval benefit. Triggering on user message is the natural alignment: retrieval contextualises *the user's intent* at the moment it is expressed, and that context is stable for the whole turn.  
 **Trade-off**: If a long multi-tool turn surfaces genuinely new information (e.g. a file read that reveals an unexpected architectural pattern), that information will not trigger a fresh retrieval until the next user message. This is an acceptable trade-off — mid-turn discoveries are transient context; they will influence the next user message, which will trigger fresh retrieval at that point.
 
-**Decision**: `memory.classifier_model` and `memory.retrieval_model` are separate config keys targeting different model classes  
+**Decision**: `memory.classifier_model` and `memory.hypothesis_model` are separate config keys targeting different model classes  
 **Rationale**: The capture classifier does heavy reasoning — assessing memory-worthiness, assigning categories, detecting relationships, drawing graph edges — and benefits from a capable model. The retrieval hook generates simple hypothetical sentences and runs on the critical path; it must be fast and cheap. A single shared model config forces an irreconcilable trade-off between capture quality and retrieval latency.  
 **Trade-off**: Two model config keys to manage; mitigated by sensible defaults (classifier inherits from summarisation model config, retrieval should be set explicitly to provider's fastest model)
 

@@ -8,7 +8,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -20,6 +19,8 @@ import (
 	"github.com/entrhq/forge/pkg/agent/tools"
 	appconfig "github.com/entrhq/forge/pkg/config"
 	"github.com/entrhq/forge/pkg/executor/tui"
+	"github.com/entrhq/forge/pkg/llm"
+	"github.com/entrhq/forge/pkg/llm/openai"
 
 	"github.com/entrhq/forge/pkg/security/workspace"
 	"github.com/entrhq/forge/pkg/tools/browser"
@@ -73,7 +74,8 @@ func main() {
 
 	// Validate configuration
 	if err := config.validate(); err != nil {
-		log.Fatalf("Configuration error: %v", err)
+		cmdLog.Errorf("Configuration error: %v", err)
+		os.Exit(1)
 	}
 
 	// Create context with signal handling for graceful shutdown
@@ -91,7 +93,8 @@ func main() {
 	// Run the application
 	if runErr := run(ctx, config); runErr != nil {
 		cancel()
-		log.Fatalf("Application error: %v", runErr)
+		cmdLog.Errorf("Application error: %v", runErr)
+		os.Exit(1)
 	}
 }
 
@@ -209,7 +212,7 @@ func runTUI(ctx context.Context, config *Config) error {
 		cliAPIKey = *config.APIKey
 	}
 
-	provider, err := appconfig.BuildProvider(cliModel, cliBaseURL, cliAPIKey, defaultModel)
+	provider, err := openai.BuildProvider(cliModel, cliBaseURL, cliAPIKey, defaultModel)
 	if err != nil {
 		return err
 	}
@@ -255,6 +258,29 @@ func runTUI(ctx context.Context, config *Config) error {
 		}
 	}
 
+	// Initialize the embedding provider for long-term memory retrieval.
+	// NewEmbedder returns (nil, nil) when embedding is unconfigured — the agent
+	// treats a nil embedder as "retrieval disabled" and continues normally.
+	var embedder llm.Embedder
+	if memoryCfg := appconfig.GetMemory(); memoryCfg != nil && memoryCfg.IsEnabled() {
+		// Warn when exactly one of hypothesis_model / embedding_model is configured,
+		// since both are required for retrieval to function.
+		hypothesisModel := memoryCfg.GetHypothesisModel()
+		embeddingModel := memoryCfg.GetEmbeddingModel()
+		if hypothesisModel != "" && embeddingModel == "" {
+			cmdLog.Warnf("memory.hypothesis_model is set but memory.embedding_model is empty — retrieval is disabled")
+		} else if embeddingModel != "" && hypothesisModel == "" {
+			cmdLog.Warnf("memory.embedding_model is set but memory.hypothesis_model is empty — retrieval is disabled")
+		}
+
+		var embedErr error
+		embedder, embedErr = llm.NewEmbedder(memoryCfg, provider.GetAPIKey())
+		if embedErr != nil {
+			cmdLog.Warnf("memory retrieval disabled: embedding provider error: %v", embedErr)
+			embedder = nil
+		}
+	}
+
 	// Create workspace security guard
 	guard, err := workspace.NewGuard(config.WorkspaceDir)
 	if err != nil {
@@ -297,6 +323,7 @@ func runTUI(ctx context.Context, config *Config) error {
 		agent.WithContextManager(contextManager),
 		agent.WithNotesManager(notesManager),
 		agent.WithBrowserManager(browserManager),
+		agent.WithEmbedder(embedder),
 	}
 
 	// Add repository context if AGENTS.md was loaded
