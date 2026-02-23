@@ -37,6 +37,12 @@ If a new memory refines, contradicts, or supersedes an existing memory listed in
 EXISTING MEMORIES below, include the relationship in the "related" or "supersedes"
 field using the exact ID from that list. Do not invent IDs.
 
+The "relationship" field in related entries MUST be one of these exact strings:
+- "refines"      — this memory adds detail or precision to the related one
+- "contradicts"  — this memory conflicts with or corrects the related one
+- "relates-to"   — this memory is topically connected but neither refines nor contradicts
+- "supersedes"   — this memory fully replaces the related one (prefer the top-level supersedes field instead)
+
 OUTPUT FORMAT:
 Return a JSON array of memory objects. Return an empty array [] if nothing is memory-worthy.
 Each object must have: content (markdown string), scope, category.

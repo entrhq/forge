@@ -310,7 +310,7 @@ func TestClassifier_ValidMemory(t *testing.T) {
 		{Content: "Use errors.As.", Scope: longtermmemory.ScopeUser, Category: longtermmemory.CategoryCodingPreferences},
 	}
 	raw, _ := json.Marshal(mems)
-	c := NewClassifier(&fakeProvider{response: string(raw)}, "", newFakeStore())
+	c := NewClassifier(&fakeProvider{response: string(raw)}, "", newFakeStore(), nil)
 
 	got, err := c.Classify(context.Background(), TriggerEvent{
 		Kind:      TriggerKindTurn,
@@ -335,7 +335,7 @@ func TestClassifier_ValidMemory(t *testing.T) {
 }
 
 func TestClassifier_EmptyArrayResponse(t *testing.T) {
-	c := NewClassifier(&fakeProvider{response: "[]"}, "", newFakeStore())
+	c := NewClassifier(&fakeProvider{response: "[]"}, "", newFakeStore(), nil)
 	got, err := c.Classify(context.Background(), TriggerEvent{
 		Kind:      TriggerKindTurn,
 		Messages:  []ConversationMessage{{Role: "user", Content: "nothing memorable"}},
@@ -350,7 +350,7 @@ func TestClassifier_EmptyArrayResponse(t *testing.T) {
 }
 
 func TestClassifier_NonJSONResponse(t *testing.T) {
-	c := NewClassifier(&fakeProvider{response: "nothing to save"}, "", newFakeStore())
+	c := NewClassifier(&fakeProvider{response: "nothing to save"}, "", newFakeStore(), nil)
 	got, err := c.Classify(context.Background(), TriggerEvent{
 		Kind:      TriggerKindTurn,
 		Messages:  []ConversationMessage{{Role: "user", Content: "test"}},
@@ -365,7 +365,7 @@ func TestClassifier_NonJSONResponse(t *testing.T) {
 }
 
 func TestClassifier_LLMError(t *testing.T) {
-	c := NewClassifier(&fakeProvider{err: context.DeadlineExceeded}, "", newFakeStore())
+	c := NewClassifier(&fakeProvider{err: context.DeadlineExceeded}, "", newFakeStore(), nil)
 	_, err := c.Classify(context.Background(), TriggerEvent{
 		Kind:      TriggerKindTurn,
 		Messages:  []ConversationMessage{{Role: "user", Content: "test"}},
@@ -377,7 +377,7 @@ func TestClassifier_LLMError(t *testing.T) {
 }
 
 func TestClassifier_EmptyMessages(t *testing.T) {
-	c := NewClassifier(&fakeProvider{response: "[]"}, "", newFakeStore())
+	c := NewClassifier(&fakeProvider{response: "[]"}, "", newFakeStore(), nil)
 	got, err := c.Classify(context.Background(), TriggerEvent{Kind: TriggerKindTurn, SessionID: "s"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -393,7 +393,7 @@ func TestClassifier_RejectsUnknownScope(t *testing.T) {
 		{Content: "good memory", Scope: longtermmemory.ScopeUser, Category: longtermmemory.CategoryUserFacts},
 	}
 	raw, _ := json.Marshal(mems)
-	c := NewClassifier(&fakeProvider{response: string(raw)}, "", newFakeStore())
+	c := NewClassifier(&fakeProvider{response: string(raw)}, "", newFakeStore(), nil)
 
 	got, err := c.Classify(context.Background(), TriggerEvent{
 		Kind:      TriggerKindTurn,
@@ -413,7 +413,7 @@ func TestClassifier_RejectsUnknownCategory(t *testing.T) {
 		{Content: "bad cat", Scope: longtermmemory.ScopeRepo, Category: "gibberish"},
 	}
 	raw, _ := json.Marshal(mems)
-	c := NewClassifier(&fakeProvider{response: string(raw)}, "", newFakeStore())
+	c := NewClassifier(&fakeProvider{response: string(raw)}, "", newFakeStore(), nil)
 
 	got, err := c.Classify(context.Background(), TriggerEvent{
 		Kind:      TriggerKindTurn,
@@ -437,7 +437,7 @@ func TestClassifier_SupersedesResolution(t *testing.T) {
 		{Content: "Updated fact.", Scope: longtermmemory.ScopeUser, Category: longtermmemory.CategoryUserFacts, Supersedes: "mem_old"},
 	}
 	raw, _ := json.Marshal(mems)
-	c := NewClassifier(&fakeProvider{response: string(raw)}, "", store)
+	c := NewClassifier(&fakeProvider{response: string(raw)}, "", store, nil)
 
 	got, err := c.Classify(context.Background(), TriggerEvent{
 		Kind:      TriggerKindTurn,
@@ -463,7 +463,7 @@ func TestClassifier_DanglingSupersedesCleared(t *testing.T) {
 		{Content: "New memory.", Scope: longtermmemory.ScopeRepo, Category: longtermmemory.CategoryPatterns, Supersedes: "mem_ghost"},
 	}
 	raw, _ := json.Marshal(mems)
-	c := NewClassifier(&fakeProvider{response: string(raw)}, "", newFakeStore())
+	c := NewClassifier(&fakeProvider{response: string(raw)}, "", newFakeStore(), nil)
 
 	got, err := c.Classify(context.Background(), TriggerEvent{
 		Kind:      TriggerKindTurn,
@@ -489,7 +489,7 @@ func TestClassifier_CompactionTriggerMaps(t *testing.T) {
 		{Content: "arch decision", Scope: longtermmemory.ScopeRepo, Category: longtermmemory.CategoryArchitecturalDecisions},
 	}
 	raw, _ := json.Marshal(mems)
-	c := NewClassifier(&fakeProvider{response: string(raw)}, "", newFakeStore())
+	c := NewClassifier(&fakeProvider{response: string(raw)}, "", newFakeStore(), nil)
 
 	got, err := c.Classify(context.Background(), TriggerEvent{
 		Kind:      TriggerKindCompaction,
@@ -525,7 +525,7 @@ func TestPipeline_WritesMemoriesToStore(t *testing.T) {
 		mu.Lock()
 		rebuilt = true
 		mu.Unlock()
-	})
+	}, nil)
 	p.Start(ctx)
 
 	p.Enqueue(TriggerEvent{
@@ -565,7 +565,7 @@ func TestPipeline_RebuildNotCalledForEmptyResult(t *testing.T) {
 		mu.Lock()
 		rebuilt = true
 		mu.Unlock()
-	})
+	}, nil)
 	p.Start(ctx)
 
 	p.Enqueue(TriggerEvent{
@@ -586,7 +586,7 @@ func TestPipeline_RebuildNotCalledForEmptyResult(t *testing.T) {
 
 func TestPipeline_EnqueueIsNonBlocking(t *testing.T) {
 	// Do NOT start the pipeline so the buffer fills; excess events must be dropped.
-	p := NewPipeline(&fakeProvider{response: "[]"}, "", newFakeStore(), nil)
+	p := NewPipeline(&fakeProvider{response: "[]"}, "", newFakeStore(), nil, nil)
 
 	done := make(chan struct{})
 	go func() {
@@ -610,7 +610,7 @@ func TestPipeline_EnqueueIsNonBlocking(t *testing.T) {
 
 func TestPipeline_StopsOnContextCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	p := NewPipeline(&fakeProvider{response: "[]"}, "", newFakeStore(), nil)
+	p := NewPipeline(&fakeProvider{response: "[]"}, "", newFakeStore(), nil, nil)
 	p.Start(ctx)
 	cancel()
 	time.Sleep(50 * time.Millisecond)
@@ -627,7 +627,7 @@ func TestPipeline_StopsOnContextCancel(t *testing.T) {
 func TestObserver_OnTurnComplete(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	p := NewPipeline(&fakeProvider{response: "[]"}, "", newFakeStore(), nil)
+	p := NewPipeline(&fakeProvider{response: "[]"}, "", newFakeStore(), nil, nil)
 	p.Start(ctx)
 	obs := NewObserver(p)
 
@@ -643,7 +643,7 @@ func TestObserver_OnTurnComplete(t *testing.T) {
 func TestObserver_OnCompaction(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	p := NewPipeline(&fakeProvider{response: "[]"}, "", newFakeStore(), nil)
+	p := NewPipeline(&fakeProvider{response: "[]"}, "", newFakeStore(), nil, nil)
 	p.Start(ctx)
 	obs := NewObserver(p)
 
@@ -659,7 +659,7 @@ func TestObserver_SkipsSystemAndToolMessages(t *testing.T) {
 	store := newFakeStore()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	p := NewPipeline(&fakeProvider{response: "[]"}, "", store, nil)
+	p := NewPipeline(&fakeProvider{response: "[]"}, "", store, nil, nil)
 	p.Start(ctx)
 	obs := NewObserver(p)
 

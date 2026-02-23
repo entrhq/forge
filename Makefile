@@ -1,4 +1,4 @@
-.PHONY: test test-verbose test-quiet test-coverage lint fmt clean examples run-example help install-tools tidy install uninstall build validate-workflows
+.PHONY: test test-verbose test-quiet test-coverage lint fmt vet check clean examples run-example help install-tools hooks tidy install uninstall build validate-workflows
 
 # Go parameters
 GOCMD=go
@@ -40,6 +40,14 @@ test-quiet: ## Run tests with minimal output (agent-friendly)
 test-coverage: test ## Run tests and generate HTML coverage report
 	$(GOCMD) tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report generated: coverage.html"
+
+vet: ## Run go vet
+	@echo "Running go vet..."
+	$(GOCMD) vet ./...
+
+check: fmt tidy vet lint test ## Pre-commit gate — fmt, vet, lint, test
+	@echo ""
+	@echo "✓ All checks passed"
 
 lint: ## Run linters
 	@echo "Running linters..."
@@ -92,14 +100,27 @@ run-example: ## Run the agent chat example
 	@echo "Note: Make sure OPENAI_API_KEY is set in your environment"
 	$(GOCMD) run $(AGENT_CHAT)/main.go
 
-install-tools: ## Install development tools
+install-tools: ## Install development tools and git hooks
 	@echo "Installing development tools..."
 	@if ! command -v golangci-lint > /dev/null; then \
 		echo "Installing golangci-lint..."; \
-		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell go env GOPATH)/bin; \
+		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell go env GOPATH)/bin v2.6.2; \
 	else \
 		echo "golangci-lint already installed"; \
 	fi
+	@if ! command -v gosec > /dev/null; then \
+		echo "Installing gosec..."; \
+		$(GOCMD) install github.com/securego/gosec/v2/cmd/gosec@latest; \
+	else \
+		echo "gosec already installed"; \
+	fi
+	@$(MAKE) hooks
+
+hooks: ## Install git pre-commit hooks for this project
+	@echo "Installing git hooks..."
+	@cp scripts/pre-commit .git/hooks/pre-commit
+	@chmod +x .git/hooks/pre-commit
+	@echo "✓ Pre-commit hook installed (runs make check)"
 
 run: ## Run the forge TUI coding agent
 	@echo "Running forge..."
@@ -125,6 +146,6 @@ uninstall: ## Remove forge binary from GOPATH/bin
 
 dev: run-example ## Run in development mode (alias for run-example)
 
-all: tidy fmt lint validate-workflows test examples ## Run all checks and build examples
+all: tidy check validate-workflows examples ## Run all checks and build examples
 
 .DEFAULT_GOAL := help

@@ -276,7 +276,15 @@ func runTUI(ctx context.Context, config *Config) error {
 		}
 
 		var embedErr error
-		embedder, embedErr = llm.NewEmbedder(memoryCfg, provider.GetAPIKey())
+		// Resolve embedding API key: config field > EMBEDDING_API_KEY env var > main provider key.
+		embeddingAPIKey := memoryCfg.GetEmbeddingAPIKey()
+		if embeddingAPIKey == "" {
+			embeddingAPIKey = os.Getenv("EMBEDDING_API_KEY")
+		}
+		if embeddingAPIKey == "" {
+			embeddingAPIKey = provider.GetAPIKey()
+		}
+		embedder, embedErr = llm.NewEmbedder(memoryCfg, embeddingAPIKey)
 		if embedErr != nil {
 			cmdLog.Warnf("memory retrieval disabled: embedding provider error: %v", embedErr)
 			embedder = nil
@@ -289,21 +297,29 @@ func runTUI(ctx context.Context, config *Config) error {
 	var capturePipeline *capture.Pipeline
 	if memoryCfg := appconfig.GetMemory(); memoryCfg != nil && memoryCfg.IsEnabled() {
 		classifierModel := memoryCfg.GetClassifierModel()
-		if classifierModel != "" {
+		if classifierModel == "" {
+			cmdLog.Warnf("memory: long-term capture disabled — classifier_model not configured (set it in /settings → Memory)")
+		} else {
+			cmdLog.Infof("memory: initializing long-term capture pipeline (classifier_model=%s)", classifierModel)
 			memHomeDir, homeErr := os.UserHomeDir()
 			if homeErr != nil {
-				cmdLog.Warnf("long-term memory capture disabled: cannot determine home dir: %v", homeErr)
+				cmdLog.Warnf("memory: long-term capture disabled — cannot determine home dir: %v", homeErr)
 			} else {
 				userMemDir := filepath.Join(memHomeDir, ".forge", "memories")
-				memStore, storeErr := longtermmemory.NewFileStore(config.WorkspaceDir, userMemDir)
+				cmdLog.Infof("memory: store paths — repo=%s user=%s", config.WorkspaceDir, userMemDir)
+				repoMemDir := filepath.Join(config.WorkspaceDir, ".forge", "memories")
+				memStore, storeErr := longtermmemory.NewFileStore(repoMemDir, userMemDir)
 				if storeErr != nil {
-					cmdLog.Warnf("long-term memory capture disabled: storage error: %v", storeErr)
+					cmdLog.Warnf("memory: long-term capture disabled — storage error: %v", storeErr)
 				} else {
-					capturePipeline = capture.NewPipeline(provider, classifierModel, memStore, func() {})
+					capturePipeline = capture.NewPipeline(provider, classifierModel, memStore, func() {}, cmdLog)
 					capturePipeline.Start(ctx)
+					cmdLog.Infof("memory: long-term capture pipeline started (buffer_size=%d)", 8)
 				}
 			}
 		}
+	} else {
+		cmdLog.Infof("memory: long-term capture disabled (memory section not configured or not enabled)")
 	}
 
 	// Create workspace security guard

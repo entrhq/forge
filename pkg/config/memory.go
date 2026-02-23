@@ -16,6 +16,7 @@ type MemorySection struct {
 	HypothesisModel          string
 	EmbeddingModel           string
 	EmbeddingBaseURL         string
+	EmbeddingAPIKey          string
 	RetrievalTopK            int
 	RetrievalHopDepth        int
 	RetrievalHypothesisCount int
@@ -31,6 +32,7 @@ func NewMemorySection() *MemorySection {
 		HypothesisModel:          "",
 		EmbeddingModel:           "",
 		EmbeddingBaseURL:         "",
+		EmbeddingAPIKey:          "",
 		RetrievalTopK:            10,
 		RetrievalHopDepth:        1,
 		RetrievalHypothesisCount: 5,
@@ -63,6 +65,7 @@ func (s *MemorySection) Data() map[string]any {
 		"hypothesis_model":           s.HypothesisModel,
 		"embedding_model":            s.EmbeddingModel,
 		"embedding_base_url":         s.EmbeddingBaseURL,
+		"embedding_api_key":          s.EmbeddingAPIKey,
 		"retrieval_top_k":            s.RetrievalTopK,
 		"retrieval_hop_depth":        s.RetrievalHopDepth,
 		"retrieval_hypothesis_count": s.RetrievalHypothesisCount,
@@ -108,6 +111,9 @@ func (s *MemorySection) SetData(data map[string]any) error {
 	if url, ok := data["embedding_base_url"].(string); ok {
 		s.EmbeddingBaseURL = url
 	}
+	if key, ok := data["embedding_api_key"].(string); ok {
+		s.EmbeddingAPIKey = key
+	}
 	if v, ok := intFromAny(data["retrieval_top_k"]); ok {
 		s.RetrievalTopK = v
 	}
@@ -139,6 +145,7 @@ func (s *MemorySection) Reset() {
 	s.HypothesisModel = ""
 	s.EmbeddingModel = ""
 	s.EmbeddingBaseURL = ""
+	s.EmbeddingAPIKey = ""
 	s.RetrievalTopK = 10
 	s.RetrievalHopDepth = 1
 	s.RetrievalHypothesisCount = 5
@@ -191,6 +198,18 @@ func (s *MemorySection) SetEmbeddingModel(model string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.EmbeddingModel = model
+}
+
+func (s *MemorySection) GetEmbeddingAPIKey() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.EmbeddingAPIKey
+}
+
+func (s *MemorySection) SetEmbeddingAPIKey(key string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.EmbeddingAPIKey = key
 }
 
 func (s *MemorySection) GetEmbeddingBaseURL() string {

@@ -307,6 +307,40 @@ func (s *SettingsOverlay) loadSettings() {
 				}
 				section.items = append(section.items, item)
 			}
+
+		case "memory":
+			// Create toggle and text items for memory configuration
+			memoryFields := []struct {
+				key         string
+				displayName string
+				itemType    itemType
+			}{
+				{"enabled", "Enabled", itemTypeToggle},
+				{"classifier_model", "Classifier Model", itemTypeText},
+				{"hypothesis_model", "Hypothesis Model", itemTypeText},
+				{"embedding_model", "Embedding Model", itemTypeText},
+				{"embedding_base_url", "Embedding Base URL", itemTypeText},
+				{"retrieval_top_k", "Retrieval Top-K", itemTypeText},
+				{"retrieval_hop_depth", "Retrieval Hop Depth", itemTypeText},
+				{"retrieval_hypothesis_count", "Retrieval Hypothesis Count", itemTypeText},
+				{"injection_token_budget", "Injection Token Budget", itemTypeText},
+			}
+
+			for _, field := range memoryFields {
+				value := data[field.key]
+				// Render numeric values as strings for text fields
+				if field.itemType == itemTypeText {
+					value = fmt.Sprintf("%v", value)
+				}
+				item := settingsItem{
+					key:         field.key,
+					displayName: field.displayName,
+					value:       value,
+					itemType:    field.itemType,
+					modified:    false,
+				}
+				section.items = append(section.items, item)
+			}
 		}
 
 		s.sections = append(s.sections, section)
@@ -584,6 +618,12 @@ func (s *SettingsOverlay) saveSettings() error {
 
 		case "ui":
 			// Save UI settings (toggles and text fields)
+			for _, item := range section.items {
+				data[item.key] = item.value
+			}
+
+		case "memory":
+			// Save memory settings (toggle and text fields)
 			for _, item := range section.items {
 				data[item.key] = item.value
 			}

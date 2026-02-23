@@ -18,6 +18,15 @@ func NewObserver(pipeline *Pipeline) *Observer {
 	return &Observer{pipeline: pipeline}
 }
 
+// log is a convenience accessor so Observer methods can call o.log().Xf(...)
+func (o *Observer) log() interface {
+	Debugf(string, ...interface{})
+	Infof(string, ...interface{})
+	Warnf(string, ...interface{})
+} {
+	return o.pipeline.Logger()
+}
+
 // OnTurnComplete is called by the agent loop after each completed user turn.
 // It strips tool call content from messages, then enqueues a TriggerKindTurn event.
 //
@@ -27,8 +36,11 @@ func NewObserver(pipeline *Pipeline) *Observer {
 // messages is the full conversation window (all user+assistant messages since the
 // last summarisation event). Tool call content is stripped here before enqueueing.
 func (o *Observer) OnTurnComplete(messages []*types.Message, sessionID string) {
+	o.log().Debugf("memory: OnTurnComplete called (raw_messages=%d session=%s)", len(messages), sessionID)
 	stripped := StripToolContent(messages)
+	o.log().Debugf("memory: after stripping tool content (stripped_messages=%d)", len(stripped))
 	if len(stripped) == 0 {
+		o.log().Debugf("memory: all messages stripped — skipping capture trigger")
 		return
 	}
 	o.pipeline.Enqueue(TriggerEvent{
@@ -44,8 +56,11 @@ func (o *Observer) OnTurnComplete(messages []*types.Message, sessionID string) {
 //
 // messages is the full conversation arc, tool content excluded.
 func (o *Observer) OnCompaction(messages []*types.Message, sessionID string) {
+	o.log().Debugf("memory: OnCompaction called (raw_messages=%d session=%s)", len(messages), sessionID)
 	stripped := StripToolContent(messages)
+	o.log().Debugf("memory: after stripping tool content (stripped_messages=%d)", len(stripped))
 	if len(stripped) == 0 {
+		o.log().Debugf("memory: all messages stripped — skipping compaction capture trigger")
 		return
 	}
 	o.pipeline.Enqueue(TriggerEvent{
