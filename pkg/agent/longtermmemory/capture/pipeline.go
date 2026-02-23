@@ -83,7 +83,7 @@ func (p *Pipeline) Enqueue(event TriggerEvent) {
 	case p.ch <- event:
 		p.log.Debugf("memory: capture trigger enqueued (kind=%s session=%s messages=%d)", event.Kind, event.SessionID, len(event.Messages))
 	default:
-		p.log.Warnf("memory: capture trigger dropped — pipeline buffer full (kind=%s)", event.Kind)
+		p.log.Debugf("memory: capture trigger dropped — pipeline buffer full (kind=%s)", event.Kind)
 	}
 }
 

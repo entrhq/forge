@@ -2,6 +2,14 @@ package capture
 
 import "github.com/entrhq/forge/pkg/types"
 
+// captureLogger is the minimal logging interface used by Observer and other
+// capture-package types to avoid coupling to a concrete logger implementation.
+type captureLogger interface {
+	Debugf(string, ...interface{})
+	Infof(string, ...interface{})
+	Warnf(string, ...interface{})
+}
+
 // Observer hooks into the agent loop and enqueues a capture trigger after
 // every completed user turn. There is no cadence counter or modulo check —
 // every turn fires a trigger. The classifier is responsible for determining
@@ -19,11 +27,7 @@ func NewObserver(pipeline *Pipeline) *Observer {
 }
 
 // log is a convenience accessor so Observer methods can call o.log().Xf(...)
-func (o *Observer) log() interface {
-	Debugf(string, ...interface{})
-	Infof(string, ...interface{})
-	Warnf(string, ...interface{})
-} {
+func (o *Observer) log() captureLogger {
 	return o.pipeline.Logger()
 }
 

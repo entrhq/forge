@@ -221,10 +221,6 @@ func (c *Classifier) loadExistingMemories(ctx context.Context) ([]*longtermmemor
 	return combined, nil
 }
 
-// providerForClassification returns the provider to use for classifier LLM calls.
-// If a model override is configured and the provider implements llm.ModelCloner,
-// a lightweight clone is returned. Otherwise the original provider is used.
-// This follows the same pattern as the context manager (ADR-0042).
 // truncate returns the first n characters of s, appending "..." if truncated.
 func truncate(s string, n int) string {
 	if len(s) <= n {
@@ -248,6 +244,10 @@ func stripCodeFences(s string) string {
 	return strings.TrimSpace(s)
 }
 
+// providerForClassification returns the provider to use for classifier LLM calls.
+// If a model override is configured and the provider implements llm.ModelCloner,
+// a lightweight clone is returned. Otherwise the original provider is used.
+// This follows the same pattern as the context manager (ADR-0042).
 func (c *Classifier) providerForClassification() llm.Provider {
 	if c.model == "" {
 		return c.provider

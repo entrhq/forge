@@ -305,9 +305,9 @@ func runTUI(ctx context.Context, config *Config) error {
 			if homeErr != nil {
 				cmdLog.Warnf("memory: long-term capture disabled — cannot determine home dir: %v", homeErr)
 			} else {
-				userMemDir := filepath.Join(memHomeDir, ".forge", "memories")
-				cmdLog.Infof("memory: store paths — repo=%s user=%s", config.WorkspaceDir, userMemDir)
 				repoMemDir := filepath.Join(config.WorkspaceDir, ".forge", "memories")
+				userMemDir := filepath.Join(memHomeDir, ".forge", "memories")
+				cmdLog.Infof("memory: store paths — repo=%s user=%s", repoMemDir, userMemDir)
 				memStore, storeErr := longtermmemory.NewFileStore(repoMemDir, userMemDir)
 				if storeErr != nil {
 					cmdLog.Warnf("memory: long-term capture disabled — storage error: %v", storeErr)
