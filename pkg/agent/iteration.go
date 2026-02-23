@@ -63,6 +63,27 @@ func (a *DefaultAgent) preparePrompt(ctx context.Context, errorContext string) *
 	// Get conversation history from memory
 	history := a.memory.GetAll()
 
+	// Retrieve relevant long-term memories and prepend them to the system prompt.
+	// This is a no-op when the retrieval engine is nil or the index is empty.
+	if a.retrievalEngine != nil {
+		a.cancelMu.Lock()
+		turnID := a.currentTurnID
+		a.cancelMu.Unlock()
+
+		// Grab the last user message content for the HyDE window.
+		var lastUserContent string
+		for i := len(history) - 1; i >= 0; i-- {
+			if history[i].Role == "user" {
+				lastUserContent = history[i].Content
+				break
+			}
+		}
+
+		if injection := a.retrievalEngine.RetrieveForTurn(ctx, turnID, history, lastUserContent); injection != "" {
+			systemPrompt = injection + "\n\n" + systemPrompt
+		}
+	}
+
 	// Build messages for LLM with optional error context
 	messages := prompts.BuildMessages(systemPrompt, history, "", errorContext)
 

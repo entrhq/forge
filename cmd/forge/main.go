@@ -17,6 +17,7 @@ import (
 	agentcontext "github.com/entrhq/forge/pkg/agent/context"
 	"github.com/entrhq/forge/pkg/agent/longtermmemory"
 	"github.com/entrhq/forge/pkg/agent/longtermmemory/capture"
+	"github.com/entrhq/forge/pkg/agent/longtermmemory/retrieval"
 	"github.com/entrhq/forge/pkg/agent/memory/notes"
 	"github.com/entrhq/forge/pkg/agent/tools"
 	appconfig "github.com/entrhq/forge/pkg/config"
@@ -291,10 +292,10 @@ func runTUI(ctx context.Context, config *Config) error {
 		}
 	}
 
-	// Initialize the async long-term memory capture pipeline.
-	// Capture is silently disabled when classifier_model is not configured
-	// or when the storage directories cannot be created.
+	// Initialize the async long-term memory capture pipeline and retrieval engine.
+	// Both are silently disabled when not configured.
 	var capturePipeline *capture.Pipeline
+	var retrievalEngine *retrieval.Engine
 	if memoryCfg := appconfig.GetMemory(); memoryCfg != nil && memoryCfg.IsEnabled() {
 		classifierModel := memoryCfg.GetClassifierModel()
 		if classifierModel == "" {
@@ -312,7 +313,29 @@ func runTUI(ctx context.Context, config *Config) error {
 				if storeErr != nil {
 					cmdLog.Warnf("memory: long-term capture disabled — storage error: %v", storeErr)
 				} else {
-					capturePipeline = capture.NewPipeline(provider, classifierModel, memStore, func() {}, cmdLog)
+					// Wire up the retrieval engine when both embedding and hypothesis
+					// models are configured. Its Rebuild method becomes the pipeline's
+					// rebuildFn so the index refreshes after every new memory write.
+					rebuildFn := func() {}
+					if embedder != nil && memoryCfg.GetHypothesisModel() != "" {
+						retrievalCfg := retrieval.Config{
+							HypothesisProvider:   provider,
+							HypothesisModel:      memoryCfg.GetHypothesisModel(),
+							HypothesisCount:      memoryCfg.GetRetrievalHypothesisCount(),
+							TopK:                 memoryCfg.GetRetrievalTopK(),
+							HopDepth:             memoryCfg.GetRetrievalHopDepth(),
+							InjectionTokenBudget: memoryCfg.GetInjectionTokenBudget(),
+						}
+						retrievalEngine = retrieval.New(memStore, embedder, retrievalCfg, cmdLog)
+						retrievalEngine.Start(ctx)
+						rebuildFn = retrievalEngine.Rebuild
+						cmdLog.Infof("memory: retrieval engine started (top_k=%d, hop_depth=%d, hypothesis_count=%d)",
+							memoryCfg.GetRetrievalTopK(), memoryCfg.GetRetrievalHopDepth(), memoryCfg.GetRetrievalHypothesisCount())
+					} else {
+						cmdLog.Infof("memory: retrieval disabled — hypothesis_model or embedding_model not configured")
+					}
+
+					capturePipeline = capture.NewPipeline(provider, classifierModel, memStore, rebuildFn, cmdLog)
 					capturePipeline.Start(ctx)
 					cmdLog.Infof("memory: long-term capture pipeline started (buffer_size=%d)", 8)
 				}
@@ -365,6 +388,7 @@ func runTUI(ctx context.Context, config *Config) error {
 		agent.WithNotesManager(notesManager),
 		agent.WithBrowserManager(browserManager),
 		agent.WithEmbedder(embedder),
+		agent.WithRetrievalEngine(retrievalEngine),
 	}
 
 	// Attach the capture pipeline when it was successfully initialized

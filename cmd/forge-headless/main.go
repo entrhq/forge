@@ -13,13 +13,20 @@ import (
 	"syscall"
 	"time"
 
+	"path/filepath"
+
 	"github.com/entrhq/forge/pkg/agent"
 	agentcontext "github.com/entrhq/forge/pkg/agent/context"
+	"github.com/entrhq/forge/pkg/agent/longtermmemory"
+	"github.com/entrhq/forge/pkg/agent/longtermmemory/capture"
+	"github.com/entrhq/forge/pkg/agent/longtermmemory/retrieval"
 	"github.com/entrhq/forge/pkg/agent/memory/notes"
 	"github.com/entrhq/forge/pkg/agent/tools"
 	appconfig "github.com/entrhq/forge/pkg/config"
 	"github.com/entrhq/forge/pkg/executor/headless"
+	"github.com/entrhq/forge/pkg/llm"
 	"github.com/entrhq/forge/pkg/llm/openai"
+	"github.com/entrhq/forge/pkg/logging"
 	"github.com/entrhq/forge/pkg/security/workspace"
 	"github.com/entrhq/forge/pkg/tools/browser"
 	"github.com/entrhq/forge/pkg/tools/coding"
@@ -221,6 +228,67 @@ func run(ctx context.Context, cliConfig *CLIConfig) error {
 		}
 	}
 
+	// Initialize the embedding provider for long-term memory retrieval.
+	// NewEmbedder returns (nil, nil) when embedding is unconfigured.
+	var embedder llm.Embedder
+	if memoryCfg := appconfig.GetMemory(); memoryCfg != nil && memoryCfg.IsEnabled() {
+		embeddingAPIKey := memoryCfg.GetEmbeddingAPIKey()
+		if embeddingAPIKey == "" {
+			embeddingAPIKey = os.Getenv("EMBEDDING_API_KEY")
+		}
+		if embeddingAPIKey == "" {
+			embeddingAPIKey = provider.GetAPIKey()
+		}
+		var embedErr error
+		embedder, embedErr = llm.NewEmbedder(memoryCfg, embeddingAPIKey)
+		if embedErr != nil {
+			log.Printf("memory retrieval disabled: embedding provider error: %v", embedErr)
+			embedder = nil
+		}
+	}
+
+	// Initialize long-term memory capture pipeline and retrieval engine.
+	var capturePipeline *capture.Pipeline
+	var retrievalEngine *retrieval.Engine
+	if memoryCfg := appconfig.GetMemory(); memoryCfg != nil && memoryCfg.IsEnabled() {
+		classifierModel := memoryCfg.GetClassifierModel()
+		if classifierModel != "" {
+			memHomeDir, homeErr := os.UserHomeDir()
+			if homeErr != nil {
+				log.Printf("memory: long-term capture disabled — cannot determine home dir: %v", homeErr)
+			} else {
+				repoMemDir := filepath.Join(execConfig.WorkspaceDir, ".forge", "memories")
+				userMemDir := filepath.Join(memHomeDir, ".forge", "memories")
+				memStore, storeErr := longtermmemory.NewFileStore(repoMemDir, userMemDir)
+				if storeErr != nil {
+					log.Printf("memory: long-term capture disabled — storage error: %v", storeErr)
+				} else {
+					rebuildFn := func() {}
+					if embedder != nil && memoryCfg.GetHypothesisModel() != "" {
+						memLog, _ := logging.NewLogger("headless-retrieval")
+						retrievalCfg := retrieval.Config{
+							HypothesisProvider:   provider,
+							HypothesisModel:      memoryCfg.GetHypothesisModel(),
+							HypothesisCount:      memoryCfg.GetRetrievalHypothesisCount(),
+							TopK:                 memoryCfg.GetRetrievalTopK(),
+							HopDepth:             memoryCfg.GetRetrievalHopDepth(),
+							InjectionTokenBudget: memoryCfg.GetInjectionTokenBudget(),
+						}
+						retrievalEngine = retrieval.New(memStore, embedder, retrievalCfg, memLog)
+						retrievalEngine.Start(ctx)
+						rebuildFn = retrievalEngine.Rebuild
+						log.Printf("memory: retrieval engine started (top_k=%d, hop_depth=%d)",
+							memoryCfg.GetRetrievalTopK(), memoryCfg.GetRetrievalHopDepth())
+					}
+					memLog, _ := logging.NewLogger("headless-capture")
+					capturePipeline = capture.NewPipeline(provider, classifierModel, memStore, rebuildFn, memLog)
+					capturePipeline.Start(ctx)
+					log.Printf("memory: long-term capture pipeline started")
+				}
+			}
+		}
+	}
+
 	// Create workspace security guard
 	guard, err := workspace.NewGuard(execConfig.WorkspaceDir)
 	if err != nil {
@@ -234,13 +302,18 @@ func run(ctx context.Context, cliConfig *CLIConfig) error {
 	notesManager := notes.NewManager()
 
 	// Create agent with headless system prompt, disabled interactive tools, context management, and shared notes manager
-	ag := agent.NewDefaultAgent(
-		provider,
+	agentOpts := []agent.AgentOption{
 		agent.WithCustomInstructions(systemPrompt),
 		agent.WithDisabledTools("ask_question", "converse"),
 		agent.WithContextManager(contextManager),
 		agent.WithNotesManager(notesManager),
-	)
+		agent.WithEmbedder(embedder),
+		agent.WithRetrievalEngine(retrievalEngine),
+	}
+	if capturePipeline != nil {
+		agentOpts = append(agentOpts, agent.WithCapturePipeline(capturePipeline))
+	}
+	ag := agent.NewDefaultAgent(provider, agentOpts...)
 
 	// Register coding tools with workspace guard, filtered by constraints
 	codingTools := []tools.Tool{
