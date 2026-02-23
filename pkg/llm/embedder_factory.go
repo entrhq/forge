@@ -1,6 +1,8 @@
 package llm
 
 import (
+	"os"
+
 	"github.com/entrhq/forge/pkg/config"
 	"github.com/entrhq/forge/pkg/llm/embedding"
 )
@@ -14,9 +16,11 @@ func NewEmbedder(cfg *config.MemorySection, apiKey string, opts ...embedding.Pro
 		return nil, nil // gracefully disabled
 	}
 
-	// Wire up base URL from config if set, otherwise fallback to provider defaults.
+	// Resolve base URL: config field > EMBEDDING_BASE_URL env var > OPENAI_BASE_URL env var (in embedding.go) > default.
 	if baseURL := cfg.GetEmbeddingBaseURL(); baseURL != "" {
 		opts = append(opts, embedding.WithBaseURL(baseURL))
+	} else if envURL := os.Getenv("EMBEDDING_BASE_URL"); envURL != "" {
+		opts = append(opts, embedding.WithBaseURL(envURL))
 	}
 
 	return embedding.NewProvider(

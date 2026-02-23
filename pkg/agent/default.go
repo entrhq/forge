@@ -6,8 +6,12 @@ import (
 	"sync"
 	"time"
 
+	"crypto/rand"
+	"encoding/hex"
+
 	"github.com/entrhq/forge/pkg/agent/approval"
 	agentcontext "github.com/entrhq/forge/pkg/agent/context"
+	"github.com/entrhq/forge/pkg/agent/longtermmemory/capture"
 	"github.com/entrhq/forge/pkg/agent/memory"
 	"github.com/entrhq/forge/pkg/agent/memory/notes"
 	"github.com/entrhq/forge/pkg/agent/prompts"
@@ -81,6 +85,11 @@ type DefaultAgent struct {
 
 	// Embedding provider for long-term memory retrieval (may be nil — means retrieval disabled)
 	embedder llm.Embedder
+
+	// Long-term memory capture (may be nil — means capture disabled)
+	capturePipeline *capture.Pipeline
+	captureObserver *capture.Observer
+	sessionID       string
 }
 
 // AgentOption is a function that configures an agent
@@ -161,6 +170,18 @@ func WithEmbedder(e llm.Embedder) AgentOption {
 	}
 }
 
+// WithCapturePipeline attaches a long-term memory capture pipeline to the agent.
+// The pipeline must already be started (via Pipeline.Start) before being passed here.
+// A nil pipeline is valid — it disables capture silently.
+func WithCapturePipeline(pipeline *capture.Pipeline) AgentOption {
+	return func(a *DefaultAgent) {
+		a.capturePipeline = pipeline
+		if pipeline != nil {
+			a.captureObserver = capture.NewObserver(pipeline)
+		}
+	}
+}
+
 // WithDisabledTools returns an option to disable specific built-in tools
 // This is useful for headless mode where interactive tools should be disabled
 func WithDisabledTools(toolNames ...string) AgentOption {
@@ -189,6 +210,12 @@ func NewDefaultAgent(provider llm.Provider, opts ...AgentOption) *DefaultAgent {
 		tools:      make(map[string]tools.Tool),
 		memory:     memory.NewConversationMemory(),
 		tokenizer:  tok,
+	}
+
+	// Generate a per-session ID used to correlate long-term memory captures.
+	sidBytes := make([]byte, 8)
+	if _, randErr := rand.Read(sidBytes); randErr == nil {
+		a.sessionID = hex.EncodeToString(sidBytes)
 	}
 
 	// Register built-in tools
@@ -393,6 +420,13 @@ func (a *DefaultAgent) processUserInput(ctx context.Context, content string) {
 
 	// Run agent loop (now in assistant.go)
 	a.runAgentLoop(turnCtx)
+
+	// Notify the long-term memory capture pipeline that a turn completed.
+	// This is non-blocking: the observer enqueues an event on a buffered
+	// channel; the pipeline goroutine processes it asynchronously.
+	if a.captureObserver != nil {
+		a.captureObserver.OnTurnComplete(a.memory.GetAll(), a.sessionID)
+	}
 
 	// Emit turn end
 	a.emitEvent(types.NewTurnEndEvent())
@@ -650,4 +684,17 @@ func (a *DefaultAgent) SetSummarizationModel(model string) {
 	if a.contextManager != nil {
 		a.contextManager.SetSummarizationModel(model)
 	}
+}
+
+// GetSessionID returns the per-session identifier used to correlate long-term
+// memory captures with a single agent lifecycle. The value is stable for the
+// duration of the agent's lifetime and is safe for concurrent reads.
+func (a *DefaultAgent) GetSessionID() string {
+	return a.sessionID
+}
+
+// GetCaptureObserver returns the capture.Observer attached to this agent, or
+// nil when no capture pipeline has been configured via WithCapturePipeline.
+func (a *DefaultAgent) GetCaptureObserver() *capture.Observer {
+	return a.captureObserver
 }

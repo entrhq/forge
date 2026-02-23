@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/entrhq/forge/pkg/agent/longtermmemory/capture"
 	"github.com/entrhq/forge/pkg/agent/memory"
 	"github.com/entrhq/forge/pkg/llm"
 	"github.com/entrhq/forge/pkg/types"
@@ -43,6 +44,12 @@ type GoalBatchCompactionStrategy struct {
 	maxTurnsPerBatch int
 
 	eventChannel chan<- *types.AgentEvent
+
+	// captureObserver forwards a compaction event to the long-term memory
+	// capture pipeline after each successful goal-batch run.
+	// May be nil — means capture is disabled.
+	captureObserver  *capture.Observer
+	captureSessionID string
 }
 
 // NewGoalBatchCompactionStrategy creates a new goal-batch compaction strategy.
@@ -66,6 +73,15 @@ func NewGoalBatchCompactionStrategy(minMessagesOldThreshold, minTurnsToCompact, 
 		minTurnsToCompact:       minTurnsToCompact,
 		maxTurnsPerBatch:        maxTurnsPerBatch,
 	}
+}
+
+// SetCaptureObserver attaches a long-term memory capture observer to this strategy.
+// After each successful compaction, the observer's OnCompaction hook is called
+// with the full (pre-compaction) conversation window so the pipeline can extract
+// memories from the goal arc. A nil observer disables capture silently.
+func (s *GoalBatchCompactionStrategy) SetCaptureObserver(observer *capture.Observer, sessionID string) {
+	s.captureObserver = observer
+	s.captureSessionID = sessionID
 }
 
 // SetEventChannel sets the event channel for emitting progress events during compaction.
@@ -150,6 +166,13 @@ func (s *GoalBatchCompactionStrategy) Summarize(ctx context.Context, conv *memor
 
 	conv.Clear()
 	conv.AddMultiple(newMessages)
+
+	// Notify long-term memory capture with the pre-compaction conversation arc.
+	// The observer strips tool content and enqueues asynchronously; this returns
+	// immediately and never blocks the agent loop.
+	if s.captureObserver != nil {
+		s.captureObserver.OnCompaction(messages, s.captureSessionID)
+	}
 
 	if s.eventChannel != nil {
 		s.eventChannel <- types.NewContextSummarizationProgressEvent(

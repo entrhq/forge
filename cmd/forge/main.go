@@ -15,6 +15,8 @@ import (
 
 	"github.com/entrhq/forge/pkg/agent"
 	agentcontext "github.com/entrhq/forge/pkg/agent/context"
+	"github.com/entrhq/forge/pkg/agent/longtermmemory"
+	"github.com/entrhq/forge/pkg/agent/longtermmemory/capture"
 	"github.com/entrhq/forge/pkg/agent/memory/notes"
 	"github.com/entrhq/forge/pkg/agent/tools"
 	appconfig "github.com/entrhq/forge/pkg/config"
@@ -274,11 +276,50 @@ func runTUI(ctx context.Context, config *Config) error {
 		}
 
 		var embedErr error
-		embedder, embedErr = llm.NewEmbedder(memoryCfg, provider.GetAPIKey())
+		// Resolve embedding API key: config field > EMBEDDING_API_KEY env var > main provider key.
+		embeddingAPIKey := memoryCfg.GetEmbeddingAPIKey()
+		if embeddingAPIKey == "" {
+			embeddingAPIKey = os.Getenv("EMBEDDING_API_KEY")
+		}
+		if embeddingAPIKey == "" {
+			embeddingAPIKey = provider.GetAPIKey()
+		}
+		embedder, embedErr = llm.NewEmbedder(memoryCfg, embeddingAPIKey)
 		if embedErr != nil {
 			cmdLog.Warnf("memory retrieval disabled: embedding provider error: %v", embedErr)
 			embedder = nil
 		}
+	}
+
+	// Initialize the async long-term memory capture pipeline.
+	// Capture is silently disabled when classifier_model is not configured
+	// or when the storage directories cannot be created.
+	var capturePipeline *capture.Pipeline
+	if memoryCfg := appconfig.GetMemory(); memoryCfg != nil && memoryCfg.IsEnabled() {
+		classifierModel := memoryCfg.GetClassifierModel()
+		if classifierModel == "" {
+			cmdLog.Warnf("memory: long-term capture disabled — classifier_model not configured (set it in /settings → Memory)")
+		} else {
+			cmdLog.Infof("memory: initializing long-term capture pipeline (classifier_model=%s)", classifierModel)
+			memHomeDir, homeErr := os.UserHomeDir()
+			if homeErr != nil {
+				cmdLog.Warnf("memory: long-term capture disabled — cannot determine home dir: %v", homeErr)
+			} else {
+				repoMemDir := filepath.Join(config.WorkspaceDir, ".forge", "memories")
+				userMemDir := filepath.Join(memHomeDir, ".forge", "memories")
+				cmdLog.Infof("memory: store paths — repo=%s user=%s", repoMemDir, userMemDir)
+				memStore, storeErr := longtermmemory.NewFileStore(repoMemDir, userMemDir)
+				if storeErr != nil {
+					cmdLog.Warnf("memory: long-term capture disabled — storage error: %v", storeErr)
+				} else {
+					capturePipeline = capture.NewPipeline(provider, classifierModel, memStore, func() {}, cmdLog)
+					capturePipeline.Start(ctx)
+					cmdLog.Infof("memory: long-term capture pipeline started (buffer_size=%d)", 8)
+				}
+			}
+		}
+	} else {
+		cmdLog.Infof("memory: long-term capture disabled (memory section not configured or not enabled)")
 	}
 
 	// Create workspace security guard
@@ -326,12 +367,23 @@ func runTUI(ctx context.Context, config *Config) error {
 		agent.WithEmbedder(embedder),
 	}
 
+	// Attach the capture pipeline when it was successfully initialized
+	if capturePipeline != nil {
+		agentOptions = append(agentOptions, agent.WithCapturePipeline(capturePipeline))
+	}
+
 	// Add repository context if AGENTS.md was loaded
 	if repositoryContext != "" {
 		agentOptions = append(agentOptions, agent.WithRepositoryContext(repositoryContext))
 	}
 
 	ag := agent.NewDefaultAgent(provider, agentOptions...)
+
+	// Wire the capture observer into the goal-batch compaction strategy so that
+	// compaction events also trigger long-term memory classification.
+	if obs := ag.GetCaptureObserver(); obs != nil {
+		goalBatchStrategy.SetCaptureObserver(obs, ag.GetSessionID())
+	}
 
 	// Register coding tools
 	codingTools := []tools.Tool{
