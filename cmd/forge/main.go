@@ -15,6 +15,8 @@ import (
 
 	"github.com/entrhq/forge/pkg/agent"
 	agentcontext "github.com/entrhq/forge/pkg/agent/context"
+	"github.com/entrhq/forge/pkg/agent/longtermmemory"
+	"github.com/entrhq/forge/pkg/agent/longtermmemory/capture"
 	"github.com/entrhq/forge/pkg/agent/memory/notes"
 	"github.com/entrhq/forge/pkg/agent/tools"
 	appconfig "github.com/entrhq/forge/pkg/config"
@@ -281,6 +283,29 @@ func runTUI(ctx context.Context, config *Config) error {
 		}
 	}
 
+	// Initialize the async long-term memory capture pipeline.
+	// Capture is silently disabled when classifier_model is not configured
+	// or when the storage directories cannot be created.
+	var capturePipeline *capture.Pipeline
+	if memoryCfg := appconfig.GetMemory(); memoryCfg != nil && memoryCfg.IsEnabled() {
+		classifierModel := memoryCfg.GetClassifierModel()
+		if classifierModel != "" {
+			memHomeDir, homeErr := os.UserHomeDir()
+			if homeErr != nil {
+				cmdLog.Warnf("long-term memory capture disabled: cannot determine home dir: %v", homeErr)
+			} else {
+				userMemDir := filepath.Join(memHomeDir, ".forge", "memories")
+				memStore, storeErr := longtermmemory.NewFileStore(config.WorkspaceDir, userMemDir)
+				if storeErr != nil {
+					cmdLog.Warnf("long-term memory capture disabled: storage error: %v", storeErr)
+				} else {
+					capturePipeline = capture.NewPipeline(provider, classifierModel, memStore, func() {})
+					capturePipeline.Start(ctx)
+				}
+			}
+		}
+	}
+
 	// Create workspace security guard
 	guard, err := workspace.NewGuard(config.WorkspaceDir)
 	if err != nil {
@@ -326,12 +351,23 @@ func runTUI(ctx context.Context, config *Config) error {
 		agent.WithEmbedder(embedder),
 	}
 
+	// Attach the capture pipeline when it was successfully initialized
+	if capturePipeline != nil {
+		agentOptions = append(agentOptions, agent.WithCapturePipeline(capturePipeline))
+	}
+
 	// Add repository context if AGENTS.md was loaded
 	if repositoryContext != "" {
 		agentOptions = append(agentOptions, agent.WithRepositoryContext(repositoryContext))
 	}
 
 	ag := agent.NewDefaultAgent(provider, agentOptions...)
+
+	// Wire the capture observer into the goal-batch compaction strategy so that
+	// compaction events also trigger long-term memory classification.
+	if obs := ag.GetCaptureObserver(); obs != nil {
+		goalBatchStrategy.SetCaptureObserver(obs, ag.GetSessionID())
+	}
 
 	// Register coding tools
 	codingTools := []tools.Tool{
