@@ -25,9 +25,14 @@ type MemorySection struct {
 }
 
 // NewMemorySection creates a new memory section with default settings.
+// Enabled defaults to false because retrieval requires an embedding model and
+// a hypothesis model to be explicitly configured; enabling memory without those
+// would silently degrade to capture-only mode, which is confusing. Users who
+// want memory must opt in by setting memory.enabled = true alongside the
+// required model config keys.
 func NewMemorySection() *MemorySection {
 	return &MemorySection{
-		Enabled:                  true,
+		Enabled:                  false,
 		ClassifierModel:          "",
 		HypothesisModel:          "",
 		EmbeddingModel:           "",
@@ -140,7 +145,7 @@ func (s *MemorySection) Validate() error {
 func (s *MemorySection) Reset() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.Enabled = true
+	s.Enabled = false
 	s.ClassifierModel = ""
 	s.HypothesisModel = ""
 	s.EmbeddingModel = ""

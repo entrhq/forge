@@ -24,7 +24,7 @@ The classifier LLM receives the full conversation window (all messages since the
 ### Goals
 
 - Implement an observer that hooks into the agent loop after each completed turn without blocking it, firing a capture trigger on every turn
-- Implement two capture trigger sources: per-turn cadence and goal-based compaction events (ADR-0041)
+- Implement two capture trigger sources: every-turn (fires after each user turn; no cadence counter or modulo gate — a configurable cadence is a potential future enhancement) and goal-based compaction events (ADR-0041)
 - Implement the async classifier: an LLM call that determines memory-worthiness, assigns scope/category/relationships, and writes memory files via the store interface (ADR-0044)
 - Pass the full conversation window (messages since last summarisation, tool call content excluded) to the classifier on each trigger
 - Ensure classifier failures are non-fatal and silently skipped for that trigger
@@ -88,7 +88,7 @@ A single long-lived goroutine reads trigger events from a buffered channel. The 
 
 **Cons:**
 - Slightly more complex setup (goroutine lifecycle management)
-- A very slow classifier call can cause a cadence trigger to be dropped if it arrives while the previous is still processing — acceptable given the non-critical nature of capture
+- A very slow classifier call can cause a turn trigger to be dropped if it arrives while the previous is still processing — acceptable given the non-critical nature of capture
 
 ---
 
@@ -98,7 +98,7 @@ A single long-lived goroutine reads trigger events from a buffered channel. The 
 
 ### Rationale
 
-Sequential processing with a non-blocking channel send gives the best combination of simplicity, zero agent loop impact, and safe concurrent state. The risk of dropped triggers under a slow classifier is explicitly acceptable: capture is best-effort. Missing one cadence window does not cause data loss — the next trigger will capture the buffered context. Compaction triggers are higher-priority and are never dropped (channel buffer is sized to hold at least one of each type).
+Sequential processing with a non-blocking channel send gives the best combination of simplicity, zero agent loop impact, and safe concurrent state. The risk of dropped triggers under a slow classifier is explicitly acceptable: capture is best-effort. Missing one turn's capture does not cause data loss — the next trigger will capture the buffered context. Compaction triggers are higher-priority and are never dropped (channel buffer is sized to hold at least one of each type).
 
 ---
 
@@ -108,12 +108,12 @@ Sequential processing with a non-blocking channel send gives the best combinatio
 
 - Agent loop never blocks on capture — latency impact is zero
 - At most one classifier LLM call in-flight at any time — no concurrent writes to store
-- Compaction and cadence triggers are both serviced by the same pipeline — unified code path
+- Compaction and every-turn triggers are both serviced by the same pipeline — unified code path
 - Classifier failures drop silently without any session impact
 
 ### Negative
 
-- If classifier is slow and a cadence trigger arrives during processing, the trigger is dropped — a conversational window may not be captured. This is acceptable.
+- If classifier is slow and a turn trigger arrives during processing, the trigger is dropped — a conversational window may not be captured. This is acceptable.
 - Slightly more complex agent initialisation (goroutine start, channel wiring, context propagation)
 
 ### Neutral

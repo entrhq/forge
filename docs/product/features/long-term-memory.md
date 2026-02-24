@@ -97,14 +97,14 @@ The agent made the same mistake (over-use of goroutines without proper lifecycle
 **Memory Capture**
 - Autonomous side-channel observer captures user↔assistant exchanges without consuming agent loop turns
 - Capture is non-blocking — the main agent loop is never delayed by memory operations
-- Two capture triggers: configurable turn-cadence (default every 5 turns) and goal-based compaction events (ADR-0041)
+- Two capture triggers: every-turn capture (fires after each user turn; the classifier is the filter for memory-worthiness, so not every turn produces a memory) and goal-based compaction events (ADR-0041)
 - Tool call content is explicitly excluded from memory analysis — only user and assistant messages are processed
 - Classifier determines whether content is memory-worthy; not every exchange produces a memory
 - Classifier LLM call is async and out-of-band; failures are non-fatal and silently retried
 - Classifier assigns a human-readable `category` to each memory (see Data Model)
 
 **Memory Storage**
-- Two-tier persistent storage: `.forge/memory/` (repo-scoped) and `~/.forge/memory/` (user-scoped)
+- Two-tier persistent storage: `.forge/memories/` (repo-scoped) and `~/.forge/memories/` (user-scoped)
 - Each memory is a standalone file identified by a UUID
 - File format: YAML front-matter + markdown body (human-readable and human-editable)
 - YAML front-matter schema (see Data Model section)
@@ -130,8 +130,7 @@ The agent made the same mistake (over-use of goroutines without proper lifecycle
 - **In-memory vector map**: embeddings are never persisted to disk; the map is built **asynchronously at agent startup** (non-blocking — the agent is ready immediately); a read/write lock guards the map so that if the first user message arrives before the build completes, retrieval waits on the lock until the map is ready; subsequent turns are zero-wait; the map is also rebuilt asynchronously (on the capture goroutine) after each capture event; no sidecar files, no migration tooling — changing `memory.embedding_model` triggers automatic full re-embed on next startup
 
 **Configuration**
-- `memory.enabled` — global on/off (default: true)
-- `memory.cadence_turns` — turns between cadence-triggered capture passes (default: 5, range: 1–10)
+- `memory.enabled` — global on/off (default: false; requires an embedding model to be configured before retrieval activates)
 - `memory.classifier_model` — LLM model for the capture classifier; intended for a higher-reasoning model for accurate memory formation, relationship detection, scope assignment, and category assignment (default: inherits summarization model from ADR-0042)
 - `memory.hypothesis_model` — LLM model for the pre-RAG hypothesis generation hook; must be a lightweight/flash-class model to minimise turn latency since this call is on the critical path (no default — if unset, retrieval is disabled even if embedding model is configured)
 - `memory.embedding_model` — embedding model used to build the in-memory vector map at startup and after each capture event (no default — must be explicitly configured; retrieval is disabled until set; changing this value causes a full re-embed on next startup, old vectors are discarded); the API key is shared with the main LLM provider, but the endpoint can be overridden independently via `memory.embedding_base_url` — this allows the embedding model to target a different service (e.g. Ollama locally, a dedicated Mistral endpoint) while the main LLM continues to use a different provider
@@ -179,7 +178,7 @@ related:
   - id: mem_<uuid>
     relationship: refines | contradicts | relates-to
 session_id: <session-uuid>
-trigger: cadence | compaction
+trigger: every-turn | compaction
 ---
 
 Memory content written as plain markdown. The classifier determines appropriate
@@ -213,13 +212,13 @@ but why, and what alternatives were considered.
 
 ```
 # Repo-scoped
-.forge/memory/
+.forge/memories/
   mem_abc123.md
   mem_def456.md
   ...
 
 # User-scoped
-~/.forge/memory/
+~/.forge/memories/
   mem_xyz789.md
   mem_uvw012.md
   ...
@@ -273,7 +272,7 @@ but why, and what alternatives were considered.
 [Stage 2 — In-Memory Cosine Search]
   → Embed each hypothesis independently via API (N short sentences — cheap)
   → Compute cosine similarity against in-memory vector map (pure CPU, no I/O)
-  → In-memory map covers both .forge/memory/ + ~/.forge/memory/
+  → In-memory map covers both .forge/memories/ + ~/.forge/memories/
   → Union all result sets, deduplicate by memory UUID
   → Retain highest similarity score per memory across all hypothesis seeds
       ↓
@@ -382,7 +381,6 @@ Memories are organised across three dimensions:
 
 Users who want to control memory behaviour configure it via the standard settings system:
 - Enable/disable globally (`memory.enabled`)
-- Set capture cadence — more frequent means finer-grained memories and more classifier calls (`memory.cadence_turns`)
 - Choose the capture classifier model — use a capable reasoning model for high-quality memory formation (`memory.classifier_model`)
 - Choose the hypothesis model — must be a flash-class model; this call is on the critical path (`memory.hypothesis_model`)
 - Set the embedding model — both stored memories and retrieval hypotheses are embedded through this model (`memory.embedding_model`)
@@ -414,7 +412,7 @@ Users who want to control memory behaviour configure it via the standard setting
 **Mitigation**: Classifier prompt explicitly instructs against capturing sensitive literals; user owns and controls all memory files; no memory sync or upload
 
 **Risk**: Repo-scoped memories contain information that should not persist (e.g. a temporary workspace)  
-**Mitigation**: P2 per-repo memory disable override; users can delete `.forge/memory/` directory at any time
+**Mitigation**: P2 per-repo memory disable override; users can delete `.forge/memories/` directory at any time
 
 ### Adoption Risks
 
@@ -458,9 +456,9 @@ Both are assumed to be available from the user's already-configured LLM provider
 
 ### Design Decisions
 
-**Decision**: Capture is turn-cadence + compaction triggered, not streaming every message  
-**Rationale**: True per-message streaming would be expensive; batching provides better classifier context (multiple exchanges) and more signal for the compaction pass  
-**Trade-off**: A preference stated and then immediately contradicted within the same batch may create an ambiguous memory; classifier must handle this case
+**Decision**: Capture fires every user turn (async, non-blocking) and on compaction events  
+**Rationale**: Every-turn capture is architecturally simpler and avoids the need for a cadence counter; the classifier LLM is the filter for memory-worthiness, so the practical cost is one async classifier call per turn regardless of a modulo gate. A configurable `cadence_turns` counter may be added in a future release if cost proves a concern.  
+**Trade-off**: Slightly more classifier calls than a cadence-batched approach; mitigated by the classifier running out-of-band and failures being non-fatal
 
 **Decision**: Memory files are never deleted on update — version chain via `supersedes`  
 **Rationale**: Auditability and agent reasoning over history are first-class requirements; deletion would break both  

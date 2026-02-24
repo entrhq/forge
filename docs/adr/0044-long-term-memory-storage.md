@@ -22,7 +22,7 @@ Cross-session memories need a storage representation that is:
 - **Machine-parseable** — the Go runtime must be able to read, write, and query memory files efficiently
 - **Graph-aware** — memories reference other memories via typed relationship edges; the format must carry these edges explicitly
 - **Versionable** — old memories are never deleted; updated memories form a linear version chain via `supersedes` links
-- **Dual-scoped** — memories are stored at either repo scope (`.forge/memory/`) or user scope (`~/.forge/memory/`) depending on their category
+- **Dual-scoped** — memories are stored at either repo scope (`.forge/memories/`) or user scope (`~/.forge/memories/`) depending on their category
 
 ### Goals
 
@@ -161,12 +161,12 @@ func NewMemoryID() string {
 
 ```
 # Repo-scoped memories
-.forge/memory/
+.forge/memories/
     mem_abc12345-...md
     mem_def67890-...md
 
 # User-scoped memories
-~/.forge/memory/
+~/.forge/memories/
     mem_xyz11111-...md
     mem_uvw22222-...md
 ```
@@ -383,8 +383,8 @@ var ErrAlreadyExists = errors.New("longtermmemory: memory already exists")
 
 // FileStore is a MemoryStore backed by the local filesystem.
 type FileStore struct {
-    repoDir string // absolute path to .forge/memory/
-    userDir string // absolute path to ~/.forge/memory/
+    repoDir string // absolute path to .forge/memories/
+    userDir string // absolute path to ~/.forge/memories/
 }
 
 // NewFileStore creates a FileStore rooted at the given directories,
@@ -629,7 +629,7 @@ pkg/agent/longtermmemory/
 
 ### Migration Path
 
-No migration is required. The `.forge/memory/` and `~/.forge/memory/` directories are new; they do not conflict with any existing Forge state.
+No migration is required. The `.forge/memories/` and `~/.forge/memories/` directories are new; they do not conflict with any existing Forge state.
 
 ### Timeline
 

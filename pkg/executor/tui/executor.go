@@ -28,11 +28,12 @@ import (
 // Executor is a TUI-based executor that provides an interactive,
 // Gemini-style interface for agent interaction.
 type Executor struct {
-	agent        agent.Agent
-	program      *tea.Program
-	provider     llm.Provider
-	workspaceDir string
-	header       string // Custom ASCII art header (optional)
+	agent           agent.Agent
+	program         *tea.Program
+	provider        llm.Provider
+	workspaceDir    string
+	header          string     // Custom ASCII art header (optional)
+	startupWarnings []toastMsg // Warning toasts shown once at session start
 }
 
 // NewExecutor creates a new TUI executor for the given agent.
@@ -44,6 +45,22 @@ func NewExecutor(agent agent.Agent, provider llm.Provider, workspaceDir string, 
 		workspaceDir: workspaceDir,
 		header:       headerText,
 	}
+}
+
+// AddStartupWarning queues a toast notification to be shown once at session
+// start. Warnings are displayed immediately after the TUI renders its first
+// frame. Use isError=true for error-level warnings (shown with a red icon).
+func (e *Executor) AddStartupWarning(message, details string, isError bool) {
+	icon := "⚠️"
+	if isError {
+		icon = "❌"
+	}
+	e.startupWarnings = append(e.startupWarnings, toastMsg{
+		message: message,
+		details: details,
+		icon:    icon,
+		isError: isError,
+	})
 }
 
 // Run starts the TUI executor and blocks until the user exits.
@@ -71,6 +88,7 @@ func (e *Executor) Run(ctx context.Context) error {
 	m.provider = e.provider
 	m.workspaceDir = e.workspaceDir
 	m.header = e.header
+	m.startupWarnings = e.startupWarnings
 	debugLog.Printf("Model initialized, workspace: %s", e.workspaceDir)
 
 	// Initialize slash handler for git operations

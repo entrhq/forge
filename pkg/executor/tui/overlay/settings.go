@@ -628,10 +628,10 @@ func (s *SettingsOverlay) saveSettings() error {
 			// Save memory settings - numeric fields must be stored as int so
 			// SetData's intFromAny helper can parse them correctly.
 			numericMemoryKeys := map[string]bool{
-				"retrieval_top_k":          true,
-				"retrieval_hop_depth":      true,
+				"retrieval_top_k":            true,
+				"retrieval_hop_depth":        true,
 				"retrieval_hypothesis_count": true,
-				"injection_token_budget":   true,
+				"injection_token_budget":     true,
 			}
 			for _, item := range section.items {
 				if numericMemoryKeys[item.key] {

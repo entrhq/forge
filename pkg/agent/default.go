@@ -12,6 +12,7 @@ import (
 	"github.com/entrhq/forge/pkg/agent/approval"
 	agentcontext "github.com/entrhq/forge/pkg/agent/context"
 	"github.com/entrhq/forge/pkg/agent/longtermmemory/capture"
+	"github.com/entrhq/forge/pkg/agent/longtermmemory/retrieval"
 	"github.com/entrhq/forge/pkg/agent/memory"
 	"github.com/entrhq/forge/pkg/agent/memory/notes"
 	"github.com/entrhq/forge/pkg/agent/prompts"
@@ -85,6 +86,13 @@ type DefaultAgent struct {
 
 	// Embedding provider for long-term memory retrieval (may be nil — means retrieval disabled)
 	embedder llm.Embedder
+
+	// Long-term memory retrieval engine (may be nil — means retrieval disabled)
+	retrievalEngine *retrieval.Engine
+
+	// currentTurnID identifies the active user turn for per-turn retrieval caching.
+	// Protected by cancelMu since it is set before and read during the same turn.
+	currentTurnID string
 
 	// Long-term memory capture (may be nil — means capture disabled)
 	capturePipeline *capture.Pipeline
@@ -167,6 +175,14 @@ func WithContextManager(manager *agentcontext.Manager) AgentOption {
 func WithEmbedder(e llm.Embedder) AgentOption {
 	return func(a *DefaultAgent) {
 		a.embedder = e
+	}
+}
+
+// WithRetrievalEngine attaches a long-term memory retrieval engine to the agent.
+// A nil engine is valid — it disables retrieval silently.
+func WithRetrievalEngine(engine *retrieval.Engine) AgentOption {
+	return func(a *DefaultAgent) {
+		a.retrievalEngine = engine
 	}
 }
 
@@ -399,6 +415,19 @@ func (a *DefaultAgent) processUserInput(ctx context.Context, content string) {
 	// Add user message to memory
 	userMsg := types.NewUserMessage(content)
 	a.memory.Add(userMsg)
+
+	// Generate a unique ID for this turn so the retrieval engine can cache
+	// results across multiple sub-turns without repeating LLM/embed calls.
+	turnIDBytes := make([]byte, 8)
+	var turnID string
+	if _, err := rand.Read(turnIDBytes); err == nil {
+		turnID = hex.EncodeToString(turnIDBytes)
+	} else {
+		turnID = fmt.Sprintf("%x", time.Now().UnixNano())
+	}
+	a.cancelMu.Lock()
+	a.currentTurnID = turnID
+	a.cancelMu.Unlock()
 
 	// Create cancellable context for this turn
 	turnCtx, cancel := context.WithCancel(ctx)

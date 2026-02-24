@@ -11,7 +11,7 @@ import (
 func TestNewMemorySection(t *testing.T) {
 	section := NewMemorySection()
 	assert.NotNil(t, section)
-	assert.True(t, section.Enabled)
+	assert.False(t, section.Enabled) // default is false — requires explicit opt-in
 	assert.Equal(t, "", section.ClassifierModel)
 	assert.Equal(t, "", section.HypothesisModel)
 	assert.Equal(t, "", section.EmbeddingModel)
@@ -83,7 +83,7 @@ func TestMemorySection_SetData(t *testing.T) {
 				"retrieval_top_k": float64(25),
 			},
 			initial:              NewMemorySection(),
-			expectEnabled:        true,
+			expectEnabled:        false, // unchanged from default (false)
 			expectEmbeddingModel: "",
 			expectTopK:           25,
 			expectError:          false,
@@ -92,7 +92,7 @@ func TestMemorySection_SetData(t *testing.T) {
 			name:                 "nil data does not change anything",
 			data:                 nil,
 			initial:              NewMemorySection(),
-			expectEnabled:        true,
+			expectEnabled:        false, // unchanged from default (false)
 			expectEmbeddingModel: "",
 			expectTopK:           10,
 			expectError:          false,
@@ -100,11 +100,11 @@ func TestMemorySection_SetData(t *testing.T) {
 		{
 			name: "invalid data types are ignored",
 			data: map[string]any{
-				"enabled":         "true",
-				"retrieval_top_k": "10",
+				"enabled":         "true", // string — ignored by SetData
+				"retrieval_top_k": "10",   // string — ignored by SetData
 			},
 			initial:              NewMemorySection(),
-			expectEnabled:        true,
+			expectEnabled:        false, // unchanged from default (false)
 			expectEmbeddingModel: "",
 			expectTopK:           10,
 			expectError:          false,
@@ -136,13 +136,13 @@ func TestMemorySection_Validate(t *testing.T) {
 
 func TestMemorySection_Reset(t *testing.T) {
 	section := NewMemorySection()
-	section.Enabled = false
+	section.Enabled = true // change from default (false) to verify Reset restores it
 	section.EmbeddingModel = "custom-model"
 	section.RetrievalTopK = 50
 
 	section.Reset()
 
-	assert.Equal(t, true, section.Enabled)
+	assert.Equal(t, false, section.Enabled) // Reset returns to default (false)
 	assert.Equal(t, "", section.EmbeddingModel)
 	assert.Equal(t, 10, section.RetrievalTopK)
 }

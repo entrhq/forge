@@ -81,7 +81,8 @@ type model struct {
 	lastToolName     string                  // Track the last tool name
 
 	// Application state
-	shouldQuit bool // Flag to trigger application exit
+	shouldQuit      bool       // Flag to trigger application exit
+	startupWarnings []toastMsg // Queued toasts shown once at session start
 }
 
 // agentErrMsg represents an error from agent operations
