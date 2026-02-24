@@ -14,10 +14,10 @@ import (
 // A single goroutine owns the rebuild; concurrent trigger signals are coalesced
 // via a 1-capacity channel so no rebuild is ever lost but signals never block.
 type builder struct {
-	store   longtermmemory.MemoryStore
+	store    longtermmemory.MemoryStore
 	embedder llm.Embedder
-	vm      *VectorMap
-	log     *logging.Logger
+	vm       *VectorMap
+	log      *logging.Logger
 
 	triggerCh chan struct{}
 	building  atomic.Bool
@@ -42,7 +42,7 @@ func (b *builder) Trigger() {
 	}
 }
 
-// Run starts the rebuild loop. It blocks until ctx is cancelled.
+// Run starts the rebuild loop. It blocks until ctx is canceled.
 func (b *builder) Run(ctx context.Context) {
 	for {
 		select {
@@ -81,7 +81,15 @@ func (b *builder) rebuild(ctx context.Context) {
 		texts[i] = f.Content
 	}
 
+	// Check if the parent context was canceled before starting the embed call.
+	select {
+	case <-ctx.Done():
+		return
+	default:
+	}
+
 	// Embed in a single batched call (providers may split internally).
+	// Derive from ctx so cancellation propagates promptly on shutdown.
 	bctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	vecs, err := b.embedder.Embed(bctx, texts)
 	cancel()

@@ -45,12 +45,23 @@ func generateHypotheses(ctx context.Context, provider llm.Provider, model string
 
 // splitLines splits content into non-empty trimmed lines, capped at max.
 func splitLines(content string, max int) []string {
+	if max <= 0 {
+		return []string{}
+	}
 	raw := strings.Split(content, "\n")
 	out := make([]string, 0, max)
 	for _, l := range raw {
 		l = strings.TrimSpace(l)
-		// Strip common list prefixes: "- ", "1. ", etc.
-		if len(l) > 2 && (l[0] == '-' || l[1] == '.') {
+		// Strip "- " dash-list prefix. A bare "-" (from "- " after trimming)
+		// is treated as an empty list item and discarded.
+		if len(l) >= 1 && l[0] == '-' && (len(l) == 1 || l[1] == ' ') {
+			if len(l) > 2 {
+				l = strings.TrimSpace(l[2:])
+			} else {
+				l = ""
+			}
+		} else if len(l) > 2 && l[0] >= '0' && l[0] <= '9' && l[1] == '.' {
+			// Strip "N." numbered list prefix.
 			l = strings.TrimSpace(l[2:])
 		}
 		if l != "" {

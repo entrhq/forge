@@ -36,7 +36,7 @@ type Config struct {
 	HypothesisModel string
 	// HypothesisCount is the number of hypothetical sentences to generate.
 	HypothesisCount int
-	// TopK is the number of nearest-neighbour results to return before graph
+	// TopK is the number of nearest-neighbor results to return before graph
 	// expansion.
 	TopK int
 	// HopDepth is the number of relationship edges to follow after the initial
@@ -48,11 +48,11 @@ type Config struct {
 
 // Engine is the public interface of the retrieval subsystem.
 type Engine struct {
-	cfg     Config
-	vm      *VectorMap
-	bld     *builder
+	cfg      Config
+	vm       *VectorMap
+	bld      *builder
 	embedder llm.Embedder
-	log     *logging.Logger
+	log      *logging.Logger
 
 	// Per-turn cache: keyed by turnID.
 	cacheMu sync.Mutex
@@ -169,11 +169,34 @@ func (e *Engine) retrieve(
 		topK = 10
 	}
 
-	// 3. Union-of-searches: run a TopK query for each hypothesis vector
-	// independently, then merge by keeping the highest cosine score per
-	// memory UUID. This preserves the diversity benefit of HyDE — a memory
-	// that scores highly against one specific hypothesis is not buried by
-	// averaging across all others.
+	// 3. Union-of-searches + 4. sort/cap.
+	hits := e.mergeTopK(vecs, topK)
+
+	// 5. Graph hop traversal.
+	hopDepth := e.cfg.HopDepth
+	if hopDepth < 0 {
+		hopDepth = 0
+	}
+	if hopDepth > 0 {
+		hits = e.expandHops(hits, hopDepth)
+	}
+
+	// 6. Collect unique memory files in ranked order.
+	memories := deduplicateHits(hits)
+
+	injection := FormatInjection(memories, e.cfg.InjectionTokenBudget)
+	if injection == "" {
+		e.log.Debugf("retrieval: no memories passed similarity threshold (index_size=%d, hypotheses=%d, top_k=%d)", e.vm.Len(), len(hypotheses), topK)
+	} else {
+		e.log.Infof("retrieval: injecting %d memories into system prompt (%d chars, index_size=%d)", len(memories), len(injection), e.vm.Len())
+	}
+	return injection
+}
+
+// mergeTopK runs a TopK cosine search for each hypothesis vector independently
+// and merges the results by keeping the highest score per memory UUID, then
+// returns the top-K candidates sorted by score descending.
+func (e *Engine) mergeTopK(vecs [][]float32, topK int) []MemoryVector {
 	type scored struct {
 		mv    MemoryVector
 		score float64
@@ -189,8 +212,6 @@ func (e *Engine) retrieve(
 			}
 		}
 	}
-
-	// 4. Sort merged candidates by score descending and cap at topK.
 	merged := make([]scored, 0, len(best))
 	for _, s := range best {
 		merged = append(merged, s)
@@ -205,17 +226,11 @@ func (e *Engine) retrieve(
 	for i, s := range merged {
 		hits[i] = s.mv
 	}
+	return hits
+}
 
-	// 5. Graph hop traversal.
-	hopDepth := e.cfg.HopDepth
-	if hopDepth < 0 {
-		hopDepth = 0
-	}
-	if hopDepth > 0 {
-		hits = e.expandHops(hits, hopDepth)
-	}
-
-	// 6. Collect unique memory files in ranked order.
+// deduplicateHits returns unique MemoryFile entries from hits in ranked order.
+func deduplicateHits(hits []MemoryVector) []*longtermmemory.MemoryFile {
 	seen := make(map[string]struct{}, len(hits))
 	memories := make([]*longtermmemory.MemoryFile, 0, len(hits))
 	for _, h := range hits {
@@ -225,14 +240,7 @@ func (e *Engine) retrieve(
 		seen[h.Memory.Meta.ID] = struct{}{}
 		memories = append(memories, h.Memory)
 	}
-
-	injection := FormatInjection(memories, e.cfg.InjectionTokenBudget)
-	if injection == "" {
-		e.log.Debugf("retrieval: no memories passed similarity threshold (index_size=%d, hypotheses=%d, top_k=%d)", e.vm.Len(), len(hypotheses), topK)
-	} else {
-		e.log.Infof("retrieval: injecting %d memories into system prompt (%d chars, index_size=%d)", len(memories), len(injection), e.vm.Len())
-	}
-	return injection
+	return memories
 }
 
 // expandHops follows Related edges up to depth hops, appending any newly
@@ -268,5 +276,3 @@ func (e *Engine) expandHops(initial []MemoryVector, depth int) []MemoryVector {
 	}
 	return result
 }
-
-

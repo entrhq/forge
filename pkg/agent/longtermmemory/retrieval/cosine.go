@@ -50,7 +50,9 @@ func Normalise(v []float32) []float32 {
 	}
 	norm := math.Sqrt(sum)
 	if norm == 0 {
-		return v
+		out := make([]float32, len(v))
+		copy(out, v)
+		return out
 	}
 	out := make([]float32, len(v))
 	for i, x := range v {

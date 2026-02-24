@@ -33,11 +33,11 @@ func buildEngine(
 	t.Helper()
 	log := testLogger(t)
 	cfg := Config{
-		HypothesisProvider:  provider,
-		HypothesisModel:     "fake",
-		HypothesisCount:     hypothesisCount,
-		TopK:                topK,
-		HopDepth:            hopDepth,
+		HypothesisProvider:   provider,
+		HypothesisModel:      "fake",
+		HypothesisCount:      hypothesisCount,
+		TopK:                 topK,
+		HopDepth:             hopDepth,
 		InjectionTokenBudget: 0,
 	}
 	eng := New(store, embedder, cfg, log)
@@ -78,10 +78,10 @@ func TestRetrieve_UnionFindsDistinctMemories(t *testing.T) {
 
 	log := testLogger(t)
 	cfg := Config{
-		HypothesisProvider:  &fakeProvider{response: hyp1 + "\n" + hyp2},
-		HypothesisCount:     2,
-		TopK:                2, // Return up to 2; union finds both via separate searches.
-		HopDepth:            0,
+		HypothesisProvider:   &fakeProvider{response: hyp1 + "\n" + hyp2},
+		HypothesisCount:      2,
+		TopK:                 2, // Return up to 2; union finds both via separate searches.
+		HopDepth:             0,
 		InjectionTokenBudget: 0,
 	}
 	eng := New(store, emb, cfg, log)
@@ -117,10 +117,10 @@ func TestRetrieve_UnionKeepsHighestScore(t *testing.T) {
 
 	log := testLogger(t)
 	cfg := Config{
-		HypothesisProvider:  &fakeProvider{response: hypClose + "\n" + hypFar},
-		HypothesisCount:     2,
-		TopK:                5,
-		HopDepth:            0,
+		HypothesisProvider:   &fakeProvider{response: hypClose + "\n" + hypFar},
+		HypothesisCount:      2,
+		TopK:                 5,
+		HopDepth:             0,
 		InjectionTokenBudget: 0,
 	}
 	eng := New(store, emb, cfg, log)
@@ -233,11 +233,11 @@ func TestRetrieveForTurn_CachesResult(t *testing.T) {
 
 	log := testLogger(t)
 	cfg := Config{
-		HypothesisProvider:  prov,
-		HypothesisModel:     "fake",
-		HypothesisCount:     1,
-		TopK:                5,
-		HopDepth:            0,
+		HypothesisProvider:   prov,
+		HypothesisModel:      "fake",
+		HypothesisCount:      1,
+		TopK:                 5,
+		HopDepth:             0,
 		InjectionTokenBudget: 0,
 	}
 	eng := New(store, emb, cfg, log)
@@ -270,9 +270,9 @@ func TestRetrieveForTurn_NewTurnEvictsCache(t *testing.T) {
 
 	log := testLogger(t)
 	cfg := Config{
-		HypothesisProvider:  &fakeProvider{response: "hyp"},
-		HypothesisCount:     1,
-		TopK:                5,
+		HypothesisProvider:   &fakeProvider{response: "hyp"},
+		HypothesisCount:      1,
+		TopK:                 5,
 		InjectionTokenBudget: 0,
 	}
 	eng := New(store, emb, cfg, log)
@@ -380,10 +380,10 @@ func TestRetrieveForTurn_ReturnsMemoryInInjection(t *testing.T) {
 
 	log := testLogger(t)
 	cfg := Config{
-		HypothesisProvider:  &fakeProvider{response: hyp},
-		HypothesisCount:     1,
-		TopK:                5,
-		HopDepth:            0,
+		HypothesisProvider:   &fakeProvider{response: hyp},
+		HypothesisCount:      1,
+		TopK:                 5,
+		HopDepth:             0,
 		InjectionTokenBudget: 0,
 	}
 	eng := New(store, emb, cfg, log)
@@ -415,9 +415,9 @@ func TestRetrieveForTurn_WithHistory(t *testing.T) {
 
 	log := testLogger(t)
 	cfg := Config{
-		HypothesisProvider:  &fakeProvider{response: hyp},
-		HypothesisCount:     1,
-		TopK:                5,
+		HypothesisProvider:   &fakeProvider{response: hyp},
+		HypothesisCount:      1,
+		TopK:                 5,
 		InjectionTokenBudget: 0,
 	}
 	eng := New(store, emb, cfg, log)

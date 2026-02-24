@@ -419,11 +419,15 @@ func (a *DefaultAgent) processUserInput(ctx context.Context, content string) {
 	// Generate a unique ID for this turn so the retrieval engine can cache
 	// results across multiple sub-turns without repeating LLM/embed calls.
 	turnIDBytes := make([]byte, 8)
+	var turnID string
 	if _, err := rand.Read(turnIDBytes); err == nil {
-		a.cancelMu.Lock()
-		a.currentTurnID = hex.EncodeToString(turnIDBytes)
-		a.cancelMu.Unlock()
+		turnID = hex.EncodeToString(turnIDBytes)
+	} else {
+		turnID = fmt.Sprintf("%x", time.Now().UnixNano())
 	}
+	a.cancelMu.Lock()
+	a.currentTurnID = turnID
+	a.cancelMu.Unlock()
 
 	// Create cancellable context for this turn
 	turnCtx, cancel := context.WithCancel(ctx)
