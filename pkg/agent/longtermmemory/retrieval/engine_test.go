@@ -47,58 +47,94 @@ func buildEngine(
 	return eng
 }
 
-// ── averageVectors ────────────────────────────────────────────────────────────
+// ── union-of-searches ────────────────────────────────────────────────────────
+//
+// These tests validate that the retrieval engine performs a per-hypothesis
+// TopK search and merges results by keeping the highest cosine score per
+// memory UUID — preserving the diversity benefit of HyDE.
 
-func TestAverageVectors_Nil(t *testing.T) {
-	if averageVectors(nil) != nil {
-		t.Error("expected nil for nil input")
+// TestRetrieve_UnionFindsDistinctMemories checks that two orthogonal hypotheses
+// each retrieve their closest memory and both appear in the final result set.
+//
+// The key benefit over average-then-search: with averaging, the centroid of
+// two orthogonal vectors ([1,0] and [0,1]) becomes [0.707, 0.707], scoring
+// both memories equally. Union-of-searches runs two separate TopK queries so
+// each memory is found at full confidence by its dedicated hypothesis.
+func TestRetrieve_UnionFindsDistinctMemories(t *testing.T) {
+	// m1 lives near (1,0), m2 lives near (0,1).
+	m1 := makeMemoryFile("m1", "content about databases", "")
+	m2 := makeMemoryFile("m2", "content about networking", "")
+
+	store := &fakeStore{files: []*longtermmemory.MemoryFile{m1, m2}}
+	emb := newFakeEmbedder(2)
+	emb.set("content about databases", Normalise([]float32{1, 0}))
+	emb.set("content about networking", Normalise([]float32{0, 1}))
+
+	// Two hypotheses pointing in orthogonal directions — each covers one memory.
+	hyp1 := "database schema design"
+	hyp2 := "tcp connection handling"
+	emb.set(hyp1, Normalise([]float32{1, 0}))
+	emb.set(hyp2, Normalise([]float32{0, 1}))
+
+	log := testLogger(t)
+	cfg := Config{
+		HypothesisProvider:  &fakeProvider{response: hyp1 + "\n" + hyp2},
+		HypothesisCount:     2,
+		TopK:                2, // Return up to 2; union finds both via separate searches.
+		HopDepth:            0,
+		InjectionTokenBudget: 0,
+	}
+	eng := New(store, emb, cfg, log)
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	eng.Start(ctx)
+	waitForIndex(t, eng, 2)
+
+	got := eng.RetrieveForTurn(context.Background(), "turn-union", nil, "db and network question")
+	if !strings.Contains(got, "content about databases") {
+		t.Errorf("expected m1 in injection; got: %q", got)
+	}
+	if !strings.Contains(got, "content about networking") {
+		t.Errorf("expected m2 in injection; got: %q", got)
 	}
 }
 
-func TestAverageVectors_Empty(t *testing.T) {
-	if averageVectors([][]float32{}) != nil {
-		t.Error("expected nil for empty input")
-	}
-}
+// TestRetrieve_UnionKeepsHighestScore checks that when the same memory is
+// returned by multiple hypothesis searches, the entry with the highest score
+// is kept (not duplicated, and not the lower score).
+func TestRetrieve_UnionKeepsHighestScore(t *testing.T) {
+	m1 := makeMemoryFile("m1", "shared memory content", "")
 
-func TestAverageVectors_ZeroDim(t *testing.T) {
-	vecs := [][]float32{{}}
-	if averageVectors(vecs) != nil {
-		t.Error("expected nil for zero-dim vector")
-	}
-}
+	store := &fakeStore{files: []*longtermmemory.MemoryFile{m1}}
+	emb := newFakeEmbedder(2)
+	emb.set("shared memory content", Normalise([]float32{1, 0}))
 
-func TestAverageVectors_Single(t *testing.T) {
-	vecs := [][]float32{{1, 2, 3}}
-	got := averageVectors(vecs)
-	want := []float32{1, 2, 3}
-	for i := range want {
-		if got[i] != want[i] {
-			t.Errorf("avg[%d] = %v, want %v", i, got[i], want[i])
-		}
-	}
-}
+	// Both hypotheses hit m1; one is closer (score ≈ 1), one is farther.
+	hypClose := "very relevant hypothesis"
+	hypFar := "loosely related hypothesis"
+	emb.set(hypClose, Normalise([]float32{1, 0}))   // cosine ≈ 1.0 vs m1
+	emb.set(hypFar, Normalise([]float32{0.6, 0.8})) // cosine ≈ 0.6 vs m1
 
-func TestAverageVectors_Multiple(t *testing.T) {
-	vecs := [][]float32{
-		{0, 4},
-		{4, 0},
+	log := testLogger(t)
+	cfg := Config{
+		HypothesisProvider:  &fakeProvider{response: hypClose + "\n" + hypFar},
+		HypothesisCount:     2,
+		TopK:                5,
+		HopDepth:            0,
+		InjectionTokenBudget: 0,
 	}
-	got := averageVectors(vecs)
-	if got[0] != 2 || got[1] != 2 {
-		t.Errorf("avg = %v, want [2 2]", got)
-	}
-}
+	eng := New(store, emb, cfg, log)
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	eng.Start(ctx)
+	waitForIndex(t, eng, 1)
 
-func TestAverageVectors_SkipsMismatchedLength(t *testing.T) {
-	vecs := [][]float32{
-		{1, 0},
-		{0, 1, 9999}, // mismatched — skipped
-	}
-	got := averageVectors(vecs)
-	// Only first vector contributes; divided by 2 (len(vecs)), not 1.
-	if got[0] != 0.5 || got[1] != 0.0 {
-		t.Errorf("avg = %v, want [0.5 0.0]", got)
+	got := eng.RetrieveForTurn(context.Background(), "turn-dedup", nil, "relevant question")
+
+	// m1 should appear exactly once in the output.
+	count := strings.Count(got, "shared memory content")
+	if count != 1 {
+		t.Errorf("expected m1 exactly once in injection, got %d occurrences; output: %q", count, got)
 	}
 }
 

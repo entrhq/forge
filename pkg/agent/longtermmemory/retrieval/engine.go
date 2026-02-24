@@ -8,6 +8,7 @@ package retrieval
 
 import (
 	"context"
+	"sort"
 	"sync"
 	"time"
 
@@ -17,7 +18,14 @@ import (
 	"github.com/entrhq/forge/pkg/types"
 )
 
-const retrievalTimeout = 2 * time.Second
+// retrievalTimeout caps the total wall-clock time allowed for one retrieval
+// cycle (HyDE generation + embedding + vector search + graph hops).
+// HyDE generation requires an LLM call; flash-class models typically respond
+// in 2-5s, but can take longer under load. 15s gives ample headroom while
+// still ensuring retrieval never blocks a user turn indefinitely.
+// If you configure a large model (e.g. Sonnet) as hypothesis_model, consider
+// raising this or switching to a flash-class model for lower latency.
+const retrievalTimeout = 15 * time.Second
 
 // Config holds runtime parameters for the Engine.
 type Config struct {
@@ -120,6 +128,7 @@ func (e *Engine) retrieve(
 	userMessage string,
 ) string {
 	if e.vm.Len() == 0 {
+		e.log.Debugf("retrieval: skipping — vector index is empty (no memories indexed yet)")
 		return ""
 	}
 
@@ -143,6 +152,11 @@ func (e *Engine) retrieve(
 		return ""
 	}
 
+	// Log each hypothesis so operators can inspect what the HyDE step produced.
+	for i, h := range hypotheses {
+		e.log.Debugf("retrieval: hypothesis[%d]: %s", i+1, h)
+	}
+
 	// 2. Embed the hypotheses.
 	vecs, err := e.embedder.Embed(ctx, hypotheses)
 	if err != nil {
@@ -150,20 +164,47 @@ func (e *Engine) retrieve(
 		return ""
 	}
 
-	// 3. Average the hypothesis vectors to form a single query vector.
-	query := averageVectors(vecs)
-	if query == nil {
-		return ""
-	}
-	query = Normalise(query)
-
 	topK := e.cfg.TopK
 	if topK <= 0 {
 		topK = 10
 	}
 
-	// 4. Cosine similarity search.
-	hits := e.vm.TopK(query, topK)
+	// 3. Union-of-searches: run a TopK query for each hypothesis vector
+	// independently, then merge by keeping the highest cosine score per
+	// memory UUID. This preserves the diversity benefit of HyDE — a memory
+	// that scores highly against one specific hypothesis is not buried by
+	// averaging across all others.
+	type scored struct {
+		mv    MemoryVector
+		score float64
+	}
+	best := make(map[string]scored, topK*len(vecs))
+	for _, vec := range vecs {
+		nv := Normalise(vec)
+		for _, mv := range e.vm.TopK(nv, topK) {
+			s := dotProduct(nv, mv.Vector)
+			id := mv.Memory.Meta.ID
+			if existing, ok := best[id]; !ok || s > existing.score {
+				best[id] = scored{mv: mv, score: s}
+			}
+		}
+	}
+
+	// 4. Sort merged candidates by score descending and cap at topK.
+	merged := make([]scored, 0, len(best))
+	for _, s := range best {
+		merged = append(merged, s)
+	}
+	sort.Slice(merged, func(i, j int) bool {
+		return merged[i].score > merged[j].score
+	})
+	if len(merged) > topK {
+		merged = merged[:topK]
+	}
+	hits := make([]MemoryVector, len(merged))
+	for i, s := range merged {
+		hits[i] = s.mv
+	}
 
 	// 5. Graph hop traversal.
 	hopDepth := e.cfg.HopDepth
@@ -185,7 +226,13 @@ func (e *Engine) retrieve(
 		memories = append(memories, h.Memory)
 	}
 
-	return FormatInjection(memories, e.cfg.InjectionTokenBudget)
+	injection := FormatInjection(memories, e.cfg.InjectionTokenBudget)
+	if injection == "" {
+		e.log.Debugf("retrieval: no memories passed similarity threshold (index_size=%d, hypotheses=%d, top_k=%d)", e.vm.Len(), len(hypotheses), topK)
+	} else {
+		e.log.Infof("retrieval: injecting %d memories into system prompt (%d chars, index_size=%d)", len(memories), len(injection), e.vm.Len())
+	}
+	return injection
 }
 
 // expandHops follows Related edges up to depth hops, appending any newly
@@ -222,27 +269,4 @@ func (e *Engine) expandHops(initial []MemoryVector, depth int) []MemoryVector {
 	return result
 }
 
-// averageVectors computes the element-wise mean of a slice of vectors.
-func averageVectors(vecs [][]float32) []float32 {
-	if len(vecs) == 0 {
-		return nil
-	}
-	dim := len(vecs[0])
-	if dim == 0 {
-		return nil
-	}
-	avg := make([]float32, dim)
-	for _, v := range vecs {
-		if len(v) != dim {
-			continue
-		}
-		for i, x := range v {
-			avg[i] += x
-		}
-	}
-	n := float32(len(vecs))
-	for i := range avg {
-		avg[i] /= n
-	}
-	return avg
-}
+

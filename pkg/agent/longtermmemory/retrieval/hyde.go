@@ -9,14 +9,14 @@ import (
 	"github.com/entrhq/forge/pkg/types"
 )
 
-const hydeSystemPrompt = `You are a memory retrieval assistant. Given the recent conversation context, generate short, self-contained sentences that describe facts, decisions, or knowledge that would be useful to retrieve from long-term memory. Output one sentence per line.`
+const hydeSystemPrompt = `You are a memory retrieval assistant. Given the recent conversation context, write short, self-contained sentences that could plausibly exist as stored memory entries relevant to this conversation. Each sentence should be phrased as a concrete fact or decision — not a description of what the user is asking, but an example of the kind of fact that would answer them. Output one sentence per line, no preamble.`
 
 // generateHypotheses uses a flash-class LLM to produce N hypothetical memory
 // sentences for the given conversation window. These sentences are then embedded
 // and used as the query vector against the VectorMap.
 func generateHypotheses(ctx context.Context, provider llm.Provider, model string, window string, n int) ([]string, error) {
 	userPrompt := fmt.Sprintf(
-		"Conversation context:\n%s\n\nGenerate %d short sentences describing facts or context that might appear in long-term memory relevant to this conversation.",
+		"Conversation context:\n%s\n\nWrite %d example memory entries — concrete facts or decisions — that would be relevant to retrieve for this conversation. Each should read like a memory, not like a description of the question.",
 		window, n,
 	)
 

@@ -264,6 +264,15 @@ func runTUI(ctx context.Context, config *Config) error {
 	// Initialize the embedding provider for long-term memory retrieval.
 	// NewEmbedder returns (nil, nil) when embedding is unconfigured — the agent
 	// treats a nil embedder as "retrieval disabled" and continues normally.
+
+	// tuiMemWarning holds a warning to surface as a TUI toast at session start.
+	type tuiMemWarning struct {
+		message string
+		details string
+		isError bool
+	}
+	var tuiMemWarnings []tuiMemWarning
+
 	var embedder llm.Embedder
 	if memoryCfg := appconfig.GetMemory(); memoryCfg != nil && memoryCfg.IsEnabled() {
 		// Warn when exactly one of hypothesis_model / embedding_model is configured,
@@ -272,8 +281,18 @@ func runTUI(ctx context.Context, config *Config) error {
 		embeddingModel := memoryCfg.GetEmbeddingModel()
 		if hypothesisModel != "" && embeddingModel == "" {
 			cmdLog.Warnf("memory.hypothesis_model is set but memory.embedding_model is empty — retrieval is disabled")
+			tuiMemWarnings = append(tuiMemWarnings, tuiMemWarning{
+				message: "Memory retrieval disabled",
+				details: "memory.hypothesis_model is set but memory.embedding_model is missing. Set both to enable retrieval.",
+				isError: false,
+			})
 		} else if embeddingModel != "" && hypothesisModel == "" {
 			cmdLog.Warnf("memory.embedding_model is set but memory.hypothesis_model is empty — retrieval is disabled")
+			tuiMemWarnings = append(tuiMemWarnings, tuiMemWarning{
+				message: "Memory retrieval disabled",
+				details: "memory.embedding_model is set but memory.hypothesis_model is missing. Set both to enable retrieval.",
+				isError: false,
+			})
 		}
 
 		var embedErr error
@@ -288,6 +307,11 @@ func runTUI(ctx context.Context, config *Config) error {
 		embedder, embedErr = llm.NewEmbedder(memoryCfg, embeddingAPIKey)
 		if embedErr != nil {
 			cmdLog.Warnf("memory retrieval disabled: embedding provider error: %v", embedErr)
+			tuiMemWarnings = append(tuiMemWarnings, tuiMemWarning{
+				message: "Memory retrieval disabled",
+				details: fmt.Sprintf("Embedding provider error: %v", embedErr),
+				isError: true,
+			})
 			embedder = nil
 		}
 	}
@@ -300,6 +324,11 @@ func runTUI(ctx context.Context, config *Config) error {
 		classifierModel := memoryCfg.GetClassifierModel()
 		if classifierModel == "" {
 			cmdLog.Warnf("memory: long-term capture disabled — classifier_model not configured (set it in /settings → Memory)")
+			tuiMemWarnings = append(tuiMemWarnings, tuiMemWarning{
+				message: "Memory capture disabled",
+				details: "memory.classifier_model is not configured. Set it in /settings → Memory to enable long-term memory capture.",
+				isError: false,
+			})
 		} else {
 			cmdLog.Infof("memory: initializing long-term capture pipeline (classifier_model=%s)", classifierModel)
 			memHomeDir, homeErr := os.UserHomeDir()
@@ -466,6 +495,11 @@ func runTUI(ctx context.Context, config *Config) error {
 
 	// Create TUI executor with provider and workspace for git operations
 	executor := tui.NewExecutor(ag, provider, config.WorkspaceDir, "forge")
+
+	// Surface any memory misconfiguration warnings as TUI toasts shown once at startup.
+	for _, w := range tuiMemWarnings {
+		executor.AddStartupWarning(w.message, w.details, w.isError)
+	}
 
 	// Display welcome message
 	fmt.Printf("Forge v%s - Coding Agent\n", version)
