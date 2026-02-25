@@ -8,7 +8,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -16,10 +15,15 @@ import (
 
 	"github.com/entrhq/forge/pkg/agent"
 	agentcontext "github.com/entrhq/forge/pkg/agent/context"
+	"github.com/entrhq/forge/pkg/agent/longtermmemory"
+	"github.com/entrhq/forge/pkg/agent/longtermmemory/capture"
+	"github.com/entrhq/forge/pkg/agent/longtermmemory/retrieval"
 	"github.com/entrhq/forge/pkg/agent/memory/notes"
 	"github.com/entrhq/forge/pkg/agent/tools"
 	appconfig "github.com/entrhq/forge/pkg/config"
 	"github.com/entrhq/forge/pkg/executor/tui"
+	"github.com/entrhq/forge/pkg/llm"
+	"github.com/entrhq/forge/pkg/llm/openai"
 
 	"github.com/entrhq/forge/pkg/security/workspace"
 	"github.com/entrhq/forge/pkg/tools/browser"
@@ -34,10 +38,10 @@ const (
 
 	// Context management defaults for coding sessions
 	// These are tuned for long coding sessions with many file operations
-	defaultMaxTokens        = 100000 // Conservative limit with headroom for 128K context
-	defaultToolCallAge     = 20 // Tool calls must be 20+ messages old to enter buffer
-	defaultMinToolCalls    = 10 // Minimum 10 tool calls in buffer before summarizing
-	defaultMaxToolCallDist = 40 // Force summarization if any tool call is 40+ messages old
+	defaultMaxTokens       = 100000 // Conservative limit with headroom for 128K context
+	defaultToolCallAge     = 20     // Tool calls must be 20+ messages old to enter buffer
+	defaultMinToolCalls    = 10     // Minimum 10 tool calls in buffer before summarizing
+	defaultMaxToolCallDist = 40     // Force summarization if any tool call is 40+ messages old
 
 	// Goal-batch compaction defaults (strategy 3: compact old completed turns into goal-batch blocks)
 	defaultGoalBatchTurnsOld = 20 // Turns must be 20+ messages old to be eligible for compaction
@@ -73,7 +77,8 @@ func main() {
 
 	// Validate configuration
 	if err := config.validate(); err != nil {
-		log.Fatalf("Configuration error: %v", err)
+		cmdLog.Errorf("Configuration error: %v", err)
+		os.Exit(1)
 	}
 
 	// Create context with signal handling for graceful shutdown
@@ -91,7 +96,8 @@ func main() {
 	// Run the application
 	if runErr := run(ctx, config); runErr != nil {
 		cancel()
-		log.Fatalf("Application error: %v", runErr)
+		cmdLog.Errorf("Application error: %v", runErr)
+		os.Exit(1)
 	}
 }
 
@@ -209,7 +215,7 @@ func runTUI(ctx context.Context, config *Config) error {
 		cliAPIKey = *config.APIKey
 	}
 
-	provider, err := appconfig.BuildProvider(cliModel, cliBaseURL, cliAPIKey, defaultModel)
+	provider, err := openai.BuildProvider(cliModel, cliBaseURL, cliAPIKey, defaultModel)
 	if err != nil {
 		return err
 	}
@@ -255,6 +261,119 @@ func runTUI(ctx context.Context, config *Config) error {
 		}
 	}
 
+	// Initialize the embedding provider for long-term memory retrieval.
+	// NewEmbedder returns (nil, nil) when embedding is unconfigured — the agent
+	// treats a nil embedder as "retrieval disabled" and continues normally.
+
+	// tuiMemWarning holds a warning to surface as a TUI toast at session start.
+	type tuiMemWarning struct {
+		message string
+		details string
+		isError bool
+	}
+	var tuiMemWarnings []tuiMemWarning
+
+	var embedder llm.Embedder
+	if memoryCfg := appconfig.GetMemory(); memoryCfg != nil && memoryCfg.IsEnabled() {
+		// Warn when exactly one of hypothesis_model / embedding_model is configured,
+		// since both are required for retrieval to function.
+		hypothesisModel := memoryCfg.GetHypothesisModel()
+		embeddingModel := memoryCfg.GetEmbeddingModel()
+		if hypothesisModel != "" && embeddingModel == "" {
+			cmdLog.Warnf("memory.hypothesis_model is set but memory.embedding_model is empty — retrieval is disabled")
+			tuiMemWarnings = append(tuiMemWarnings, tuiMemWarning{
+				message: "Memory retrieval disabled",
+				details: "memory.hypothesis_model is set but memory.embedding_model is missing. Set both to enable retrieval.",
+				isError: false,
+			})
+		} else if embeddingModel != "" && hypothesisModel == "" {
+			cmdLog.Warnf("memory.embedding_model is set but memory.hypothesis_model is empty — retrieval is disabled")
+			tuiMemWarnings = append(tuiMemWarnings, tuiMemWarning{
+				message: "Memory retrieval disabled",
+				details: "memory.embedding_model is set but memory.hypothesis_model is missing. Set both to enable retrieval.",
+				isError: false,
+			})
+		}
+
+		var embedErr error
+		// Resolve embedding API key: config field > EMBEDDING_API_KEY env var > main provider key.
+		embeddingAPIKey := memoryCfg.GetEmbeddingAPIKey()
+		if embeddingAPIKey == "" {
+			embeddingAPIKey = os.Getenv("EMBEDDING_API_KEY")
+		}
+		if embeddingAPIKey == "" {
+			embeddingAPIKey = provider.GetAPIKey()
+		}
+		embedder, embedErr = llm.NewEmbedder(memoryCfg, embeddingAPIKey)
+		if embedErr != nil {
+			cmdLog.Warnf("memory retrieval disabled: embedding provider error: %v", embedErr)
+			tuiMemWarnings = append(tuiMemWarnings, tuiMemWarning{
+				message: "Memory retrieval disabled",
+				details: fmt.Sprintf("Embedding provider error: %v", embedErr),
+				isError: true,
+			})
+			embedder = nil
+		}
+	}
+
+	// Initialize the async long-term memory capture pipeline and retrieval engine.
+	// Both are silently disabled when not configured.
+	var capturePipeline *capture.Pipeline
+	var retrievalEngine *retrieval.Engine
+	if memoryCfg := appconfig.GetMemory(); memoryCfg != nil && memoryCfg.IsEnabled() {
+		classifierModel := memoryCfg.GetClassifierModel()
+		if classifierModel == "" {
+			cmdLog.Warnf("memory: long-term capture disabled — classifier_model not configured (set it in /settings → Memory)")
+			tuiMemWarnings = append(tuiMemWarnings, tuiMemWarning{
+				message: "Memory capture disabled",
+				details: "memory.classifier_model is not configured. Set it in /settings → Memory to enable long-term memory capture.",
+				isError: false,
+			})
+		} else {
+			cmdLog.Infof("memory: initializing long-term capture pipeline (classifier_model=%s)", classifierModel)
+			memHomeDir, homeErr := os.UserHomeDir()
+			if homeErr != nil {
+				cmdLog.Warnf("memory: long-term capture disabled — cannot determine home dir: %v", homeErr)
+			} else {
+				repoMemDir := filepath.Join(config.WorkspaceDir, ".forge", "memories")
+				userMemDir := filepath.Join(memHomeDir, ".forge", "memories")
+				cmdLog.Infof("memory: store paths — repo=%s user=%s", repoMemDir, userMemDir)
+				memStore, storeErr := longtermmemory.NewFileStore(repoMemDir, userMemDir)
+				if storeErr != nil {
+					cmdLog.Warnf("memory: long-term capture disabled — storage error: %v", storeErr)
+				} else {
+					// Wire up the retrieval engine when both embedding and hypothesis
+					// models are configured. Its Rebuild method becomes the pipeline's
+					// rebuildFn so the index refreshes after every new memory write.
+					rebuildFn := func() {}
+					if embedder != nil && memoryCfg.GetHypothesisModel() != "" {
+						retrievalCfg := retrieval.Config{
+							HypothesisProvider:   provider,
+							HypothesisModel:      memoryCfg.GetHypothesisModel(),
+							HypothesisCount:      memoryCfg.GetRetrievalHypothesisCount(),
+							TopK:                 memoryCfg.GetRetrievalTopK(),
+							HopDepth:             memoryCfg.GetRetrievalHopDepth(),
+							InjectionTokenBudget: memoryCfg.GetInjectionTokenBudget(),
+						}
+						retrievalEngine = retrieval.New(memStore, embedder, retrievalCfg, cmdLog)
+						retrievalEngine.Start(ctx)
+						rebuildFn = retrievalEngine.Rebuild
+						cmdLog.Infof("memory: retrieval engine started (top_k=%d, hop_depth=%d, hypothesis_count=%d)",
+							memoryCfg.GetRetrievalTopK(), memoryCfg.GetRetrievalHopDepth(), memoryCfg.GetRetrievalHypothesisCount())
+					} else {
+						cmdLog.Infof("memory: retrieval disabled — hypothesis_model or embedding_model not configured")
+					}
+
+					capturePipeline = capture.NewPipeline(provider, classifierModel, memStore, rebuildFn, cmdLog)
+					capturePipeline.Start(ctx)
+					cmdLog.Infof("memory: long-term capture pipeline started (buffer_size=%d)", 8)
+				}
+			}
+		}
+	} else {
+		cmdLog.Infof("memory: long-term capture disabled (memory section not configured or not enabled)")
+	}
+
 	// Create workspace security guard
 	guard, err := workspace.NewGuard(config.WorkspaceDir)
 	if err != nil {
@@ -297,6 +416,13 @@ func runTUI(ctx context.Context, config *Config) error {
 		agent.WithContextManager(contextManager),
 		agent.WithNotesManager(notesManager),
 		agent.WithBrowserManager(browserManager),
+		agent.WithEmbedder(embedder),
+		agent.WithRetrievalEngine(retrievalEngine),
+	}
+
+	// Attach the capture pipeline when it was successfully initialized
+	if capturePipeline != nil {
+		agentOptions = append(agentOptions, agent.WithCapturePipeline(capturePipeline))
 	}
 
 	// Add repository context if AGENTS.md was loaded
@@ -305,6 +431,12 @@ func runTUI(ctx context.Context, config *Config) error {
 	}
 
 	ag := agent.NewDefaultAgent(provider, agentOptions...)
+
+	// Wire the capture observer into the goal-batch compaction strategy so that
+	// compaction events also trigger long-term memory classification.
+	if obs := ag.GetCaptureObserver(); obs != nil {
+		goalBatchStrategy.SetCaptureObserver(obs, ag.GetSessionID())
+	}
 
 	// Register coding tools
 	codingTools := []tools.Tool{
@@ -363,6 +495,11 @@ func runTUI(ctx context.Context, config *Config) error {
 
 	// Create TUI executor with provider and workspace for git operations
 	executor := tui.NewExecutor(ag, provider, config.WorkspaceDir, "forge")
+
+	// Surface any memory misconfiguration warnings as TUI toasts shown once at startup.
+	for _, w := range tuiMemWarnings {
+		executor.AddStartupWarning(w.message, w.details, w.isError)
+	}
 
 	// Display welcome message
 	fmt.Printf("Forge v%s - Coding Agent\n", version)

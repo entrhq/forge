@@ -134,7 +134,9 @@ func (s *ToolCallSummarizationStrategy) ShouldRun(conv *memory.ConversationMemor
 // existing [SUMMARIZED] blocks, recent messages) in their original order.
 //
 // This ensures that on repeated runs summaries accumulate correctly:
-//   [user1] [SUMMARIZED_A] [user2] [SUMMARIZED_B] [user3] [live messages...]
+//
+//	[user1] [SUMMARIZED_A] [user2] [SUMMARIZED_B] [user3] [live messages...]
+//
 // rather than collapsing all history into a single ever-rewritten summary block.
 func (s *ToolCallSummarizationStrategy) Summarize(ctx context.Context, conv *memory.ConversationMemory, llm llm.Provider) (int, error) {
 	messages := conv.GetAll()

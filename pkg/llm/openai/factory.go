@@ -1,14 +1,15 @@
-package config
+package openai
 
 import (
 	"fmt"
-	"github.com/entrhq/forge/pkg/llm/openai"
 	"os"
+
+	"github.com/entrhq/forge/pkg/config"
 )
 
 // BuildProvider creates an LLM provider based on configuration precedence:
 // CLI flags > Environment variables > Config file > Defaults
-func BuildProvider(cliModel, cliBaseURL, cliAPIKey, defaultModel string) (*openai.Provider, error) {
+func BuildProvider(cliModel, cliBaseURL, cliAPIKey, defaultModel string) (*Provider, error) {
 	// Start with CLI values (empty strings if not provided)
 	finalModel := cliModel
 	finalBaseURL := cliBaseURL
@@ -23,7 +24,7 @@ func BuildProvider(cliModel, cliBaseURL, cliAPIKey, defaultModel string) (*opena
 	}
 
 	// Get config file settings
-	llmConfigFromFile := GetLLM()
+	llmConfigFromFile := config.GetLLM()
 
 	// Fall back to config file if still empty
 	if llmConfigFromFile != nil {
@@ -58,14 +59,14 @@ func BuildProvider(cliModel, cliBaseURL, cliAPIKey, defaultModel string) (*opena
 	}
 
 	// Create OpenAI provider with the final, resolved configuration
-	providerOpts := []openai.ProviderOption{
-		openai.WithModel(finalModel),
+	providerOpts := []ProviderOption{
+		WithModel(finalModel),
 	}
 	if finalBaseURL != "" {
-		providerOpts = append(providerOpts, openai.WithBaseURL(finalBaseURL))
+		providerOpts = append(providerOpts, WithBaseURL(finalBaseURL))
 	}
 
-	provider, err := openai.NewProvider(finalAPIKey, providerOpts...)
+	provider, err := NewProvider(finalAPIKey, providerOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create LLM provider: %w", err)
 	}

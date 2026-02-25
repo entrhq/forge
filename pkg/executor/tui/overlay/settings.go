@@ -3,6 +3,7 @@ package overlay
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -307,6 +308,41 @@ func (s *SettingsOverlay) loadSettings() {
 				}
 				section.items = append(section.items, item)
 			}
+
+		case "memory":
+			// Create toggle and text items for memory configuration
+			memoryFields := []struct {
+				key         string
+				displayName string
+				itemType    itemType
+			}{
+				{"enabled", "Enabled", itemTypeToggle},
+				{"classifier_model", "Classifier Model", itemTypeText},
+				{"hypothesis_model", "Hypothesis Model", itemTypeText},
+				{"embedding_model", "Embedding Model", itemTypeText},
+				{"embedding_base_url", "Embedding Base URL", itemTypeText},
+				{"embedding_api_key", "Embedding API Key", itemTypeText},
+				{"retrieval_top_k", "Retrieval Top-K", itemTypeText},
+				{"retrieval_hop_depth", "Retrieval Hop Depth", itemTypeText},
+				{"retrieval_hypothesis_count", "Retrieval Hypothesis Count", itemTypeText},
+				{"injection_token_budget", "Injection Token Budget", itemTypeText},
+			}
+
+			for _, field := range memoryFields {
+				value := data[field.key]
+				// Render numeric values as strings for text fields
+				if field.itemType == itemTypeText {
+					value = fmt.Sprintf("%v", value)
+				}
+				item := settingsItem{
+					key:         field.key,
+					displayName: field.displayName,
+					value:       value,
+					itemType:    field.itemType,
+					modified:    false,
+				}
+				section.items = append(section.items, item)
+			}
 		}
 
 		s.sections = append(s.sections, section)
@@ -587,6 +623,27 @@ func (s *SettingsOverlay) saveSettings() error {
 			for _, item := range section.items {
 				data[item.key] = item.value
 			}
+
+		case "memory":
+			// Save memory settings - numeric fields must be stored as int so
+			// SetData's intFromAny helper can parse them correctly.
+			numericMemoryKeys := map[string]bool{
+				"retrieval_top_k":            true,
+				"retrieval_hop_depth":        true,
+				"retrieval_hypothesis_count": true,
+				"injection_token_budget":     true,
+			}
+			for _, item := range section.items {
+				if numericMemoryKeys[item.key] {
+					if s, ok := item.value.(string); ok {
+						if n, err := strconv.Atoi(s); err == nil {
+							data[item.key] = n
+							continue
+						}
+					}
+				}
+				data[item.key] = item.value
+			}
 		}
 
 		// Update section
@@ -781,23 +838,7 @@ func (s *SettingsOverlay) renderItem(item settingsItem, isFocused bool) string {
 	case itemTypeList:
 		out.WriteString(fmt.Sprintf("• %s", labelStyle.Render(item.displayName)))
 	case itemTypeText:
-		// Check if this is an API key field by examining the item key directly
-		isAPIKey := item.key == "api_key"
-
-		// Display value - mask API keys
-		displayValue := fmt.Sprintf("%v", item.value)
-		if isAPIKey && displayValue != "" {
-			displayValue = "••••••••"
-		}
-
-		valueStyle := lipgloss.NewStyle().Foreground(types.MutedGray)
-		if isFocused {
-			valueStyle = valueStyle.Foreground(types.BrightWhite)
-		}
-
-		out.WriteString(fmt.Sprintf("%s: %s",
-			labelStyle.Render(item.displayName),
-			valueStyle.Render(displayValue)))
+		out.WriteString(s.renderTextItem(item, isFocused, labelStyle))
 	}
 
 	if item.modified {
@@ -806,6 +847,25 @@ func (s *SettingsOverlay) renderItem(item settingsItem, isFocused bool) string {
 
 	out.WriteString("\n")
 	return out.String()
+}
+
+// renderTextItem renders a text setting field, masking API key values.
+func (s *SettingsOverlay) renderTextItem(item settingsItem, isFocused bool, labelStyle lipgloss.Style) string {
+	isAPIKey := strings.HasSuffix(item.key, "_api_key") || item.key == "api_key"
+
+	displayValue := fmt.Sprintf("%v", item.value)
+	if isAPIKey && displayValue != "" {
+		displayValue = "••••••••"
+	}
+
+	valueStyle := lipgloss.NewStyle().Foreground(types.MutedGray)
+	if isFocused {
+		valueStyle = valueStyle.Foreground(types.BrightWhite)
+	}
+
+	return fmt.Sprintf("%s: %s",
+		labelStyle.Render(item.displayName),
+		valueStyle.Render(displayValue))
 }
 
 // Helper methods for dialogs and state management
@@ -963,7 +1023,7 @@ func (s *SettingsOverlay) showTextFieldEditDialog() tea.Cmd {
 	item := &section.items[s.selectedItem]
 
 	// Determine if this is an API key field for masking
-	isAPIKey := section.id == "llm" && item.key == "api_key"
+	isAPIKey := strings.HasSuffix(item.key, "_api_key") || item.key == "api_key"
 
 	// Get current value as string
 	currentValue := ""

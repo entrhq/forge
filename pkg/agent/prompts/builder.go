@@ -169,5 +169,3 @@ func BuildMessages(systemPrompt string, history []*types.Message, userMessage st
 
 	return messages
 }
-
-

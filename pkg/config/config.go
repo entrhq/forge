@@ -42,6 +42,10 @@ func Initialize(configPath string) error {
 		return err
 	}
 
+	if err := manager.RegisterSection(NewMemorySection()); err != nil {
+		return err
+	}
+
 	// Load configuration
 	if err := manager.LoadAll(); err != nil {
 		return err
@@ -169,4 +173,24 @@ func GetUI() *UISection {
 	}
 
 	return ui
+}
+
+// GetMemory returns the memory settings section from global config.
+// Returns nil if config is not initialized.
+func GetMemory() *MemorySection {
+	if !IsInitialized() {
+		return nil
+	}
+
+	section, ok := Global().GetSection("memory")
+	if !ok {
+		return nil
+	}
+
+	memory, ok := section.(*MemorySection)
+	if !ok {
+		return nil
+	}
+
+	return memory
 }
