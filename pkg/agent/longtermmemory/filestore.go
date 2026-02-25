@@ -63,9 +63,11 @@ func (fs *FileStore) pathForID(id string, scope Scope) (string, error) {
 	return resolved, nil
 }
 
-// Write persists a new memory file to disk. It writes atomically via a
-// temporary file, ensuring append-only behavior by returning ErrAlreadyExists
-// if the given ID is already present on disk. It must be safe for concurrent use.
+// Write persists a new memory file to disk. It uses O_EXCL to atomically
+// create the file, ensuring append-only behavior by returning ErrAlreadyExists
+// if the given ID is already present on disk. The O_EXCL flag eliminates the
+// TOCTOU race that would exist between a prior os.Stat check and the actual
+// file creation. It must be safe for concurrent use.
 func (fs *FileStore) Write(_ context.Context, m *MemoryFile) error {
 	b, err := Serialize(m)
 	if err != nil {
@@ -75,31 +77,23 @@ func (fs *FileStore) Write(_ context.Context, m *MemoryFile) error {
 	if err != nil {
 		return err
 	}
-	if _, statErr := os.Stat(path); statErr == nil {
+	// O_CREATE|O_EXCL is an atomic "create-if-not-exists" at the OS level,
+	// which removes the TOCTOU race of the previous Stat+CreateTemp+Rename approach.
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if errors.Is(err, os.ErrExist) {
 		return ErrAlreadyExists
 	}
-	f, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+"-*.tmp")
 	if err != nil {
-		return fmt.Errorf("longtermmemory: create temp file: %w", err)
-	}
-	tmp := f.Name()
-	if err := f.Chmod(0o600); err != nil {
-		_ = f.Close()
-		_ = os.Remove(tmp)
-		return fmt.Errorf("longtermmemory: chmod temp file: %w", err)
+		return fmt.Errorf("longtermmemory: create file: %w", err)
 	}
 	_, writeErr := f.Write(b)
 	closeErr := f.Close()
 	if writeErr != nil || closeErr != nil {
-		_ = os.Remove(tmp)
+		_ = os.Remove(path)
 		if writeErr != nil {
-			return fmt.Errorf("longtermmemory: write temp file: %w", writeErr)
+			return fmt.Errorf("longtermmemory: write file: %w", writeErr)
 		}
-		return fmt.Errorf("longtermmemory: close temp file: %w", closeErr)
-	}
-	if err := os.Rename(tmp, path); err != nil {
-		_ = os.Remove(tmp) // best-effort cleanup
-		return fmt.Errorf("longtermmemory: atomic rename %s: %w", path, err)
+		return fmt.Errorf("longtermmemory: close file: %w", closeErr)
 	}
 	return nil
 }

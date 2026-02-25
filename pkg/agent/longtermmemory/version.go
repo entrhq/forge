@@ -14,8 +14,10 @@ func NewVersion(predecessor *MemoryFile, sessionID string, trigger Trigger) *Mem
 	now := timeNow()
 	predecessorID := predecessor.Meta.ID
 
-	related := make([]RelatedMemory, len(predecessor.Meta.Related))
-	copy(related, predecessor.Meta.Related)
+	// append(nil, ...) allocates a fresh backing array, preventing capacity
+	// sharing that would occur with make+copy when the predecessor's Related
+	// slice is later appended to.
+	related := append([]RelatedMemory(nil), predecessor.Meta.Related...)
 
 	return &MemoryFile{
 		Meta: MemoryMeta{
@@ -66,7 +68,12 @@ func LatestVersion(ctx context.Context, store MemoryStore, id string) (string, e
 	}
 	current := id
 	visited := make(map[string]bool)
-	for !visited[current] {
+	for {
+		// Check for a cycle before advancing — this ensures we detect membership
+		// in a cycle correctly and never process a node twice.
+		if visited[current] {
+			return "", fmt.Errorf("longtermmemory: cycle detected in version chain at id %q", current)
+		}
 		visited[current] = true
 
 		next, ok := successor[current]
@@ -75,5 +82,4 @@ func LatestVersion(ctx context.Context, store MemoryStore, id string) (string, e
 		}
 		current = next
 	}
-	return "", fmt.Errorf("longtermmemory: cycle detected in version chain at id %q", current)
 }
