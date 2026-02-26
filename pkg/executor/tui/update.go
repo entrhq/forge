@@ -136,6 +136,17 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// For other keys, continue to textarea update below
 	}
 
+	// ADR-0048: intercept 'g' key for scroll-lock BEFORE textarea update.
+	// When scroll-locked (!followScroll), pressing 'g' jumps to bottom and resumes
+	// auto-follow. This must happen before textarea.Update(msg) below, otherwise
+	// the textarea would add an unwanted 'g' character to the input field.
+	if keyMsg, ok := msg.(tea.KeyMsg); ok && !m.followScroll && keyMsg.String() == "g" {
+		m.followScroll = true
+		m.hasNewContent = false
+		m.viewport.GotoBottom()
+		return m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
+	}
+
 	// Only update textarea if no overlay or result list is active
 	// This prevents the textarea from capturing scroll events when an overlay is open
 	if !m.overlay.isActive() && !m.resultList.IsActive() {
