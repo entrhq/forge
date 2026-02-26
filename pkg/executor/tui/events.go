@@ -103,7 +103,17 @@ func (m *model) handleAgentEvent(event *pkgtypes.AgentEvent) {
 
 	// Update viewport with current content
 	m.viewport.SetContent(m.content.String())
-	m.viewport.GotoBottom()
+	m.scrollToBottomOrMark() // ADR-0048: respect scroll-lock
+}
+
+// scrollToBottomOrMark advances the viewport to the bottom when followScroll is
+// true, or marks hasNewContent when the user has scrolled up (ADR-0048).
+func (m *model) scrollToBottomOrMark() {
+	if m.followScroll {
+		m.viewport.GotoBottom()
+	} else {
+		m.hasNewContent = true
+	}
 }
 
 // Thinking event handlers
@@ -123,7 +133,7 @@ func (m *model) handleThinkingContent(event *pkgtypes.AgentEvent) {
 	header := "💭 Thinking "
 	formatted := formatEntry("", m.thinkingBuffer.String(), thinkingStyle, m.width, false)
 	m.viewport.SetContent(m.content.String() + header + formatted)
-	m.viewport.GotoBottom()
+	m.scrollToBottomOrMark() // ADR-0048
 }
 
 func (m *model) handleThinkingEnd() {
@@ -147,7 +157,7 @@ func (m *model) handleToolCallStart(event *pkgtypes.AgentEvent) {
 		m.content.WriteString(formatted)
 		m.content.WriteString("\n")
 		m.viewport.SetContent(m.content.String())
-		m.viewport.GotoBottom()
+		m.scrollToBottomOrMark() // ADR-0048
 		m.toolNameDisplayed = true
 	}
 	// If no tool name yet, we'll wait for EventTypeToolCall
@@ -221,7 +231,7 @@ func (m *model) handleMessageContent(content string) bool {
 	// Stream message content as it arrives
 	formatted := formatEntry("", m.messageBuffer.String(), lipgloss.NewStyle(), m.width, false)
 	m.viewport.SetContent(m.content.String() + formatted)
-	m.viewport.GotoBottom()
+	m.scrollToBottomOrMark() // ADR-0048
 
 	return true
 }
@@ -245,8 +255,10 @@ func (m *model) handleError(event *pkgtypes.AgentEvent) {
 }
 
 func (m *model) handleTurnEnd() {
-	// Turn end - clear busy state
+	// Turn end — clear busy state and resume scroll following (ADR-0048)
 	m.agentBusy = false
+	m.followScroll = true
+	m.hasNewContent = false
 	m.recalculateLayout()
 }
 
@@ -272,7 +284,7 @@ func (m *model) handleToolApprovalRequest(event *pkgtypes.AgentEvent) {
 	m.content.WriteString(formatted)
 	m.content.WriteString("\n")
 	m.viewport.SetContent(m.content.String())
-	m.viewport.GotoBottom()
+	m.scrollToBottomOrMark() // ADR-0048
 
 	// Handle tool approval request by showing overlay
 	if event.Preview != nil {
@@ -283,8 +295,10 @@ func (m *model) handleToolApprovalRequest(event *pkgtypes.AgentEvent) {
 				// Send approval response to agent
 				m.channels.Approval <- response
 
-				// Close overlay and update viewport
+				// Close overlay; the user interacted so resume auto-following (ADR-0048)
 				m.overlay.deactivate()
+				m.followScroll = true
+				m.hasNewContent = false
 				m.viewport.SetContent(m.content.String())
 				m.viewport.GotoBottom()
 			}
@@ -352,7 +366,7 @@ func (m *model) handleCommandExecutionStart(event *pkgtypes.AgentEvent) {
 		m.content.WriteString(formatted)
 		m.content.WriteString("\n")
 		m.viewport.SetContent(m.content.String())
-		m.viewport.GotoBottom()
+		m.scrollToBottomOrMark() // ADR-0048
 
 		// Create and activate command execution overlay
 		overlay := overlay.NewCommandExecutionOverlay(

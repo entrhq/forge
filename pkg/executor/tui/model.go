@@ -80,6 +80,10 @@ type model struct {
 	lastToolCallID   string                  // Track the last tool call for 'v' shortcut
 	lastToolName     string                  // Track the last tool name
 
+	// Scroll-lock state (ADR-0048)
+	followScroll  bool // true = auto-follow agent output; false = user has scrolled up
+	hasNewContent bool // true = new content arrived while scroll is locked
+
 	// Application state
 	shouldQuit      bool       // Flag to trigger application exit
 	startupWarnings []toastMsg // Queued toasts shown once at session start

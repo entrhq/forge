@@ -28,8 +28,11 @@ func (m *model) View() string {
 	// Build viewport section
 	viewportSection := m.viewport.View()
 
+	// ADR-0048: scroll-lock indicator (shown only when user has scrolled up and new content arrived)
+	scrollIndicator := m.buildScrollLockIndicator()
+
 	// Assemble the base UI
-	baseView := m.assembleBaseView(header, tips, topStatus, viewportSection, loadingIndicator, inputBox, bottomBar)
+	baseView := m.assembleBaseView(header, tips, topStatus, viewportSection, scrollIndicator, loadingIndicator, inputBox, bottomBar)
 
 	// Layer overlays
 	return m.applyOverlays(baseView)
@@ -58,6 +61,18 @@ func (m *model) buildTopStatus() string {
 		cwd = "~"
 	}
 	return statusBarStyle.Render(fmt.Sprintf(" Working directory: %s", cwd))
+}
+
+// buildScrollLockIndicator renders a "↓ New content below" hint when the user
+// has scrolled up and new agent output has arrived (ADR-0048).
+func (m *model) buildScrollLockIndicator() string {
+	if m.followScroll || !m.hasNewContent {
+		return ""
+	}
+	return scrollLockIndicatorStyle.
+		Width(m.width - 4).
+		Align(lipgloss.Center).
+		Render("↓  New content below  — press G or PgDn to follow")
 }
 
 // buildLoadingIndicator renders the loading spinner when agent is busy
@@ -128,31 +143,23 @@ func (m *model) buildTokenDisplay() string {
 		formatTokenCount(m.totalTokens))
 }
 
-// assembleBaseView combines all UI components into the base view
-func (m *model) assembleBaseView(header, tips, topStatus, viewportSection, loadingIndicator, inputBox, bottomBar string) string {
-	if m.agentBusy {
-		return lipgloss.JoinVertical(
-			lipgloss.Left,
-			header,
-			tips,
-			topStatus,
-			"",
-			viewportSection,
-			loadingIndicator,
-			inputBox,
-			bottomBar,
-		)
+// assembleBaseView combines all UI components into the base view.
+// scrollIndicator is the ADR-0048 "new content" banner (empty string when not needed).
+func (m *model) assembleBaseView(header, tips, topStatus, viewportSection, scrollIndicator, loadingIndicator, inputBox, bottomBar string) string {
+	// Collect the rows that always appear between the viewport and the input box
+	var middle []string
+	middle = append(middle, viewportSection)
+	if scrollIndicator != "" {
+		middle = append(middle, scrollIndicator)
 	}
-	return lipgloss.JoinVertical(
-		lipgloss.Left,
-		header,
-		tips,
-		topStatus,
-		"",
-		viewportSection,
-		inputBox,
-		bottomBar,
-	)
+	if m.agentBusy {
+		middle = append(middle, loadingIndicator)
+	}
+
+	rows := []string{header, tips, topStatus, ""}
+	rows = append(rows, middle...)
+	rows = append(rows, inputBox, bottomBar)
+	return lipgloss.JoinVertical(lipgloss.Left, rows...)
 }
 
 // applyOverlays layers all active overlays on top of the base view
