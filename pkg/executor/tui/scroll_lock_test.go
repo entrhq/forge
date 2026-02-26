@@ -15,10 +15,10 @@ func newScrollTestModel() *model {
 	vp.SetContent(strings.Repeat("line\n", 50))
 	vp.GotoBottom()
 	return &model{
-		viewport:       vp,
-		followScroll:   true,
-		hasNewContent:  false,
-		content:        &strings.Builder{},
+		viewport:      vp,
+		followScroll:  true,
+		hasNewContent: false,
+		content:       &strings.Builder{},
 	}
 }
 
