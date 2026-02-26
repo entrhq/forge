@@ -70,4 +70,9 @@ var (
 	OverlayHelpStyle = lipgloss.NewStyle().
 				Foreground(mutedGray).
 				Italic(true)
+
+	// scrollLockIndicatorStyle is used for the ADR-0048 "new content below" banner
+	scrollLockIndicatorStyle = lipgloss.NewStyle().
+					Foreground(salmonPink).
+					Bold(true)
 )

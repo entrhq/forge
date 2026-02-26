@@ -1,6 +1,6 @@
 # 48. TUI Smart Scroll-Lock
 
-**Status:** Proposed
+**Status:** Implemented
 **Date:** 2025-01-26
 **Deciders:** Product Team, Engineering Team
 **Technical Story:** [TUI Visual Polish PRD](../product/features/tui-visual-polish.md) — scroll-lock use case

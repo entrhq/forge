@@ -256,7 +256,16 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Note: Mouse event forwarding to overlay is now handled in the early message forwarding section
 		// Route mouse events to viewport for scrolling (only if no overlay is active)
 		if !m.overlay.isActive() {
+			// ADR-0048: track scroll direction before updating viewport
+			if msg.Button == tea.MouseButtonWheelUp {
+				m.followScroll = false
+			}
 			m.viewport, vpCmd = m.viewport.Update(msg)
+			// ADR-0048: if the user scrolled down and reached the bottom, resume following
+			if msg.Button == tea.MouseButtonWheelDown && m.viewport.AtBottom() {
+				m.followScroll = true
+				m.hasNewContent = false
+			}
 		}
 		return m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
 
@@ -324,8 +333,13 @@ func (m *model) calculateViewportHeight() int {
 	if m.agentBusy {
 		loadingHeight = 1 // Loading indicator is a separate line when visible
 	}
+	// ADR-0048: reserve one line for the scroll-lock "new content" indicator
+	scrollIndicatorHeight := 0
+	if !m.followScroll && m.hasNewContent {
+		scrollIndicatorHeight = 1
+	}
 
-	viewportHeight := m.height - headerHeight - inputHeight - statusBarHeight - loadingHeight
+	viewportHeight := m.height - headerHeight - inputHeight - statusBarHeight - loadingHeight - scrollIndicatorHeight
 	if viewportHeight < 5 {
 		viewportHeight = 5
 	}
@@ -387,7 +401,7 @@ func (m *model) handleOperationComplete(msg operationCompleteMsg) (tea.Model, te
 	if m.overlay.isActive() {
 		m.overlay.deactivate()
 		m.viewport.SetContent(m.content.String())
-		m.viewport.GotoBottom()
+		m.scrollToBottomOrMark() // ADR-0048
 	}
 
 	return m, nil
@@ -404,7 +418,7 @@ func (m *model) handleToast(msg toastMsg) (tea.Model, tea.Cmd) {
 	if m.overlay.isActive() {
 		m.overlay.deactivate()
 		m.viewport.SetContent(m.content.String())
-		m.viewport.GotoBottom()
+		m.scrollToBottomOrMark() // ADR-0048
 	}
 
 	return m, nil
@@ -415,7 +429,7 @@ func (m *model) handleAgentError(msg agentErrMsg) (tea.Model, tea.Cmd) {
 	m.content.WriteString(errorStyle.Render(fmt.Sprintf("  ❌ Error: %v", msg.err)))
 	m.content.WriteString("\n\n")
 	m.viewport.SetContent(m.content.String())
-	m.viewport.GotoBottom()
+	m.scrollToBottomOrMark() // ADR-0048
 	m.agentBusy = false
 	m.recalculateLayout()
 	return m, nil
@@ -429,7 +443,7 @@ func (m *model) handleBashCommandResult(msg bashCommandResultMsg) (tea.Model, te
 	m.content.WriteString("\n\n")
 
 	m.viewport.SetContent(m.content.String())
-	m.viewport.GotoBottom()
+	m.scrollToBottomOrMark() // ADR-0048
 
 	return m, nil
 }
@@ -445,13 +459,6 @@ func (m *model) handleApprovalRequest(msg approvalRequestMsg) (tea.Model, tea.Cm
 
 // handleKeyPress processes keyboard input
 func (m *model) handleKeyPress(msg tea.KeyMsg, vpCmd, tiCmd, spinnerCmd tea.Cmd) (tea.Model, tea.Cmd) {
-	// Command palette handling is now done earlier in Update() before textarea update
-	// This prevents the duplicate handling issue
-
-	// Note: Overlay keyboard handling is now done in the main Update() function
-	// to ensure all messages (including custom types) reach the overlay.
-	// KeyMsg handling here is skipped if overlay is active since it's already processed.
-
 	// If result list is active, pass keys to the result list
 	if m.resultList.IsActive() {
 		updated, cmd := m.resultList.Update(msg, m, m)
@@ -461,10 +468,13 @@ func (m *model) handleKeyPress(msg tea.KeyMsg, vpCmd, tiCmd, spinnerCmd tea.Cmd)
 		return m, tea.Batch(cmd, spinnerCmd)
 	}
 
-	// Handle key presses based on type
+	// ADR-0048: scroll-lock keys are handled in a dedicated helper
+	if handled, mdl, cmd := m.handleScrollKey(msg, vpCmd, tiCmd, spinnerCmd); handled {
+		return mdl, cmd
+	}
+
 	switch msg.Type {
 	case tea.KeyEsc:
-		// Escape exits bash mode if active
 		if m.bashMode {
 			m.bashMode = false
 			m.textarea.Reset()
@@ -489,9 +499,7 @@ func (m *model) handleKeyPress(msg tea.KeyMsg, vpCmd, tiCmd, spinnerCmd tea.Cmd)
 		return m.handleCtrlP()
 
 	case tea.KeyEnter:
-		// Check if Alt is held down
 		if msg.Alt {
-			// Insert a newline character
 			m.textarea.InsertString("\n")
 			m.updateTextAreaHeight()
 			return m, nil
@@ -500,6 +508,36 @@ func (m *model) handleKeyPress(msg tea.KeyMsg, vpCmd, tiCmd, spinnerCmd tea.Cmd)
 	}
 
 	return m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
+}
+
+// handleScrollKey handles ADR-0048 scroll-lock key events (PgUp, PgDn, g).
+// Returns (handled, model, cmd) — if handled is false the caller should
+// continue with normal key dispatch.
+func (m *model) handleScrollKey(msg tea.KeyMsg, vpCmd, tiCmd, spinnerCmd tea.Cmd) (bool, tea.Model, tea.Cmd) {
+	switch msg.Type {
+	case tea.KeyPgUp, tea.KeyCtrlB:
+		m.followScroll = false
+		m.viewport.HalfPageUp()
+		return true, m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
+
+	case tea.KeyPgDown:
+		m.viewport.HalfPageDown()
+		if m.viewport.AtBottom() {
+			m.followScroll = true
+			m.hasNewContent = false
+		}
+		return true, m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
+	}
+
+	// Lowercase "g": jump to bottom and resume auto-follow (mirrors vim / less)
+	if msg.String() == "g" && !m.followScroll {
+		m.followScroll = true
+		m.hasNewContent = false
+		m.viewport.GotoBottom()
+		return true, m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
+	}
+
+	return false, m, nil
 }
 
 // handleCtrlC handles Ctrl+C key press (exit or exit bash mode)
@@ -596,7 +634,7 @@ func (m *model) handleBashModeInput(input string, tiCmd, vpCmd, spinnerCmd tea.C
 	// Clear the input area
 	m.textarea.Reset()
 	m.viewport.SetContent(m.content.String())
-	m.viewport.GotoBottom()
+	m.scrollToBottomOrMark() // ADR-0048
 
 	// Execute command and return to event loop
 	return m, tea.Batch(tiCmd, vpCmd, spinnerCmd, m.executeBashCommand(input))
@@ -636,7 +674,7 @@ func (m *model) handleSingleShotBash(input string, tiCmd, vpCmd, spinnerCmd tea.
 	// Clear the input area
 	m.textarea.Reset()
 	m.viewport.SetContent(m.content.String())
-	m.viewport.GotoBottom()
+	m.scrollToBottomOrMark() // ADR-0048
 
 	// Execute command
 	return m, tea.Batch(tiCmd, vpCmd, spinnerCmd, m.executeBashCommand(bashCmd))
@@ -652,6 +690,10 @@ func (m *model) handleAgentMessage(input string, tiCmd, vpCmd, spinnerCmd tea.Cm
 
 	// Clear input
 	m.textarea.Reset()
+
+	// ADR-0048: sending a message always resumes auto-follow
+	m.followScroll = true
+	m.hasNewContent = false
 	m.viewport.SetContent(m.content.String())
 	m.viewport.GotoBottom()
 
@@ -672,5 +714,5 @@ func (m *model) recalculateLayout() {
 	// Update viewport height based on current state (including loading indicator)
 	m.viewport.Height = m.calculateViewportHeight()
 	m.viewport.SetContent(m.content.String())
-	m.viewport.GotoBottom()
+	m.scrollToBottomOrMark() // ADR-0048: respect scroll-lock during layout recalculation
 }
