@@ -79,6 +79,40 @@ Proposed → Accepted → [Deprecated or Superseded]
 | [0015](0015-buffered-tool-call-summarization.md) | Buffered Tool Call Summarization with Parallel Processing | Accepted |
 | [0016](0016-file-ignore-system.md) | File Ignore System for Coding Tools | Proposed |
 | [0017](0017-auto-approval-and-settings-system.md) | Auto-Approval and Interactive Settings System | Accepted |
+| [0018](0018-selective-tool-call-summarization.md) | Selective Tool Call Summarization | Accepted |
+| [0019](0019-xml-cdata-tool-call-format.md) | XML CDATA Tool Call Format | Accepted |
+| [0020](0020-context-information-overlay.md) | Context Information Overlay | Accepted |
+| [0021](0021-early-tool-call-detection.md) | Early Tool Call Detection | Accepted |
+| [0022](0022-intelligent-tool-result-display.md) | Intelligent Tool Result Display | Accepted |
+| [0023](0023-bash-mode-architecture.md) | Bash Mode Architecture | Accepted |
+| [0024](0024-xml-escaping-primary-with-cdata-fallback.md) | XML Escaping Primary with CDATA Fallback | Accepted |
+| [0025](0025-tui-package-reorganization.md) | TUI Package Reorganization | Accepted |
+| [0026](0026-headless-mode-architecture.md) | Headless Mode Architecture | Accepted |
+| [0027](0027-safety-constraint-system.md) | Safety Constraint System | Accepted |
+| [0028](0028-quality-gate-architecture.md) | Quality Gate Architecture | Accepted |
+| [0029](0029-headless-git-integration.md) | Headless Git Integration | Accepted |
+| [0030](0030-automated-pr-documentation.md) | Automated PR Documentation | Accepted |
+| [0031](0031-headless-git-pr-creation.md) | Headless Git PR Creation | Accepted |
+| [0032](0032-agent-scratchpad-notes-system.md) | Agent Scratchpad Notes System | Accepted |
+| [0033](0033-notes-viewer-tui-command.md) | Notes Viewer TUI Command | Accepted |
+| [0034](0034-live-reloadable-llm-settings.md) | Live-Reloadable LLM Settings | Accepted |
+| [0035](0035-auto-close-command-overlay.md) | Auto-Close Command Overlay | Accepted |
+| [0036](0036-agents-md-repository-context.md) | AGENTS.md Repository Context | Accepted |
+| [0037](0037-custom-tools-system.md) | Custom Tools System | Accepted |
+| [0038](0038-browser-automation-architecture.md) | Browser Automation Architecture | Accepted |
+| [0039](0039-llm-powered-page-analysis.md) | LLM-Powered Page Analysis | Accepted |
+| [0040](0040-structured-summarization-prompt.md) | Structured Summarization Prompt | Accepted |
+| [0041](0041-goal-batch-compaction-strategy.md) | Goal Batch Compaction Strategy | Accepted |
+| [0042](0042-summarization-model-override.md) | Summarization Model Override | Accepted |
+| [0043](0043-context-snapshot-export.md) | Context Snapshot Export | Accepted |
+| [0044](0044-long-term-memory-storage.md) | Long-Term Memory Storage | Accepted |
+| [0045](0045-long-term-memory-embedding-provider.md) | Long-Term Memory Embedding Provider | Accepted |
+| [0046](0046-long-term-memory-capture.md) | Long-Term Memory Capture | Accepted |
+| [0047](0047-long-term-memory-retrieval.md) | Long-Term Memory Retrieval | Accepted |
+| [0048](0048-tui-smart-scroll-lock.md) | TUI Smart Scroll-Lock | Proposed |
+| [0049](0049-tui-bracketed-paste-support.md) | TUI Bracketed Paste Support | Proposed |
+| [0050](0050-tui-clipboard-copy.md) | TUI Clipboard Copy | Proposed |
+| [0051](0051-tui-visual-redesign.md) | TUI Visual Redesign | Proposed |
 
 ## Resources
 
