@@ -281,7 +281,7 @@ func (m *model) renderSummarizationStatus() string {
 		sepStr += "─"
 	}
 	content.WriteString(lipgloss.NewStyle().Foreground(mutedGray).Render(sepStr))
-	content.WriteString("\n\n")
+	content.WriteString("\n")
 
 	// Render the spinner alongside the loading text
 	spinnerStr := m.spinner.View()
@@ -294,7 +294,7 @@ func (m *model) renderSummarizationStatus() string {
 			formatTokenCount(m.summarization.maxTokens))
 	}
 
-	content.WriteString(fmt.Sprintf("%s %s\n", spinnerStr, textStyle.Render(statusText)))
+	content.WriteString(fmt.Sprintf("%s %s", spinnerStr, textStyle.Render(statusText)))
 
 	// Create styled box
 	boxStyle := lipgloss.NewStyle().
