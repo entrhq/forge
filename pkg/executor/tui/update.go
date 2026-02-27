@@ -338,8 +338,23 @@ func (m *model) handleViewNote(msg tuitypes.ViewNoteMsg) {
 // handleWindowResize processes window size change events
 // calculateViewportHeight computes the appropriate viewport height based on current model state
 func (m *model) calculateViewportHeight() int {
-	headerHeight := 10                     // ASCII art (6) + tips (1) + status bar (1) + blank line (1) + spacing (1)
-	inputHeight := m.textarea.Height() + 2 // textarea height + border
+	// ADR-0051: compact header bar + separator + hints + blank spacer = 4 lines (static)
+	const headerHeight = 4
+
+	// ADR-0051: Option B input zone is dynamic: rule (1) + live textarea lines
+	liveLines := strings.Count(m.textarea.Value(), "\n") + 1
+	if liveLines < 1 {
+		liveLines = 1
+	}
+	maxInputLines := m.height / 3
+	if maxInputLines < 1 {
+		maxInputLines = 1
+	}
+	if liveLines > maxInputLines {
+		liveLines = maxInputLines
+	}
+	inputZoneHeight := 1 + liveLines // rule + textarea lines
+
 	statusBarHeight := 1
 	loadingHeight := 0
 	if m.agentBusy {
@@ -351,7 +366,7 @@ func (m *model) calculateViewportHeight() int {
 		scrollIndicatorHeight = 1
 	}
 
-	viewportHeight := m.height - headerHeight - inputHeight - statusBarHeight - loadingHeight - scrollIndicatorHeight
+	viewportHeight := m.height - headerHeight - inputZoneHeight - statusBarHeight - loadingHeight - scrollIndicatorHeight
 	if viewportHeight < 5 {
 		viewportHeight = 5
 	}
@@ -438,7 +453,7 @@ func (m *model) handleToast(msg toastMsg) (tea.Model, tea.Cmd) {
 
 // handleAgentError processes agent error messages
 func (m *model) handleAgentError(msg agentErrMsg) (tea.Model, tea.Cmd) {
-	m.content.WriteString(errorStyle.Render(fmt.Sprintf("  ❌ Error: %v", msg.err)))
+	m.content.WriteString(errorStyle.Render(fmt.Sprintf("  ✗ Error: %v", msg.err)))
 	m.content.WriteString("\n\n")
 	m.viewport.SetContent(m.content.String())
 	m.scrollToBottomOrMark() // ADR-0048
@@ -665,7 +680,7 @@ func (m *model) handleSlashCommand(input string, tiCmd, vpCmd, spinnerCmd tea.Cm
 	// Parse slash command
 	commandName, args, ok := parseSlashCommand(input)
 	if !ok {
-		m.showToast("Invalid command", "Could not parse slash command", "❌", true)
+		m.showToast("Invalid command", "Could not parse slash command", "✗", true)
 		return m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
 	}
 
@@ -698,7 +713,7 @@ func (m *model) handleSingleShotBash(input string, tiCmd, vpCmd, spinnerCmd tea.
 // handleAgentMessage processes regular agent messages
 func (m *model) handleAgentMessage(input string, tiCmd, vpCmd, spinnerCmd tea.Cmd) (tea.Model, tea.Cmd) {
 	// Display user message
-	formatted := formatEntry("You: ", input, userStyle, m.width, true)
+	formatted := formatEntry("❯ ", input, userStyle, m.width, true)
 	// Strip any trailing newlines before adding our spacing
 	formatted = strings.TrimRight(formatted, "\n")
 	m.content.WriteString(formatted + "\n\n")
@@ -741,7 +756,7 @@ func (m *model) recalculateLayout() {
 func (m *model) handleCopyToClipboard() (tea.Model, tea.Cmd) {
 	content := stripANSI(m.content.String())
 	if err := clipboard.WriteAll(content); err != nil {
-		m.showToast("Clipboard unavailable", "No clipboard manager detected", "⚠", true)
+		m.showToast("Clipboard unavailable", "No clipboard manager detected", "!", true)
 		return m, nil
 	}
 	m.showToast("Copied to clipboard", "", "✓", false)

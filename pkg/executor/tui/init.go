@@ -17,7 +17,7 @@ func initialModel() model {
 	ta := textarea.New()
 	ta.Placeholder = "Type your message..."
 	ta.Focus()
-	ta.Prompt = "> "
+	ta.Prompt = "" // ADR-0051: prompt glyph rendered externally in buildInputBox
 	ta.CharLimit = 0
 	ta.SetHeight(1)
 	ta.MaxHeight = 10 // Allow up to 10 lines

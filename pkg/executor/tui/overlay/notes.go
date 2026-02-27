@@ -84,7 +84,7 @@ func NewNotesOverlay(notes []pkgtypes.NoteData, width, height int) *NotesOverlay
 	delegate := newNoteListDelegate()
 
 	l := list.New([]list.Item{}, delegate, 0, 0)
-	l.Title = "📝 Scratchpad Notes"
+	l.Title = "✎ Scratchpad Notes"
 	l.SetShowStatusBar(true)
 	l.SetFilteringEnabled(false)
 

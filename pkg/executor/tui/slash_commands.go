@@ -187,17 +187,17 @@ func executeSlashCommand(m *model, commandName string, args []string) (*model, t
 	cmd, exists := getCommand(commandName)
 	if !exists {
 		// Unknown command - show error toast
-		m.showToast("Unknown command", fmt.Sprintf("Command '/%s' not found. Type /help for available commands.", commandName), "❌", true)
+		m.showToast("Unknown command", fmt.Sprintf("Command '/%s' not found. Type /help for available commands.", commandName), "✗", true)
 		return m, nil
 	}
 
 	// Validate argument count
 	if len(args) < cmd.MinArgs {
-		m.showToast("Invalid arguments", fmt.Sprintf("Command '/%s' requires at least %d argument(s)", commandName, cmd.MinArgs), "❌", true)
+		m.showToast("Invalid arguments", fmt.Sprintf("Command '/%s' requires at least %d argument(s)", commandName, cmd.MinArgs), "✗", true)
 		return m, nil
 	}
 	if cmd.MaxArgs != -1 && len(args) > cmd.MaxArgs {
-		m.showToast("Invalid arguments", fmt.Sprintf("Command '/%s' accepts at most %d argument(s)", commandName, cmd.MaxArgs), "❌", true)
+		m.showToast("Invalid arguments", fmt.Sprintf("Command '/%s' accepts at most %d argument(s)", commandName, cmd.MaxArgs), "✗", true)
 		return m, nil
 	}
 
@@ -238,7 +238,7 @@ func executeSlashCommand(m *model, commandName string, args []string) (*model, t
 			return m, nil
 		default:
 			// Unknown return type - show error
-			m.showToast("Command Error", fmt.Sprintf("Command '/%s' returned unexpected type", commandName), "❌", true)
+			m.showToast("Command Error", fmt.Sprintf("Command '/%s' returned unexpected type", commandName), "✗", true)
 			return m, nil
 		}
 	}
@@ -281,7 +281,7 @@ func handleStopCommand(m *model, args []string) interface{} {
 	if m.channels != nil {
 		// Send cancel input to agent
 		m.channels.Input <- types.NewCancelInput()
-		m.showToast("Stopping", "Sent stop signal to agent", "⏹️", false)
+		m.showToast("Stopping", "Sent stop signal to agent", "■", false)
 	}
 	return nil
 }
@@ -289,7 +289,7 @@ func handleStopCommand(m *model, args []string) interface{} {
 // handleCommitCommand creates a git commit with preview
 func handleCommitCommand(m *model, args []string) interface{} {
 	if m.slashHandler == nil {
-		m.showToast("Error", "Git operations not available", "❌", true)
+		m.showToast("Error", "Git operations not available", "✗", true)
 		return nil
 	}
 
@@ -305,7 +305,7 @@ func handleCommitCommand(m *model, args []string) interface{} {
 			return toastMsg{
 				message: "Commit Failed",
 				details: fmt.Sprintf("Failed to get modified files: %v", err),
-				icon:    "❌",
+				icon:    "✗",
 				isError: true,
 			}
 		}
@@ -314,7 +314,7 @@ func handleCommitCommand(m *model, args []string) interface{} {
 			return toastMsg{
 				message: "Nothing to Commit",
 				details: "No modified files found",
-				icon:    "ℹ️",
+				icon:    "i",
 				isError: false,
 			}
 		}
@@ -330,7 +330,7 @@ func handleCommitCommand(m *model, args []string) interface{} {
 				return toastMsg{
 					message: "Commit Failed",
 					details: fmt.Sprintf("Failed to generate commit message: %v", err),
-					icon:    "❌",
+					icon:    "✗",
 					isError: true,
 				}
 			}
@@ -386,7 +386,7 @@ func getDiffForFiles(workingDir string, files []string) string {
 // handlePRCommand creates a pull request with preview
 func handlePRCommand(m *model, args []string) interface{} {
 	if m.slashHandler == nil {
-		m.showToast("Error", "Git operations not available", "❌", true)
+		m.showToast("Error", "Git operations not available", "✗", true)
 		return nil
 	}
 
@@ -401,7 +401,7 @@ func handlePRCommand(m *model, args []string) interface{} {
 			return toastMsg{
 				message: "PR Failed",
 				details: fmt.Sprintf("Failed to detect base branch: %v", err),
-				icon:    "❌",
+				icon:    "✗",
 				isError: true,
 			}
 		}
@@ -412,7 +412,7 @@ func handlePRCommand(m *model, args []string) interface{} {
 			return toastMsg{
 				message: "PR Failed",
 				details: fmt.Sprintf("Failed to get current branch: %v", err),
-				icon:    "❌",
+				icon:    "✗",
 				isError: true,
 			}
 		}
@@ -423,7 +423,7 @@ func handlePRCommand(m *model, args []string) interface{} {
 			return toastMsg{
 				message: "PR Failed",
 				details: fmt.Sprintf("Failed to get commits: %v", err),
-				icon:    "❌",
+				icon:    "✗",
 				isError: true,
 			}
 		}
@@ -432,7 +432,7 @@ func handlePRCommand(m *model, args []string) interface{} {
 			return toastMsg{
 				message: "Nothing to PR",
 				details: "No commits found for pull request",
-				icon:    "ℹ️",
+				icon:    "i",
 				isError: false,
 			}
 		}
@@ -443,7 +443,7 @@ func handlePRCommand(m *model, args []string) interface{} {
 			return toastMsg{
 				message: "PR Failed",
 				details: fmt.Sprintf("Failed to get diff summary: %v", err),
-				icon:    "❌",
+				icon:    "✗",
 				isError: true,
 			}
 		}
@@ -454,7 +454,7 @@ func handlePRCommand(m *model, args []string) interface{} {
 			return toastMsg{
 				message: "PR Failed",
 				details: fmt.Sprintf("Failed to generate PR content: %v", err),
-				icon:    "❌",
+				icon:    "✗",
 				isError: true,
 			}
 		}
@@ -506,7 +506,7 @@ func handleSettingsCommand(m *model, args []string) interface{} {
 func handleContextCommand(m *model, args []string) interface{} {
 	// Get context info from agent
 	if m.agent == nil {
-		m.showToast("Error", "Agent not available", "❌", true)
+		m.showToast("Error", "Agent not available", "✗", true)
 		return nil
 	}
 
@@ -557,7 +557,7 @@ func handleContextCommand(m *model, args []string) interface{} {
 func handleBashCommand(m *model, args []string) interface{} {
 	m.bashMode = true
 	m.updatePrompt()
-	m.showToast("Bash Mode", "Entered bash mode. Commands will be executed directly. Type 'exit' or press Ctrl+C to return.", "🔧", false)
+	m.showToast("Bash Mode", "Entered bash mode. Commands will be executed directly. Type 'exit' or press Ctrl+C to return.", "❯", false)
 	return nil
 }
 
@@ -603,7 +603,7 @@ type contextSnapshot struct {
 // JSON file in <workspace>/.forge/context/ and shows a toast with the output path.
 func handleSnapshotCommand(m *model, args []string) interface{} {
 	if m.agent == nil {
-		m.showToast("Error", "Agent not available", "❌", true)
+		m.showToast("Error", "Agent not available", "✗", true)
 		return nil
 	}
 
@@ -612,7 +612,7 @@ func handleSnapshotCommand(m *model, args []string) interface{} {
 	// Ensure the output directory exists.
 	outDir := filepath.Join(m.workspaceDir, ".forge", "context")
 	if err := os.MkdirAll(outDir, 0o750); err != nil {
-		m.showToast("Export failed", fmt.Sprintf("Could not create directory: %v", err), "❌", true)
+		m.showToast("Export failed", fmt.Sprintf("Could not create directory: %v", err), "✗", true)
 		return nil
 	}
 
@@ -622,16 +622,16 @@ func handleSnapshotCommand(m *model, args []string) interface{} {
 
 	data, err := json.MarshalIndent(snapshot, "", "  ")
 	if err != nil {
-		m.showToast("Export failed", fmt.Sprintf("Could not marshal JSON: %v", err), "❌", true)
+		m.showToast("Export failed", fmt.Sprintf("Could not marshal JSON: %v", err), "✗", true)
 		return nil
 	}
 
 	if err := os.WriteFile(outPath, data, 0o600); err != nil {
-		m.showToast("Export failed", fmt.Sprintf("Could not write file: %v", err), "❌", true)
+		m.showToast("Export failed", fmt.Sprintf("Could not write file: %v", err), "✗", true)
 		return nil
 	}
 
-	m.showToast("Context exported", outPath, "📄", false)
+	m.showToast("Context exported", outPath, "✓", false)
 	return nil
 }
 

@@ -51,9 +51,9 @@ func NewExecutor(agent agent.Agent, provider llm.Provider, workspaceDir string, 
 // start. Warnings are displayed immediately after the TUI renders its first
 // frame. Use isError=true for error-level warnings (shown with a red icon).
 func (e *Executor) AddStartupWarning(message, details string, isError bool) {
-	icon := "⚠️"
+	icon := "!"
 	if isError {
-		icon = "❌"
+		icon = "✗"
 	}
 	e.startupWarnings = append(e.startupWarnings, toastMsg{
 		message: message,

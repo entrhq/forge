@@ -105,9 +105,9 @@ func (p *PRRequest) OnApprove() tea.Cmd {
 				Result:       result,
 				Err:          err,
 				SuccessTitle: "Success",
-				SuccessIcon:  "🔀",
+				SuccessIcon:  "↑",
 				ErrorTitle:   "PR Failed",
-				ErrorIcon:    "❌",
+				ErrorIcon:    "✗",
 			}
 		},
 	)
@@ -119,7 +119,7 @@ func (p *PRRequest) OnReject() tea.Cmd {
 		return types.ToastMsg{
 			Message: "Canceled",
 			Details: "/pr command canceled",
-			Icon:    "ℹ️",
+			Icon:    "i",
 			IsError: false,
 		}
 	}

@@ -130,7 +130,7 @@ func (m *model) handleThinkingContent(event *pkgtypes.AgentEvent) {
 	// Buffer the thinking content
 	m.thinkingBuffer.WriteString(event.Content)
 	// Stream with "Thinking" label, content follows immediately
-	header := "💭 Thinking "
+	header := " ⸫ "
 	formatted := formatEntry("", m.thinkingBuffer.String(), thinkingStyle, m.width, false)
 	m.viewport.SetContent(m.content.String() + header + formatted)
 	m.scrollToBottomOrMark() // ADR-0048
@@ -138,7 +138,7 @@ func (m *model) handleThinkingContent(event *pkgtypes.AgentEvent) {
 
 func (m *model) handleThinkingEnd() {
 	if m.thinkingBuffer.Len() > 0 {
-		header := "💭 Thinking "
+		header := " ⸫ "
 		formatted := formatEntry("", m.thinkingBuffer.String(), thinkingStyle, m.width, false)
 		m.content.WriteString(header + formatted)
 	}
@@ -153,7 +153,7 @@ func (m *model) handleToolCallStart(event *pkgtypes.AgentEvent) {
 	// Check if we have early tool name detection in metadata
 	if toolName, ok := event.Metadata["tool_name"].(string); ok && toolName != "" && !m.toolNameDisplayed {
 		// Display the tool name immediately when detected early
-		formatted := formatEntry("🔧 ", toolName, toolStyle, m.width, false)
+		formatted := formatEntry("✎ ", toolName, toolStyle, m.width, false)
 		m.content.WriteString(formatted)
 		m.content.WriteString("\n")
 		m.viewport.SetContent(m.content.String())
@@ -166,7 +166,7 @@ func (m *model) handleToolCallStart(event *pkgtypes.AgentEvent) {
 func (m *model) handleToolCall(event *pkgtypes.AgentEvent) {
 	// Only display if we haven't already shown it from early detection
 	if !m.toolNameDisplayed {
-		formatted := formatEntry("🔧 ", event.ToolName, toolStyle, m.width, false)
+		formatted := formatEntry("✎ ", event.ToolName, toolStyle, m.width, false)
 		m.content.WriteString(formatted)
 		m.content.WriteString("\n")
 	}
@@ -250,7 +250,7 @@ func (m *model) handleMessageEnd() {
 // Error and state handlers
 
 func (m *model) handleError(event *pkgtypes.AgentEvent) {
-	m.content.WriteString(errorStyle.Render(fmt.Sprintf("  ❌ Error: %v", event.Error)))
+	m.content.WriteString(errorStyle.Render(fmt.Sprintf("  ✗ Error: %v", event.Error)))
 	m.content.WriteString("\n\n")
 }
 
@@ -280,7 +280,7 @@ func (m *model) handleUpdateBusy(event *pkgtypes.AgentEvent) {
 
 func (m *model) handleToolApprovalRequest(event *pkgtypes.AgentEvent) {
 	// Show "Requesting approval" message before overlay
-	formatted := formatEntry("  ⏳ ", "Requesting tool approval...", toolStyle, m.width, false)
+	formatted := formatEntry("  … ", "Requesting tool approval...", toolStyle, m.width, false)
 	m.content.WriteString(formatted)
 	m.content.WriteString("\n")
 	m.viewport.SetContent(m.content.String())
@@ -362,7 +362,7 @@ func (m *model) handleTokenUsage(event *pkgtypes.AgentEvent) {
 func (m *model) handleCommandExecutionStart(event *pkgtypes.AgentEvent) {
 	// Show command execution started message
 	if event.CommandExecution != nil {
-		formatted := formatEntry("  🚀 ", fmt.Sprintf("Executing: %s", event.CommandExecution.Command), toolStyle, m.width, false)
+		formatted := formatEntry("  ❯ ", fmt.Sprintf("Executing: %s", event.CommandExecution.Command), toolStyle, m.width, false)
 		m.content.WriteString(formatted)
 		m.content.WriteString("\n")
 		m.viewport.SetContent(m.content.String())
@@ -438,7 +438,7 @@ func (m *model) handleContextSummarizationComplete(event *pkgtypes.AgentEvent) {
 				formatTokenCount(oldTokens),
 				formatTokenCount(newTokens),
 				duration),
-			"🧠",
+			"◆",
 			false,
 		)
 

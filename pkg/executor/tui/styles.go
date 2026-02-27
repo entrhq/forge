@@ -52,10 +52,10 @@ var (
 			Foreground(mutedGray).
 			Padding(0, 1)
 
-	inputBoxStyle = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(salmonPink).
-			Padding(0, 1)
+	// inputPromptStyle styles the ❯ glyph in the Option B input zone
+	inputPromptStyle = lipgloss.NewStyle().
+				Foreground(salmonPink).
+				Bold(true)
 
 	// OverlayTitleStyle is used for main overlay titles
 	OverlayTitleStyle = lipgloss.NewStyle().

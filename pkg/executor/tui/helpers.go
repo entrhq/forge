@@ -218,7 +218,7 @@ func (m *model) updateTextAreaHeight() {
 		width = 80 // default width
 	}
 
-	// Account for prompt width ("> " = 2 chars)
+	// Account for prompt glyph width ("❯ " = 2 chars, rendered externally in buildInputBox)
 	effectiveWidth := width - 2
 	if effectiveWidth <= 0 {
 		effectiveWidth = 78

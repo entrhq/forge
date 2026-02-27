@@ -284,9 +284,9 @@ func (s *ToolResultSummarizer) parseListResults(result string) (fileCount, dirCo
 
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "📁") {
+		if strings.HasPrefix(line, "▸") && strings.HasSuffix(line, "/") {
 			dirCount++
-		} else if strings.HasPrefix(line, "📄") {
+		} else if strings.HasPrefix(line, "·") {
 			fileCount++
 		}
 	}
