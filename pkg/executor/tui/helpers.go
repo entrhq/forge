@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"math/rand"
+	"regexp"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -185,6 +186,18 @@ func wordWrap(text string, width int) string {
 	}
 
 	return result.String()
+}
+
+// ansiEscape matches common ANSI terminal escape sequences (color codes, cursor
+// movement commands, etc.). Used by stripANSI to clean up content before it is
+// written to the OS clipboard.
+var ansiEscape = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
+
+// stripANSI removes ANSI escape sequences from s and returns plain text.
+// The conversation buffer is rendered with lipgloss color codes, so we must
+// strip them before writing to the clipboard to avoid garbled pastes.
+func stripANSI(s string) string {
+	return ansiEscape.ReplaceAllString(s, "")
 }
 
 // updateTextAreaHeight dynamically adjusts the textarea height based on content

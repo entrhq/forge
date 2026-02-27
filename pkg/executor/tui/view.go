@@ -51,7 +51,7 @@ func (m *model) buildTips() string {
 	if m.bashMode {
 		return tipsStyle.Render(`  Bash Mode: Commands execute directly • Type 'exit' or Ctrl+C to return • Enter to run`)
 	}
-	return tipsStyle.Render(`  Tips: Ask questions • Alt+Enter for new line • Enter to send • !cmd for bash • /bash for mode • Ctrl+V to view last tool result • Ctrl+L for result history • Ctrl+C to exit`)
+	return tipsStyle.Render(`  Tips: Ask questions • Alt+Enter for new line • Enter to send • !cmd for bash • /bash for mode • Ctrl+V to view last tool result • Ctrl+L for result history • Ctrl+Y to copy • Ctrl+C to exit`)
 }
 
 // buildTopStatus renders the working directory status bar
