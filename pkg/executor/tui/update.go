@@ -339,18 +339,7 @@ func (m *model) calculateViewportHeight() int {
 	const headerHeight = 4
 
 	// ADR-0051: Option B input zone is dynamic: rule (1) + live textarea lines
-	liveLines := strings.Count(m.textarea.Value(), "\n") + 1
-	if liveLines < 1 {
-		liveLines = 1
-	}
-	maxInputLines := m.height / 3
-	if maxInputLines < 1 {
-		maxInputLines = 1
-	}
-	if liveLines > maxInputLines {
-		liveLines = maxInputLines
-	}
-	inputZoneHeight := 1 + liveLines // rule + textarea lines
+	inputZoneHeight := 1 + m.textarea.Height() // rule + textarea lines
 
 	statusBarHeight := 1
 	loadingHeight := 0
@@ -385,6 +374,14 @@ func (m *model) handleWindowResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 
 	m.width = msg.Width
 	m.height = msg.Height
+
+	// Dynamically adjust textarea max height based on terminal size (max 1/3 of screen)
+	maxInputLines := m.height / 3
+	if maxInputLines < 1 {
+		maxInputLines = 1
+	}
+	m.textarea.MaxHeight = maxInputLines
+	m.updateTextAreaHeight() // Ensure current height complies with new constraints
 
 	// Calculate and set viewport dimensions
 	m.viewport.Width = m.width - 4
