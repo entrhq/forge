@@ -741,11 +741,9 @@ func (m *model) recalculateLayout() {
 func (m *model) handleCopyToClipboard() (tea.Model, tea.Cmd) {
 	content := stripANSI(m.content.String())
 	if err := clipboard.WriteAll(content); err != nil {
-		m.showToast("Clipboard unavailable", "Use Ctrl+T to select text instead", "⚠", true)
+		m.showToast("Clipboard unavailable", "No clipboard manager detected", "⚠", true)
 		return m, nil
 	}
 	m.showToast("Copied to clipboard", "", "✓", false)
 	return m, nil
 }
-
-
