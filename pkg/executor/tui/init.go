@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/entrhq/forge/pkg/config"
 	"github.com/entrhq/forge/pkg/executor/tui/overlay"
 )
 
@@ -57,7 +58,7 @@ func initialModel() model {
 		toast:            &toastNotification{},
 		spinner:          s,
 		agentBusy:        false,
-		showThinking:     true,  // Show thinking blocks by default
+		showThinking:     loadShowThinkingSetting(), // Persisted in config
 		followScroll:     true,  // ADR-0048: auto-follow agent output by default
 		hasNewContent:    false, // ADR-0048: no new content initially
 		resultClassifier: NewToolResultClassifier(),
@@ -65,6 +66,16 @@ func initialModel() model {
 		resultCache:      newResultCache(20),
 		resultList:       overlay.NewResultListModel(),
 	}
+}
+
+// loadShowThinkingSetting reads the show_thinking preference from config.
+// Falls back to true (default) if config is not yet initialized.
+func loadShowThinkingSetting() bool {
+	ui := config.GetUI()
+	if ui == nil {
+		return true
+	}
+	return ui.IsShowThinking()
 }
 
 // Init is the first function that will be called by Bubble Tea.

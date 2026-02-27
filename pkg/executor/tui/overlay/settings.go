@@ -55,6 +55,9 @@ type SettingsOverlay struct {
 	// Callback for when LLM settings change
 	onLLMSettingsChange func() error
 
+	// Callback for when UI settings change (e.g. show_thinking toggled via overlay)
+	onUISettingsChange func() error
+
 	// Cursor blink state
 	cursorBlink bool
 }
@@ -158,6 +161,13 @@ func NewSettingsOverlayWithCallback(width, height int, onLLMSettingsChange func(
 
 	overlay.loadSettings()
 	return overlay
+}
+
+// SetOnUISettingsChange registers a callback invoked after UI settings are saved.
+// Use this to sync runtime state (e.g. showThinking on the TUI model) after
+// the user saves changes in the settings overlay.
+func (s *SettingsOverlay) SetOnUISettingsChange(fn func() error) {
+	s.onUISettingsChange = fn
 }
 
 // loadSettings loads settings from config into editable sections
@@ -298,6 +308,7 @@ func (s *SettingsOverlay) loadSettings() {
 				displayName string
 				itemType    itemType
 			}{
+				{"show_thinking", "Show Thinking Blocks", itemTypeToggle},
 				{"auto_close_command_overlay", "Auto-close Command Overlay", itemTypeToggle},
 				{"keep_open_on_error", "Keep Open On Error", itemTypeToggle},
 				{"auto_close_delay", "Auto-close Delay", itemTypeText},
@@ -736,6 +747,18 @@ func (s *SettingsOverlay) saveSettings() error {
 			if section.id == "llm" {
 				if err := s.onLLMSettingsChange(); err != nil {
 					return fmt.Errorf("failed to reload LLM settings: %w", err)
+				}
+				break
+			}
+		}
+	}
+
+	// If UI settings were changed and we have a callback, invoke it
+	if s.onUISettingsChange != nil {
+		for _, section := range s.sections {
+			if section.id == "ui" {
+				if err := s.onUISettingsChange(); err != nil {
+					return fmt.Errorf("failed to sync UI settings: %w", err)
 				}
 				break
 			}

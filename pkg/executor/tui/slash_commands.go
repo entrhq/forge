@@ -14,6 +14,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/entrhq/forge/pkg/agent/git"
+	"github.com/entrhq/forge/pkg/config"
 	"github.com/entrhq/forge/pkg/executor/tui/approval"
 	"github.com/entrhq/forge/pkg/executor/tui/overlay"
 	tuitypes "github.com/entrhq/forge/pkg/executor/tui/types"
@@ -559,6 +560,15 @@ func handleSettingsCommand(m *model, args []string) interface{} {
 	}
 
 	settingsOverlay := overlay.NewSettingsOverlayWithCallback(m.width, m.height, onLLMSettingsChange, m.provider)
+
+	// Sync runtime showThinking after UI settings are saved in the overlay
+	settingsOverlay.SetOnUISettingsChange(func() error {
+		if ui := config.GetUI(); ui != nil {
+			m.showThinking = ui.IsShowThinking()
+		}
+		return nil
+	})
+
 	m.overlay.activateAndClearStack(tuitypes.OverlayModeSettings, settingsOverlay)
 
 	return nil
@@ -628,6 +638,16 @@ func handleBashCommand(m *model, args []string) interface{} {
 // streaming; the full content is discarded after the thinking block ends.
 func handleThinkingCommand(m *model, args []string) interface{} {
 	m.showThinking = !m.showThinking
+
+	// Persist to config so the preference survives restarts
+	if ui := config.GetUI(); ui != nil {
+		ui.SetShowThinking(m.showThinking)
+		if err := config.Global().SaveAll(); err != nil {
+			m.showToast("Save failed", "Could not persist thinking setting: "+err.Error(), "⚠", true)
+			return nil
+		}
+	}
+
 	if m.showThinking {
 		m.showToast("Thinking visible", "Extended thinking blocks will be shown in full", "⸫", false)
 	} else {
