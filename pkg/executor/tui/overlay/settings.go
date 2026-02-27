@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -1141,6 +1142,13 @@ func (s *SettingsOverlay) handleDialogInput(msg tea.Msg) (types.Overlay, tea.Cmd
 		return s, nil
 	}
 
+	// In Bubble Tea v1, bracketed paste arrives as a KeyMsg with Paste: true
+	// and Type: KeyRunes. Handle it before the key-switch so pasted content
+	// is appended to the active field rather than discarded.
+	if keyMsg.Paste {
+		return s.handleDialogPaste(string(keyMsg.Runes))
+	}
+
 	switch keyMsg.String() {
 	case keyEsc:
 		return s.handleDialogCancel()
@@ -1273,11 +1281,62 @@ func (s *SettingsOverlay) handleDialogClear() {
 func (s *SettingsOverlay) handleDialogCharInput(keyMsg tea.KeyMsg) {
 	field := &s.activeDialog.fields[s.activeDialog.selectedField]
 	if field.fieldType == fieldTypeText || field.fieldType == fieldTypePassword {
-		if len(keyMsg.String()) == 1 && (field.maxLength == 0 || len(field.value) < field.maxLength) {
+		if isPrintableInput(keyMsg.String()) && (field.maxLength == 0 || len(field.value) < field.maxLength) {
 			field.value += keyMsg.String()
 			field.errorMsg = ""
 		}
 	}
+}
+
+// handleDialogPaste inserts pasted text into the currently focused settings field.
+// Newlines, carriage returns and tabs are stripped — all settings fields are
+// single-line values (API keys, model names, base URLs). Password managers
+// sometimes append a trailing newline or tab to copied secrets.
+func (s *SettingsOverlay) handleDialogPaste(text string) (types.Overlay, tea.Cmd) {
+	text = strings.Map(func(r rune) rune {
+		if r == '\n' || r == '\r' || r == '\t' {
+			return -1
+		}
+		return r
+	}, text)
+
+	if text == "" {
+		return s, nil
+	}
+
+	field := &s.activeDialog.fields[s.activeDialog.selectedField]
+	if field.fieldType == fieldTypeText || field.fieldType == fieldTypePassword {
+		if field.maxLength == 0 {
+			field.value += text
+		} else {
+			remaining := field.maxLength - len(field.value)
+			if remaining > 0 {
+				runes := []rune(text)
+				if len(runes) > remaining {
+					runes = runes[:remaining]
+				}
+				field.value += string(runes)
+			}
+		}
+		field.errorMsg = ""
+	}
+
+	return s, nil
+}
+
+// isPrintableInput returns true if s is non-empty and contains only printable
+// runes. This guards handleDialogCharInput against control sequences (e.g.
+// ctrl+c, alt+x) that Bubble Tea may surface as multi-character key strings.
+func isPrintableInput(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		if !unicode.IsPrint(r) {
+			return false
+		}
+	}
+	return true
 }
 
 // handleConfirmInput handles keyboard input for confirmation dialogs
