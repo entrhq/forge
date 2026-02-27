@@ -127,25 +127,21 @@ func (cp *CommandPalette) Render(width int) string {
 		return ""
 	}
 
-	var sb strings.Builder
-
-	// Calculate palette width (80% of screen or max 80 chars)
-	paletteWidth := width * 80 / 100
-	if paletteWidth > 80 {
-		paletteWidth = 80
-	}
-	if paletteWidth < 40 {
-		paletteWidth = 40
+	// Calculate palette width (70% standard)
+	paletteWidth := types.ComputeOverlayWidth(width, 0.70, 40, 90)
+	
+	// innerWidth accounts for border (2) and padding (2)
+	innerWidth := paletteWidth - 4
+	if innerWidth < 0 {
+		innerWidth = 0
 	}
 
-	// Header
-	headerStyle := lipgloss.NewStyle().
-		Foreground(types.SalmonPink).
-		Bold(true).
-		PaddingLeft(1)
+	var lines []string
 
-	sb.WriteString(headerStyle.Render("Available Commands:"))
-	sb.WriteString("\n")
+	// Header: Title + Divider
+	title := types.OverlayTitleStyle.Render("Slash Commands")
+	lines = append(lines, lipgloss.PlaceHorizontal(innerWidth, lipgloss.Center, title))
+	lines = append(lines, lipgloss.NewStyle().Foreground(types.MutedGray).Render(strings.Repeat("─", innerWidth)))
 
 	// Show up to 5 commands
 	maxVisible := 5
@@ -155,53 +151,51 @@ func (cp *CommandPalette) Render(width int) string {
 
 	for i := 0; i < maxVisible; i++ {
 		cmd := cp.filteredCommands[i]
-		prefix := "  "
-		if i == cp.selectedIndex {
-			prefix = "> "
+		isSelected := i == cp.selectedIndex
+
+		prefixStr := "  "
+		if isSelected {
+			prefixStr = "❯ "
 		}
 
-		// Command name in salmon pink, description in soft gray
+		// Style the prefix chevron in salmon pink when selected
+		prefixStyle := lipgloss.NewStyle().Foreground(types.MutedGray)
+		if isSelected {
+			prefixStyle = lipgloss.NewStyle().Foreground(types.SalmonPink).Bold(true)
+		}
+
 		cmdNameStyle := lipgloss.NewStyle().
 			Foreground(types.SalmonPink).
-			Bold(i == cp.selectedIndex)
+			Bold(isSelected)
 
+		// Make description bold when selected instead of using a background highlight
 		descStyle := lipgloss.NewStyle().
-			Foreground(types.MutedGray)
-
-		if i == cp.selectedIndex {
-			// Highlighted background for selected item
-			lineStyle := lipgloss.NewStyle().
-				Background(types.PaletteBg).
-				Width(paletteWidth - 2).
-				PaddingLeft(1)
-
-			line := prefix + cmdNameStyle.Render("/"+cmd.Name) + "  " + descStyle.Render(cmd.Description)
-			sb.WriteString(lineStyle.Render(line))
-		} else {
-			line := prefix + cmdNameStyle.Render("/"+cmd.Name) + "  " + descStyle.Render(cmd.Description)
-			sb.WriteString(line)
-		}
-		sb.WriteString("\n")
-	}
-
-	// Footer hint
-	if len(cp.filteredCommands) > maxVisible {
-		footerStyle := lipgloss.NewStyle().
 			Foreground(types.MutedGray).
-			Italic(true).
-			PaddingLeft(1)
-		sb.WriteString(footerStyle.Render("... and more. Keep typing to filter."))
-		sb.WriteString("\n")
+			Bold(isSelected)
+
+		renderedPrefix := prefixStyle.Render(prefixStr)
+		renderedName := cmdNameStyle.Render("/" + cmd.Name)
+		renderedDesc := descStyle.Render(cmd.Description)
+
+		line := renderedPrefix + renderedName + "  " + renderedDesc
+		lines = append(lines, line)
 	}
 
-	// Wrap in border
-	paletteStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(types.SalmonPink).
-		Width(paletteWidth).
-		Padding(0, 1)
+	// Footer hint + Divider
+	if len(cp.filteredCommands) > maxVisible {
+		lines = append(lines, lipgloss.NewStyle().Foreground(types.MutedGray).Render(strings.Repeat("─", innerWidth)))
+		
+		footerHint := "... and more. Keep typing to filter."
+		lines = append(lines, lipgloss.PlaceHorizontal(innerWidth, lipgloss.Center, types.OverlayHelpStyle.Render(footerHint)))
+	}
 
-	return paletteStyle.Render(sb.String())
+	// Wrap in container style
+	containerStyle := types.CreateOverlayContainerStyle(paletteWidth)
+	
+	// Join lines to explicitly control newlines and prevent lipgloss padded blank lines
+	content := strings.Join(lines, "\n")
+	
+	return containerStyle.Render(content)
 }
 
 // IsActive returns whether the palette is active
