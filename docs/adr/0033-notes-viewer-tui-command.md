@@ -1,6 +1,6 @@
 # 0033. Notes Viewer TUI Command
 
-**Status:** Proposed
+**Status:** Implemented
 **Date:** 2024-12-19
 **Deciders:** Engineering Team
 **Technical Story:** Implementation of `/notes` slash command to view agent scratchpad notes in TUI

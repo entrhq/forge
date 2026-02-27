@@ -329,7 +329,7 @@ Tools like `ApplyDiffTool` and `WriteFileTool` implement this to show diffs/chan
 ## Related Decisions
 
 - [ADR-0010](0010-tool-approval-mechanism.md) - Tool approval flow
-- ADR-0012 (upcoming) - Enhanced TUI with diff viewer
+- [ADR-0012](0012-enhanced-tui-executor.md) - Enhanced TUI with diff viewer
 - [ADR-0009](0009-tui-executor-design.md) - TUI executor architecture
 
 ---

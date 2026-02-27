@@ -73,7 +73,7 @@ Proposed → Accepted → [Deprecated or Superseded]
 | [0009](0009-tui-executor-design.md) | TUI Executor Design | Accepted |
 | [0010](0010-tool-approval-mechanism.md) | Tool Approval Mechanism | Accepted |
 | [0011](0011-coding-tools-architecture.md) | Coding Tools Architecture | Accepted |
-| [0012](0012-enhanced-tui-executor.md) | Enhanced TUI Executor | Accepted |
+| [0012](0012-enhanced-tui-executor.md) | Enhanced TUI Executor | Implemented |
 | [0013](0013-streaming-command-execution.md) | Streaming Command Execution with Interactive Overlay | Accepted |
 | [0014](0014-composable-context-management.md) | Composable Context Management with Strategy Pattern | Proposed |
 | [0015](0015-buffered-tool-call-summarization.md) | Buffered Tool Call Summarization with Parallel Processing | Accepted |
@@ -86,7 +86,7 @@ Proposed → Accepted → [Deprecated or Superseded]
 | [0022](0022-intelligent-tool-result-display.md) | Intelligent Tool Result Display | Accepted |
 | [0023](0023-bash-mode-architecture.md) | Bash Mode Architecture | Accepted |
 | [0024](0024-xml-escaping-primary-with-cdata-fallback.md) | XML Escaping Primary with CDATA Fallback | Accepted |
-| [0025](0025-tui-package-reorganization.md) | TUI Package Reorganization | Accepted |
+| [0025](0025-tui-package-reorganization.md) | TUI Package Reorganization | Implemented |
 | [0026](0026-headless-mode-architecture.md) | Headless Mode Architecture | Accepted |
 | [0027](0027-safety-constraint-system.md) | Safety Constraint System | Accepted |
 | [0028](0028-quality-gate-architecture.md) | Quality Gate Architecture | Accepted |
@@ -94,7 +94,7 @@ Proposed → Accepted → [Deprecated or Superseded]
 | [0030](0030-automated-pr-documentation.md) | Automated PR Documentation | Accepted |
 | [0031](0031-headless-git-pr-creation.md) | Headless Git PR Creation | Accepted |
 | [0032](0032-agent-scratchpad-notes-system.md) | Agent Scratchpad Notes System | Accepted |
-| [0033](0033-notes-viewer-tui-command.md) | Notes Viewer TUI Command | Accepted |
+| [0033](0033-notes-viewer-tui-command.md) | Notes Viewer TUI Command | Implemented |
 | [0034](0034-live-reloadable-llm-settings.md) | Live-Reloadable LLM Settings | Accepted |
 | [0035](0035-auto-close-command-overlay.md) | Auto-Close Command Overlay | Accepted |
 | [0036](0036-agents-md-repository-context.md) | AGENTS.md Repository Context | Accepted |
@@ -109,10 +109,10 @@ Proposed → Accepted → [Deprecated or Superseded]
 | [0045](0045-long-term-memory-embedding-provider.md) | Long-Term Memory Embedding Provider | Accepted |
 | [0046](0046-long-term-memory-capture.md) | Long-Term Memory Capture | Accepted |
 | [0047](0047-long-term-memory-retrieval.md) | Long-Term Memory Retrieval | Accepted |
-| [0048](0048-tui-smart-scroll-lock.md) | TUI Smart Scroll-Lock | Proposed |
-| [0049](0049-tui-bracketed-paste-support.md) | TUI Bracketed Paste Support | Proposed |
-| [0050](0050-tui-clipboard-copy.md) | TUI Clipboard Copy | Proposed |
-| [0051](0051-tui-visual-redesign.md) | TUI Visual Redesign | Proposed |
+| [0048](0048-tui-smart-scroll-lock.md) | TUI Smart Scroll-Lock | Implemented |
+| [0049](0049-tui-bracketed-paste-support.md) | TUI Bracketed Paste Support | Implemented |
+| [0050](0050-tui-clipboard-copy.md) | TUI Clipboard Copy | Implemented |
+| [0051](0051-tui-visual-redesign.md) | TUI Visual Redesign | Implemented |
 
 ## Resources
 
