@@ -114,7 +114,7 @@ Option 1 does not solve the problem. Option 2 is a workaround for a problem that
 
 ### Negative
 
-- `handleDialogCharInput` guard change must be tested against all control key sequences to confirm none slip through
+- `handleDialogCharInput` guard change was validated against control key sequences via `isPrintableInput()` unit tests to confirm none slip through
 
 ### Neutral
 
@@ -151,18 +151,11 @@ if keyMsg.Paste {
 
 ```go
 // handleDialogPaste inserts pasted text into the currently focused settings field.
-// Newlines, carriage returns, and tabs are stripped — settings fields are single-line.
+// Newlines, carriage returns and tabs are stripped — all settings fields are
+// single-line values (API keys, model names, base URLs). Password managers
+// sometimes append a trailing newline or tab to copied secrets.
 func (s *SettingsOverlay) handleDialogPaste(text string) (types.Overlay, tea.Cmd) {
-    if s.activeDialog == nil {
-        return s, nil
-    }
-    field := &s.activeDialog.fields[s.activeDialog.selectedField]
-    if field.readOnly {
-        return s, nil
-    }
-
-    // Strip control characters: \n, \r, \t — all settings fields are
-    // single-line values (API keys, model names, base URLs).
+    // Strip control characters: \n, \r, \t — all settings fields are single-line.
     text = strings.Map(func(r rune) rune {
         if r == '\n' || r == '\r' || r == '\t' {
             return -1
@@ -174,13 +167,23 @@ func (s *SettingsOverlay) handleDialogPaste(text string) (types.Overlay, tea.Cmd
         return s, nil
     }
 
-    combined := field.value + text
-    runes := []rune(combined)
-    if field.maxLength > 0 && len(runes) > field.maxLength {
-        runes = runes[:field.maxLength]
+    field := &s.activeDialog.fields[s.activeDialog.selectedField]
+    if field.fieldType == fieldTypeText || field.fieldType == fieldTypePassword {
+        if field.maxLength == 0 {
+            field.value += text
+        } else {
+            remaining := field.maxLength - len(field.value)
+            if remaining > 0 {
+                runes := []rune(text)
+                if len(runes) > remaining {
+                    runes = runes[:remaining]
+                }
+                field.value += string(runes)
+            }
+        }
+        field.errorMsg = ""
     }
-    field.value = string(runes)
-    field.errorMsg = ""
+
     return s, nil
 }
 ```
