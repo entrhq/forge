@@ -111,9 +111,22 @@ func (m *model) handleAgentEvent(event *pkgtypes.AgentEvent) {
 func (m *model) scrollToBottomOrMark() {
 	if m.followScroll {
 		m.viewport.GotoBottom()
-	} else {
+	} else if !m.hasNewContent {
+		// First transition false→true: shrink the viewport immediately so the
+		// scroll-lock indicator line is reserved before the next render.
 		m.hasNewContent = true
+		m.viewport.Height = m.calculateViewportHeight()
 	}
+}
+
+// resumeFollowScroll is the symmetric inverse of the hasNewContent true→false
+// transition inside scrollToBottomOrMark. It clears the scroll-lock state and
+// immediately expands the viewport height back by the line that was reserved
+// for the indicator, preventing a blank gap at the bottom of the view.
+func (m *model) resumeFollowScroll() {
+	m.followScroll = true
+	m.hasNewContent = false
+	m.viewport.Height = m.calculateViewportHeight()
 }
 
 // Thinking event handlers
@@ -127,20 +140,23 @@ func (m *model) handleThinkingContent(event *pkgtypes.AgentEvent) {
 	if event.Content == "" {
 		return
 	}
-	// Buffer the thinking content
 	m.thinkingBuffer.WriteString(event.Content)
-	// Stream with "Thinking" label, content follows immediately
-	header := " ⸫ "
+	// Indent the entire block (header + every wrapped line) by one space
+	header := "⸫ "
 	formatted := formatEntry("", m.thinkingBuffer.String(), thinkingStyle, m.width, false)
-	m.viewport.SetContent(m.content.String() + header + formatted)
+	block := header + formatted
+	indented := " " + strings.ReplaceAll(block, "\n", "\n ")
+	m.viewport.SetContent(m.content.String() + indented)
 	m.scrollToBottomOrMark() // ADR-0048
 }
 
 func (m *model) handleThinkingEnd() {
 	if m.thinkingBuffer.Len() > 0 {
-		header := " ⸫ "
+		header := "⸫ "
 		formatted := formatEntry("", m.thinkingBuffer.String(), thinkingStyle, m.width, false)
-		m.content.WriteString(header + formatted)
+		block := header + formatted
+		indented := " " + strings.ReplaceAll(block, "\n", "\n ")
+		m.content.WriteString(indented)
 	}
 	m.content.WriteString("\n\n")
 	m.isThinking = false
@@ -257,8 +273,7 @@ func (m *model) handleError(event *pkgtypes.AgentEvent) {
 func (m *model) handleTurnEnd() {
 	// Turn end — clear busy state and resume scroll following (ADR-0048)
 	m.agentBusy = false
-	m.followScroll = true
-	m.hasNewContent = false
+	m.resumeFollowScroll()
 	m.recalculateLayout()
 }
 
@@ -295,12 +310,10 @@ func (m *model) handleToolApprovalRequest(event *pkgtypes.AgentEvent) {
 				// Send approval response to agent
 				m.channels.Approval <- response
 
-				// Close overlay; the user interacted so resume auto-following (ADR-0048)
+				// Close overlay but preserve scroll position — user may have been reading.
 				m.overlay.deactivate()
-				m.followScroll = true
-				m.hasNewContent = false
+				m.viewport.Height = m.calculateViewportHeight()
 				m.viewport.SetContent(m.content.String())
-				m.viewport.GotoBottom()
 			}
 
 			// Create and activate diff viewer overlay

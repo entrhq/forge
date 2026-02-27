@@ -142,8 +142,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// auto-follow. This must happen before textarea.Update(msg) below, otherwise
 	// the textarea would add an unwanted 'g' character to the input field.
 	if keyMsg, ok := msg.(tea.KeyMsg); ok && !m.followScroll && keyMsg.String() == "g" {
-		m.followScroll = true
-		m.hasNewContent = false
+		m.resumeFollowScroll()
 		m.viewport.GotoBottom()
 		return m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
 	}
@@ -275,8 +274,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.viewport, vpCmd = m.viewport.Update(msg)
 			// ADR-0048: if the user scrolled down and reached the bottom, resume following
 			if msg.Button == tea.MouseButtonWheelDown && m.viewport.AtBottom() {
-				m.followScroll = true
-				m.hasNewContent = false
+				m.resumeFollowScroll()
 			}
 		}
 		return m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
@@ -553,16 +551,14 @@ func (m *model) handleScrollKey(msg tea.KeyMsg, vpCmd, tiCmd, spinnerCmd tea.Cmd
 	case tea.KeyPgDown:
 		m.viewport.HalfPageDown()
 		if m.viewport.AtBottom() {
-			m.followScroll = true
-			m.hasNewContent = false
+			m.resumeFollowScroll()
 		}
 		return true, m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
 	}
 
 	// Lowercase "g": jump to bottom and resume auto-follow (mirrors vim / less)
 	if msg.String() == "g" && !m.followScroll {
-		m.followScroll = true
-		m.hasNewContent = false
+		m.resumeFollowScroll()
 		m.viewport.GotoBottom()
 		return true, m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
 	}
@@ -722,8 +718,7 @@ func (m *model) handleAgentMessage(input string, tiCmd, vpCmd, spinnerCmd tea.Cm
 	m.textarea.Reset()
 
 	// ADR-0048: sending a message always resumes auto-follow
-	m.followScroll = true
-	m.hasNewContent = false
+	m.resumeFollowScroll()
 	m.viewport.SetContent(m.content.String())
 	m.viewport.GotoBottom()
 
@@ -744,7 +739,9 @@ func (m *model) recalculateLayout() {
 	// Update viewport height based on current state (including loading indicator)
 	m.viewport.Height = m.calculateViewportHeight()
 	m.viewport.SetContent(m.content.String())
-	m.scrollToBottomOrMark() // ADR-0048: respect scroll-lock during layout recalculation
+	// ADR-0048: scrollToBottomOrMark updates viewport.Height itself on the
+	// first false→true transition of hasNewContent, so no second call needed.
+	m.scrollToBottomOrMark()
 }
 
 // handleCopyToClipboard copies the full conversation buffer to the OS clipboard

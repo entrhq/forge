@@ -62,13 +62,13 @@ func TestScrollToBottomOrMark_WhenLocked(t *testing.T) {
 		t.Skip("viewport too small to scroll away from bottom")
 	}
 
-	offsetBefore := m.viewport.ScrollPercent()
+	yOffsetBefore := m.viewport.YOffset
 	m.scrollToBottomOrMark()
 
 	if m.viewport.AtBottom() {
 		t.Error("viewport should NOT jump to bottom when followScroll=false")
 	}
-	if m.viewport.ScrollPercent() != offsetBefore {
+	if m.viewport.YOffset != yOffsetBefore {
 		t.Error("viewport offset should be unchanged when followScroll=false")
 	}
 	if !m.hasNewContent {
