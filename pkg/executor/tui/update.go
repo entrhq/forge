@@ -125,14 +125,13 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.commandPalette.Deactivate()
 			return m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
 		case tea.KeyEnter:
-			// Autocomplete with the selected command and close the palette
+			// Execute the selected command immediately and close the palette
 			selected := m.commandPalette.GetSelected()
 			if selected != nil {
-				m.textarea.SetValue("/" + selected.Name + " ")
-				m.textarea.CursorEnd()
+				m.textarea.SetValue("/" + selected.Name)
 			}
 			m.commandPalette.Deactivate()
-			return m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
+			return m.handleEnter(tiCmd, vpCmd, spinnerCmd)
 		}
 		// For other keys, continue to textarea update below
 	}
