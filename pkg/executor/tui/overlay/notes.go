@@ -188,11 +188,7 @@ func (o *NotesOverlay) View() string {
 		titlePad += " "
 	}
 
-	sepStr := ""
-	for i := 0; i < innerWidth; i++ {
-		sepStr += "─"
-	}
-	separator := lipgloss.NewStyle().Foreground(types.MutedGray).Render(sepStr)
+	separator := lipgloss.NewStyle().Foreground(types.MutedGray).Render(strings.Repeat(sepChar, innerWidth))
 
 	content := titlePad + headerStr + "\n" + separator + "\n" + listContent
 

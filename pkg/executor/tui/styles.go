@@ -40,9 +40,6 @@ var (
 	toolResultStyle = lipgloss.NewStyle().
 			Foreground(brightWhite)
 
-	errorStyle = lipgloss.NewStyle().
-			Foreground(salmonPink)
-
 	warningStyle = lipgloss.NewStyle().
 			Foreground(mutedGray)
 

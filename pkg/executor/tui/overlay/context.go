@@ -198,7 +198,7 @@ func (c *ContextOverlay) Update(msg tea.Msg, state types.StateProvider, actions 
 		// Check if this is a close key (ESC, Ctrl+C)
 		// When BaseOverlay handles a close key, we should return nil to signal overlay close
 		if keyMsg, ok := msg.(tea.KeyMsg); ok {
-			if keyMsg.String() == "esc" || keyMsg.String() == "ctrl+c" {
+			if keyMsg.String() == keyEsc || keyMsg.String() == keyCtrlC {
 				return nil, cmd
 			}
 		}
@@ -223,10 +223,10 @@ func (c *ContextOverlay) Update(msg tea.Msg, state types.StateProvider, actions 
 
 		c.SetDimensions(newOverlayWidth, vpHeight+5)
 
-		vp := c.BaseOverlay.Viewport()
+		vp := c.Viewport()
 		vp.Width = newOverlayWidth - 4
 		vp.Height = vpHeight
-		c.BaseOverlay.SetContent(vp.View())
+		c.SetContent(vp.View())
 	}
 
 	return c, nil
@@ -245,11 +245,7 @@ func (c *ContextOverlay) renderHeader() string {
 	}
 	titleStr += types.OverlayTitleStyle.Render(c.title)
 
-	sepStr := ""
-	for i := 0; i < contentWidth; i++ {
-		sepStr += "─"
-	}
-	separator := lipgloss.NewStyle().Foreground(types.MutedGray).Render(sepStr)
+	separator := lipgloss.NewStyle().Foreground(types.MutedGray).Render(strings.Repeat(sepChar, contentWidth))
 
 	return titleStr + "\n" + separator + "\n"
 }

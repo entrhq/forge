@@ -68,7 +68,7 @@ func (o *ToolResultOverlay) Update(msg tea.Msg, state types.StateProvider, actio
 		// Check if this is a close signal (Esc key pressed)
 		// BaseOverlay.close() returns nil cmd, which signals the overlay wants to close
 		if keyMsg, ok := msg.(tea.KeyMsg); ok {
-			if keyMsg.String() == "esc" || keyMsg.String() == "ctrl+c" {
+			if keyMsg.String() == keyEsc || keyMsg.String() == keyCtrlC {
 				// Return nil to signal close - caller will handle ClearOverlay()
 				return nil, cmd
 			}

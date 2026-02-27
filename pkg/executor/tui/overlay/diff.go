@@ -148,11 +148,7 @@ func (d *DiffViewer) renderFooter() string {
 
 	var footer strings.Builder
 
-	sepStr := ""
-	for i := 0; i < contentWidth; i++ {
-		sepStr += "─"
-	}
-	separator := lipgloss.NewStyle().Foreground(types.MutedGray).Render(sepStr)
+	separator := lipgloss.NewStyle().Foreground(types.MutedGray).Render(strings.Repeat(sepChar, contentWidth))
 
 	// In the flat design, viewport is inline.
 	footer.WriteString(d.Viewport().View())

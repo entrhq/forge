@@ -129,6 +129,63 @@ func (cp *CommandPalette) GetSelected() *CommandItem {
 }
 
 // Render renders the command palette
+// clampScrollOffset adjusts scrollOffset so the selected item stays in view.
+func (cp *CommandPalette) clampScrollOffset(maxVisible int) {
+	if len(cp.filteredCommands) > 0 {
+		if cp.selectedIndex < cp.scrollOffset {
+			cp.scrollOffset = cp.selectedIndex
+		} else if cp.selectedIndex >= cp.scrollOffset+maxVisible {
+			cp.scrollOffset = cp.selectedIndex - maxVisible + 1
+		}
+	}
+	if cp.scrollOffset > len(cp.filteredCommands)-maxVisible {
+		cp.scrollOffset = len(cp.filteredCommands) - maxVisible
+	}
+	if cp.scrollOffset < 0 {
+		cp.scrollOffset = 0
+	}
+}
+
+// renderCommandItems builds the list of rendered command row strings.
+func (cp *CommandPalette) renderCommandItems(maxVisible int) []string {
+	itemsToDraw := maxVisible
+	if len(cp.filteredCommands) < itemsToDraw {
+		itemsToDraw = len(cp.filteredCommands)
+	}
+
+	var lines []string
+	for i := 0; i < itemsToDraw; i++ {
+		cmdIndex := cp.scrollOffset + i
+		if cmdIndex >= len(cp.filteredCommands) {
+			break
+		}
+
+		cmd := cp.filteredCommands[cmdIndex]
+		isSelected := cmdIndex == cp.selectedIndex
+
+		prefixStr := "  "
+		if isSelected {
+			prefixStr = "❯ "
+		}
+
+		// Style the prefix chevron in salmon pink when selected
+		prefixStyle := lipgloss.NewStyle().Foreground(types.MutedGray)
+		if isSelected {
+			prefixStyle = lipgloss.NewStyle().Foreground(types.SalmonPink).Bold(true)
+		}
+
+		cmdNameStyle := lipgloss.NewStyle().Foreground(types.SalmonPink).Bold(isSelected)
+		descStyle := lipgloss.NewStyle().Foreground(types.MutedGray).Bold(isSelected)
+
+		rawLine := prefixStyle.Render(prefixStr) +
+			cmdNameStyle.Render("/"+cmd.Name) +
+			"  " +
+			descStyle.Render(cmd.Description)
+		lines = append(lines, rawLine)
+	}
+	return lines
+}
+
 func (cp *CommandPalette) Render(width, height int) string {
 	if !cp.active || len(cp.filteredCommands) == 0 {
 		return ""
@@ -152,89 +209,24 @@ func (cp *CommandPalette) Render(width, height int) string {
 		maxVisible = 12
 	}
 
-	// Ensure selectedIndex is within viewable window by adjusting scrollOffset
-	if len(cp.filteredCommands) > 0 {
-		if cp.selectedIndex < cp.scrollOffset {
-			cp.scrollOffset = cp.selectedIndex
-		} else if cp.selectedIndex >= cp.scrollOffset+maxVisible {
-			cp.scrollOffset = cp.selectedIndex - maxVisible + 1
-		}
-	}
+	cp.clampScrollOffset(maxVisible)
 
-	// Catch-all to keep scrollOffset strictly within bounds
-	if cp.scrollOffset > len(cp.filteredCommands)-maxVisible {
-		cp.scrollOffset = len(cp.filteredCommands) - maxVisible
-	}
-	if cp.scrollOffset < 0 {
-		cp.scrollOffset = 0
-	}
+	sep := lipgloss.NewStyle().Foreground(types.MutedGray).Render(strings.Repeat(sepChar, innerWidth))
 
-	var lines []string
-
-	// Header: Title + Divider
 	title := types.OverlayTitleStyle.Render("Slash Commands")
-	lines = append(lines, lipgloss.PlaceHorizontal(innerWidth, lipgloss.Center, title))
-	lines = append(lines, lipgloss.NewStyle().Foreground(types.MutedGray).Render(strings.Repeat("─", innerWidth)))
-
-	// Figure out how many items to legally draw (it might be fewer than maxVisible)
-	itemsToDraw := maxVisible
-	if len(cp.filteredCommands) < itemsToDraw {
-		itemsToDraw = len(cp.filteredCommands)
+	lines := []string{
+		lipgloss.PlaceHorizontal(innerWidth, lipgloss.Center, title),
+		sep,
 	}
-
-	for i := 0; i < itemsToDraw; i++ {
-		cmdIndex := cp.scrollOffset + i
-		if cmdIndex >= len(cp.filteredCommands) {
-			break
-		}
-
-		cmd := cp.filteredCommands[cmdIndex]
-		isSelected := cmdIndex == cp.selectedIndex
-
-		prefixStr := "  "
-		if isSelected {
-			prefixStr = "❯ "
-		}
-
-		// Style the prefix chevron in salmon pink when selected
-		prefixStyle := lipgloss.NewStyle().Foreground(types.MutedGray)
-		if isSelected {
-			prefixStyle = lipgloss.NewStyle().Foreground(types.SalmonPink).Bold(true)
-		}
-
-		cmdNameStyle := lipgloss.NewStyle().
-			Foreground(types.SalmonPink).
-			Bold(isSelected)
-
-		// Make description bold when selected instead of using a background highlight
-		descStyle := lipgloss.NewStyle().
-			Foreground(types.MutedGray).
-			Bold(isSelected)
-
-		renderedPrefix := prefixStyle.Render(prefixStr)
-		renderedName := cmdNameStyle.Render("/" + cmd.Name)
-		renderedDesc := descStyle.Render(cmd.Description)
-
-		// Construct the line
-		rawLine := renderedPrefix + renderedName + "  " + renderedDesc
-
-		// Append the simple format
-		lines = append(lines, rawLine)
-	}
-
-	// Always show footer divider and hint for better context!
-	lines = append(lines, lipgloss.NewStyle().Foreground(types.MutedGray).Render(strings.Repeat("─", innerWidth)))
+	lines = append(lines, cp.renderCommandItems(maxVisible)...)
 
 	footerHint := fmt.Sprintf("↑/↓ Nav • ↵ Select • %d of %d", cp.selectedIndex+1, len(cp.filteredCommands))
-	lines = append(lines, lipgloss.PlaceHorizontal(innerWidth, lipgloss.Center, types.OverlayHelpStyle.Render(footerHint)))
+	lines = append(lines,
+		sep,
+		lipgloss.PlaceHorizontal(innerWidth, lipgloss.Center, types.OverlayHelpStyle.Render(footerHint)),
+	)
 
-	// Wrap in container style
-	containerStyle := types.CreateOverlayContainerStyle(paletteWidth)
-
-	// Join lines to explicitly control newlines and prevent lipgloss padded blank lines
-	content := strings.Join(lines, "\n")
-
-	return containerStyle.Render(content)
+	return types.CreateOverlayContainerStyle(paletteWidth).Render(strings.Join(lines, "\n"))
 }
 
 // IsActive returns whether the palette is active

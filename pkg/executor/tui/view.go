@@ -144,7 +144,7 @@ func (m *model) buildBottomBar() string {
 	if m.showThinking {
 		thinkingIndicator = lipgloss.NewStyle().Foreground(mintGreen).Render("⸫ Thinking On")
 	} else {
-		thinkingIndicator = lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("⸫ Thinking Off")
+		thinkingIndicator = lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("⸫ Thinking Hidden")
 	}
 
 	tokenDisplay := m.buildTokenDisplay()

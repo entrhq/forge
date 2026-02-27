@@ -59,8 +59,8 @@ func initialModel() model {
 		spinner:          s,
 		agentBusy:        false,
 		showThinking:     loadShowThinkingSetting(), // Persisted in config
-		followScroll:     true,  // ADR-0048: auto-follow agent output by default
-		hasNewContent:    false, // ADR-0048: no new content initially
+		followScroll:     true,                      // ADR-0048: auto-follow agent output by default
+		hasNewContent:    false,                     // ADR-0048: no new content initially
 		resultClassifier: NewToolResultClassifier(),
 		resultSummarizer: NewToolResultSummarizer(),
 		resultCache:      newResultCache(20),

@@ -1,6 +1,8 @@
 package overlay
 
 import (
+	"strings"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/entrhq/forge/pkg/executor/tui/types"
@@ -83,12 +85,12 @@ func (h *HelpOverlay) Update(msg tea.Msg, state types.StateProvider, actions typ
 
 		h.SetDimensions(newOverlayWidth, vpHeight+5)
 
-		vp := h.BaseOverlay.Viewport()
+		vp := h.Viewport()
 		vp.Width = newOverlayWidth - 4
 		vp.Height = vpHeight
 
 		// Re-initialize content when viewport resizes so it wraps correctly over new width
-		h.BaseOverlay.SetContent(h.BaseOverlay.Viewport().View())
+		h.SetContent(h.Viewport().View())
 	}
 
 	return h, nil
@@ -108,11 +110,7 @@ func (h *HelpOverlay) renderHeader() string {
 	titleStr += types.OverlayTitleStyle.Render(h.title)
 
 	// Separator
-	sepStr := ""
-	for i := 0; i < contentWidth; i++ {
-		sepStr += "─"
-	}
-	separator := lipgloss.NewStyle().Foreground(types.MutedGray).Render(sepStr)
+	separator := lipgloss.NewStyle().Foreground(types.MutedGray).Render(strings.Repeat(sepChar, contentWidth))
 
 	return titleStr + "\n" + separator + "\n"
 }
@@ -134,5 +132,5 @@ func (h *HelpOverlay) renderFooter() string {
 
 // View renders the help overlay
 func (h *HelpOverlay) View() string {
-	return h.BaseOverlay.View(h.BaseOverlay.Width())
+	return h.BaseOverlay.View(h.Width())
 }

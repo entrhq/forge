@@ -210,7 +210,7 @@ func stripANSI(s string) string {
 	return ansiEscape.ReplaceAllString(s, "")
 }
 
-// sanitizeOutput strips ANSI codes and non-printable control characters 
+// sanitizeOutput strips ANSI codes and non-printable control characters
 // to prevent lipgloss text measurement and line wrapping from breaking.
 func sanitizeOutput(s string) string {
 	s = stripANSI(s)

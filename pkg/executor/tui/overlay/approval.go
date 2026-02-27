@@ -19,6 +19,8 @@ const (
 	keyLeft  = "left"
 	keyRight = "right"
 	keyEsc   = "esc"
+	// sepChar is the Unicode box-drawing horizontal line used for separators
+	sepChar = "─"
 )
 
 // GenericApprovalOverlay displays an approval request for any command.
@@ -69,10 +71,10 @@ func (a *GenericApprovalOverlay) Update(msg tea.Msg, state types.StateProvider, 
 
 		a.SetDimensions(newOverlayWidth, vpHeight+8)
 
-		vp := a.BaseOverlay.Viewport()
+		vp := a.Viewport()
 		vp.Width = newOverlayWidth - 4
 		vp.Height = vpHeight
-		a.BaseOverlay.SetContent(vp.View())
+		a.SetContent(vp.View())
 	}
 
 	// Check if this is an approval/rejection key before delegating to base
@@ -123,11 +125,7 @@ func (a *GenericApprovalOverlay) renderFooter() string {
 
 	var footer strings.Builder
 
-	sepStr := ""
-	for i := 0; i < contentWidth; i++ {
-		sepStr += "─"
-	}
-	separator := lipgloss.NewStyle().Foreground(types.MutedGray).Render(sepStr)
+	separator := lipgloss.NewStyle().Foreground(types.MutedGray).Render(strings.Repeat(sepChar, contentWidth))
 
 	// Since we are nested inside the footer call, we prepend our own rendered diff
 	footer.WriteString(a.Viewport().View())
