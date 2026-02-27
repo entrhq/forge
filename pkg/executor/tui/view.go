@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	
+	"github.com/entrhq/forge/pkg/executor/tui/types"
 )
 
 // View renders the entire TUI interface.
@@ -246,31 +248,40 @@ func (m *model) renderSummarizationStatus() string {
 		return ""
 	}
 
-	// Create box with border
-	boxWidth := m.width - 4
-	if boxWidth < 40 {
-		boxWidth = 40
-	}
+	// Calculate width matching redesign
+	boxWidth := types.ComputeOverlayWidth(m.width, 0.70, 40, 90)
 
 	var content strings.Builder
 
-	// Header line with brain icon and message
-	header := fmt.Sprintf("◆ Optimizing context... [%s]", m.summarization.strategy)
-	content.WriteString(header)
+	// Header - Redesign to match mockups: salmon title + muted gray separator line
+	headerStyle := lipgloss.NewStyle().Foreground(salmonPink).Bold(true)
+	title := fmt.Sprintf("Optimizing context... [%s]", m.summarization.strategy)
+	content.WriteString(headerStyle.Render(title))
 	content.WriteString("\n")
+	
+	sepStr := ""
+	for i := 0; i < boxWidth; i++ { sepStr += "─" }
+	content.WriteString(lipgloss.NewStyle().Foreground(mutedGray).Render(sepStr))
+	content.WriteString("\n\n")
 
 	// Progress bar
-	barWidth := boxWidth - 10 // Leave room for percentage
-	if barWidth < 20 {
-		barWidth = 20
-	}
-
+	barWidth := boxWidth - 10
+	if barWidth < 20 { barWidth = 20 }
+	
 	filledWidth := int(float64(barWidth) * m.summarization.progressPercent / 100.0)
-	if filledWidth > barWidth {
-		filledWidth = barWidth
-	}
+	if filledWidth > barWidth { filledWidth = barWidth }
+	emptyWidth := barWidth - filledWidth
 
-	bar := strings.Repeat("━", filledWidth) + strings.Repeat("━", barWidth-filledWidth)
+	// Use solid block for filled, sparse block for empty
+	progressStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#A8E6CF")) // Mint green
+	emptyStyle := lipgloss.NewStyle().Foreground(mutedGray)
+	
+	barFilled := ""
+	for i := 0; i < filledWidth; i++ { barFilled += "█" }
+	for i := 0; i < emptyWidth; i++ { barFilled += "░" }
+	
+	bar := progressStyle.Render(barFilled[:filledWidth*3]) + emptyStyle.Render(barFilled[filledWidth*3:])
+
 	// Show both item count and percentage
 	if m.summarization.totalItems > 0 {
 		progressLine := fmt.Sprintf("%s %d/%d items (%.0f%%)",
@@ -284,16 +295,16 @@ func (m *model) renderSummarizationStatus() string {
 
 	// Current item description
 	if m.summarization.currentItem != "" {
-		content.WriteString(m.summarization.currentItem)
+		content.WriteString(lipgloss.NewStyle().Foreground(mutedGray).Render(m.summarization.currentItem))
 	} else if m.summarization.totalItems > 0 {
-		content.WriteString(fmt.Sprintf("Processing item %d of %d...",
-			m.summarization.itemsProcessed, m.summarization.totalItems))
+		content.WriteString(lipgloss.NewStyle().Foreground(mutedGray).Render(fmt.Sprintf("Processing item %d of %d...",
+			m.summarization.itemsProcessed, m.summarization.totalItems)))
 	}
 
 	// Create styled box
 	boxStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(salmonPink).
+		Border(lipgloss.NormalBorder()).
+		BorderForeground(mutedGray).
 		Padding(0, 1).
 		Width(boxWidth)
 
@@ -306,33 +317,40 @@ func (m *model) renderToast() string {
 		return ""
 	}
 
-	// Create box with border
-	boxWidth := m.width - 4
-	if boxWidth < 40 {
-		boxWidth = 40
-	}
+	// Calculate width matching redesign
+	boxWidth := types.ComputeOverlayWidth(m.width, 0.70, 40, 90)
 
 	var content strings.Builder
 
+	// Determine base style per type
+	baseColor := mutedGray
+	if m.toast.isError {
+		baseColor = lipgloss.Color("203") // Red color for errors
+	}
+
 	// Icon and message
 	header := fmt.Sprintf("%s %s", m.toast.icon, m.toast.message)
+	
+	// If no details, render as flat boxless string (Option B)
+	if m.toast.details == "" {
+		flatStyle := lipgloss.NewStyle().
+			Foreground(baseColor).
+			Padding(0, 1).
+			Width(boxWidth)
+		return "\n" + flatStyle.Render(header) + "\n"
+	}
+
 	content.WriteString(header)
 	content.WriteString("\n")
-
-	// Details
-	if m.toast.details != "" {
-		content.WriteString(m.toast.details)
-	}
+	
+	// Details (Option C: Normal border)
+	detailStyle := lipgloss.NewStyle().Foreground(mutedGray)
+	content.WriteString(detailStyle.Render(m.toast.details))
 
 	// Create styled box
-	borderColor := salmonPink
-	if m.toast.isError {
-		borderColor = lipgloss.Color("203") // Red color for errors
-	}
-
 	boxStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(borderColor).
+		Border(lipgloss.NormalBorder()).
+		BorderForeground(baseColor).
 		Padding(0, 1).
 		Width(boxWidth)
 

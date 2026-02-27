@@ -56,25 +56,24 @@ type ContextInfo struct {
 
 // NewContextOverlay creates a new context information overlay
 func NewContextOverlay(info *ContextInfo, width, height int) *ContextOverlay {
+	overlayWidth := types.ComputeOverlayWidth(width, 0.80, 56, 100)
+	viewportHeight := types.ComputeViewportHeight(height, 5)
+	overlayHeight := viewportHeight + 5
+
 	content := buildContextContent(info)
 
 	overlay := &ContextOverlay{
 		title: "Context Information",
 	}
 
-	// Use fixed width like help overlay for consistent centered appearance
-	overlayWidth := 80
-	overlayHeight := 32
-
 	// Configure base overlay
 	baseConfig := BaseOverlayConfig{
 		Width:          overlayWidth,
 		Height:         overlayHeight,
-		ViewportWidth:  76,
-		ViewportHeight: 28,
+		ViewportWidth:  overlayWidth - 4,
+		ViewportHeight: viewportHeight,
 		Content:        content,
 		OnClose: func(actions types.ActionHandler) tea.Cmd {
-			// Return nil to signal close - caller will handle ClearOverlay()
 			return nil
 		},
 		RenderHeader: overlay.renderHeader,
@@ -213,17 +212,55 @@ func (c *ContextOverlay) Update(msg tea.Msg, state types.StateProvider, actions 
 		}
 	}
 
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		if msg.String() == "esc" || msg.String() == "ctrl+c" {
+			return nil, nil // signal close
+		}
+	case tea.WindowSizeMsg:
+		newOverlayWidth := types.ComputeOverlayWidth(msg.Width, 0.80, 56, 100)
+		vpHeight := types.ComputeViewportHeight(msg.Height, 5)
+		
+		c.SetDimensions(newOverlayWidth, vpHeight+5)
+		
+		vp := c.BaseOverlay.Viewport()
+		vp.Width = newOverlayWidth - 4
+		vp.Height = vpHeight
+		c.BaseOverlay.SetContent(vp.View())
+	}
+
 	return c, nil
 }
 
 // renderHeader renders the context overlay header
 func (c *ContextOverlay) renderHeader() string {
-	return types.OverlayTitleStyle.Render(c.title)
+	contentWidth := c.BaseOverlay.Viewport().Width
+
+	titleLen := len(c.title)
+	titlePadding := max(0, (contentWidth-titleLen)/2)
+
+	titleStr := ""
+	for i:=0; i<titlePadding; i++ { titleStr+=" " }
+	titleStr += types.OverlayTitleStyle.Render(c.title)
+
+	sepStr := ""
+	for i:=0; i<contentWidth; i++ { sepStr+="─" }
+	separator := lipgloss.NewStyle().Foreground(types.MutedGray).Render(sepStr)
+
+	return titleStr + "\n" + separator + "\n"
 }
 
 // renderFooter renders the context overlay footer
 func (c *ContextOverlay) renderFooter() string {
-	return types.OverlayHelpStyle.Render("Press ESC or Enter to close • ↑/↓ to scroll")
+	contentWidth := c.BaseOverlay.Viewport().Width
+
+	hint := "ESC or Enter to close • ↑/↓ to scroll"
+	hintLen := lipgloss.Width(hint)
+	hintPadding := max(0, (contentWidth-hintLen)/2)
+	padStr := ""
+	for i:=0; i<hintPadding; i++ { padStr+=" " }
+
+	return "\n" + padStr + types.OverlayHelpStyle.Render(hint)
 }
 
 // View renders the overlay

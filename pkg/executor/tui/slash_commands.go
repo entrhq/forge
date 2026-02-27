@@ -270,7 +270,7 @@ func handleHelpCommand(m *model, args []string) interface{} {
 	helpContent.WriteString("  • Press Escape to cancel command entry\n")
 
 	// Create and activate the help overlay
-	helpOverlay := overlay.NewHelpOverlay("Help", helpContent.String())
+	helpOverlay := overlay.NewHelpOverlay("Help", helpContent.String(), m.width, m.height)
 	m.overlay.activate(tuitypes.OverlayModeHelp, helpOverlay)
 
 	return nil

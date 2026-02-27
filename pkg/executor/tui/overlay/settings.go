@@ -27,9 +27,11 @@ const (
 
 // SettingsOverlay provides a full interactive settings editor
 type SettingsOverlay struct {
-	width   int
-	height  int
-	focused bool
+	termWidth  int
+	termHeight int
+	width      int
+	height     int
+	focused    bool
 
 	// Navigation state
 	selectedSection int
@@ -135,9 +137,14 @@ func NewSettingsOverlay(width, height int) *SettingsOverlay {
 // NewSettingsOverlayWithCallback creates a new settings overlay with an optional callback
 // that is invoked when LLM settings are saved.
 func NewSettingsOverlayWithCallback(width, height int, onLLMSettingsChange func() error, provider llm.Provider) *SettingsOverlay {
+	overlayWidth := types.ComputeOverlayWidth(width, 0.90, 60, 140)
+	overlayHeight := types.ComputeViewportHeight(height, 4)
+
 	overlay := &SettingsOverlay{
-		width:               width,
-		height:              height,
+		termWidth:           width,
+		termHeight:          height,
+		width:               overlayWidth,
+		height:              overlayHeight,
 		focused:             true,
 		selectedSection:     0,
 		selectedItem:        0,
@@ -362,28 +369,31 @@ func tickCursorBlink() tea.Cmd {
 
 // Update handles messages for the interactive settings overlay
 func (s *SettingsOverlay) Update(msg tea.Msg, state types.StateProvider, actions types.ActionHandler) (types.Overlay, tea.Cmd) {
-	// Handle cursor blink
-	if _, ok := msg.(cursorBlinkMsg); ok {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		s.width = types.ComputeOverlayWidth(msg.Width, 0.90, 60, 140)
+		s.height = types.ComputeViewportHeight(msg.Height, 4)
+		// Return without handling further
+		return s, nil
+
+	case cursorBlinkMsg:
 		s.cursorBlink = !s.cursorBlink
 		return s, tickCursorBlink()
-	}
 
-	// Handle active dialog input first
-	if s.activeDialog != nil {
-		return s.handleDialogInput(msg)
-	}
+	case tea.KeyMsg:
+		// Handle active dialog input first
+		if s.activeDialog != nil {
+			return s.handleDialogInput(msg)
+		}
 
-	// Handle confirmation dialog
-	if s.confirmDialog != nil {
-		return s.handleConfirmInput(msg)
-	}
+		// Handle confirmation dialog
+		if s.confirmDialog != nil {
+			return s.handleConfirmInput(msg)
+		}
 
-	keyMsg, ok := msg.(tea.KeyMsg)
-	if !ok {
-		return s, nil
+		return s.handleKeyPress(msg)
 	}
-
-	return s.handleKeyPress(keyMsg)
+	return s, nil
 }
 
 // handleKeyPress processes keyboard input for the settings overlay
@@ -401,6 +411,17 @@ func (s *SettingsOverlay) handleKeyPress(keyMsg tea.KeyMsg) (types.Overlay, tea.
 		s.navigateLeft()
 	case "right", "l":
 		s.navigateRight()
+	case "pgup":
+		maxHeight := s.getVisibleBodyHeight()
+		s.scrollOffset -= maxHeight
+		if s.scrollOffset < 0 {
+			s.scrollOffset = 0
+		}
+	case "pgdown":
+		maxHeight := s.getVisibleBodyHeight()
+		// Find max possible scroll by estimating total lines
+		// Assuming ~50 lines total for now, will clip down if too far
+		s.scrollOffset += maxHeight
 	case " ":
 		s.toggleCurrent()
 	case keyEnter:
@@ -479,6 +500,12 @@ func (s *SettingsOverlay) navigateUp() {
 			s.selectedItem = len(s.sections[s.selectedSection].items) - 1
 		}
 	}
+	
+	// Adjust scroll if necessary
+	itemLine := s.calculateItemSelectedLine()
+	if itemLine < s.scrollOffset {
+		s.scrollOffset = itemLine
+	}
 }
 
 // navigateDown moves selection down
@@ -494,6 +521,49 @@ func (s *SettingsOverlay) navigateDown() {
 		s.selectedSection++
 		s.selectedItem = 0
 	}
+	
+	// Adjust scroll if necessary
+	itemLine := s.calculateItemSelectedLine()
+	maxHeight := s.getVisibleBodyHeight()
+	if itemLine >= s.scrollOffset+maxHeight {
+		s.scrollOffset = itemLine - maxHeight + 1
+	}
+}
+
+// getVisibleBodyHeight estimates the visible body height
+func (s *SettingsOverlay) getVisibleBodyHeight() int {
+	// border space = 2
+	// header = ~3 lines (title, separator, blank space)
+	// footer = ~2 lines (separator, help) + 1 if hasChanges
+	h := s.height - 2 - 3 - 2
+	if s.hasChanges {
+		h--
+	}
+	if h < 1 {
+		return 1
+	}
+	return h
+}
+
+// calculateItemSelectedLine estimates the line number of the selected item
+func (s *SettingsOverlay) calculateItemSelectedLine() int {
+	line := 0
+	for i := 0; i < s.selectedSection; i++ {
+		line += 1 // Title
+		line += 1 // Blank line after title
+		if s.sections[i].description != "" {
+			line++
+		}
+		line += len(s.sections[i].items)
+		line++ // Blank line between sections
+	}
+	line += 1 // Title of selected section
+	line += 1 // Blank line after title
+	if s.sections[s.selectedSection].description != "" {
+		line++
+	}
+	line += s.selectedItem
+	return line
 }
 
 // navigateLeft moves to previous section
@@ -511,6 +581,7 @@ func (s *SettingsOverlay) nextSection() {
 	if s.selectedSection < len(s.sections)-1 {
 		s.selectedSection++
 		s.selectedItem = 0
+		s.scrollOffset = 0 // Reset scroll when changing section
 	}
 }
 
@@ -519,6 +590,7 @@ func (s *SettingsOverlay) prevSection() {
 	if s.selectedSection > 0 {
 		s.selectedSection--
 		s.selectedItem = 0
+		s.scrollOffset = 0 // Reset scroll when changing section
 	}
 }
 
@@ -689,54 +761,123 @@ func (s *SettingsOverlay) View() string {
 		return s.renderWithConfirmation()
 	}
 
-	var content strings.Builder
-
-	// Title
-	title := types.OverlayTitleStyle.Render("Settings")
-	content.WriteString(title)
-	content.WriteString("\n\n")
-
-	// Help text
-	helpText := s.buildHelpText()
-	content.WriteString(types.OverlaySubtitleStyle.Render(helpText))
-	content.WriteString("\n\n")
-
-	// Render sections
-	for i, section := range s.sections {
-		if i > 0 {
-			content.WriteString("\n")
-		}
-		content.WriteString(s.renderSection(section, i == s.selectedSection))
+	innerWidth := s.width - 4
+	if innerWidth < 0 {
+		innerWidth = 0
 	}
 
+	// ==================== HEADER ====================
+	var header strings.Builder
+	padLeft := (innerWidth - lipgloss.Width("Settings")) / 2
+	if (innerWidth-lipgloss.Width("Settings"))%2 != 0 {
+		padLeft++
+	}
+	title := strings.Repeat(" ", padLeft) + types.OverlayTitleStyle.Render("Settings")
+	
+	header.WriteString(title)
+	header.WriteString("\n")
+	header.WriteString(lipgloss.NewStyle().Foreground(types.MutedGray).Render(strings.Repeat("─", innerWidth)))
+	header.WriteString("\n\n")
+
+	// ==================== FOOTER ====================
+	var footer strings.Builder
+	
 	// Status bar
 	if s.hasChanges {
-		content.WriteString("\n\n")
 		saveHint := lipgloss.NewStyle().
 			Foreground(types.SalmonPink).
 			Bold(true).
 			Render("● Unsaved changes - Press Ctrl+S to save")
-		content.WriteString(saveHint)
+		footer.WriteString(saveHint)
+		footer.WriteString("\n")
+	}
+	
+	footer.WriteString(lipgloss.NewStyle().Foreground(types.MutedGray).Render(strings.Repeat("─", innerWidth)))
+	footer.WriteString("\n")
+
+	// Help text
+	helpText := s.buildHelpText()
+	padLeftHelp := (innerWidth - lipgloss.Width(helpText)) / 2
+	if (innerWidth-lipgloss.Width(helpText))%2 != 0 {
+		padLeftHelp++
+	}
+	if padLeftHelp < 0 {
+		padLeftHelp = 0
+	}
+	
+	// Force truncate help text if it overflows to prevent line wrap breaking the height calculation
+	displayHelp := helpText
+	if lipgloss.Width(displayHelp) > innerWidth && innerWidth > 0 {
+		runes := []rune(displayHelp)
+		if len(runes) > innerWidth {
+			displayHelp = string(runes[:innerWidth])
+		}
+	}
+	
+	helpStr := strings.Repeat(" ", padLeftHelp) + types.OverlaySubtitleStyle.Render(displayHelp)
+	footer.WriteString(helpStr)
+
+	// ==================== BODY ====================
+	var body strings.Builder
+	for i, section := range s.sections {
+		if i > 0 {
+			body.WriteString("\n")
+		}
+		body.WriteString(s.renderSection(section, i == s.selectedSection))
 	}
 
-	// Create bordered box
-	// CreateOverlayContainerStyle adds border (2) + padding (4) = 6 total width
-	boxStyle := types.CreateOverlayContainerStyle(s.width - 6).Height(s.height - 4)
+	// Viewport logic
+	bodyStr := strings.TrimRight(body.String(), "\n")
+	lines := strings.Split(bodyStr, "\n")
+	
+	maxHeight := s.getVisibleBodyHeight()
+	
+	startIdx := s.scrollOffset
+	if startIdx+maxHeight > len(lines) {
+		startIdx = len(lines) - maxHeight
+	}
+	if startIdx < 0 {
+		startIdx = 0
+	}
+	
+	// Ensure we preserve scroll bounds going forward
+	s.scrollOffset = startIdx
+
+	visibleLines := make([]string, 0, maxHeight)
+	for i := 0; i < maxHeight; i++ {
+		if startIdx+i < len(lines) {
+			visibleLines = append(visibleLines, lines[startIdx+i])
+		} else {
+			visibleLines = append(visibleLines, "")
+		}
+	}
+	
+	var content strings.Builder
+	content.WriteString(header.String())
+	content.WriteString(strings.Join(visibleLines, "\n"))
+	content.WriteString("\n")
+	content.WriteString(footer.String())
+
+	// Provide standard outer bounding style box for constraints
+	// Height(s.height - 2) because lipgloss Height() applies to inner content bounds
+	// and we want exact outer height = s.height
+	containerStyle := types.CreateOverlayContainerStyle(s.width).
+		Height(s.height - 2)
 
 	return lipgloss.Place(
-		s.width,
-		s.height,
+		s.termWidth,
+		s.termHeight,
 		lipgloss.Center,
 		lipgloss.Center,
-		boxStyle.Render(content.String()),
+		containerStyle.Render(content.String()),
 	)
 }
 
 // buildHelpText creates the help text based on current state
 func (s *SettingsOverlay) buildHelpText() string {
 	shortcuts := []string{
-		"↑↓/jk: Navigate",
-		"Tab/←→/hl: Switch section",
+		"↑↓:Nav",
+		"Tab:Section",
 	}
 
 	// Add context-specific shortcuts based on current item type
@@ -747,21 +888,21 @@ func (s *SettingsOverlay) buildHelpText() string {
 
 			switch item.itemType {
 			case itemTypeToggle:
-				shortcuts = append(shortcuts, "Space/Enter: Toggle")
+				shortcuts = append(shortcuts, "Space/Enter:Toggle")
 			case itemTypeText:
-				shortcuts = append(shortcuts, "Enter: Edit")
+				shortcuts = append(shortcuts, "Enter:Edit")
 			case itemTypeList:
-				shortcuts = append(shortcuts, "Enter/e: Edit")
+				shortcuts = append(shortcuts, "Enter:Edit")
 			}
 		}
 	}
 
 	// Add whitelist-specific shortcuts if in that section
 	if s.isInWhitelistSection() {
-		shortcuts = append(shortcuts, "a: Add", "d: Delete")
+		shortcuts = append(shortcuts, "a:Add", "d:Del")
 	}
 
-	shortcuts = append(shortcuts, "Ctrl+S: Save", "Esc/q: Close")
+	shortcuts = append(shortcuts, "^S:Save", "Esc:Close")
 	return strings.Join(shortcuts, " • ")
 }
 
@@ -1389,11 +1530,18 @@ func (s *SettingsOverlay) renderInputDialog() string {
 
 	var content strings.Builder
 
-	// Title
-	titleStyle := lipgloss.NewStyle().
-		Foreground(types.SalmonPink).
-		Bold(true)
-	content.WriteString(titleStyle.Render(s.activeDialog.title))
+	// Flat modal redesign: Title + separator
+	titleStyle := lipgloss.NewStyle().Foreground(types.SalmonPink).Bold(true)
+	titleText := titleStyle.Render(s.activeDialog.title)
+	
+	// Create separator (fixed width dialog = 60 inner width, minus borders = 56)
+	sepStr := ""
+	for i:=0; i<56; i++ { sepStr += "─" }
+	separator := lipgloss.NewStyle().Foreground(types.MutedGray).Render(sepStr)
+	
+	content.WriteString(titleText)
+	content.WriteString("\n")
+	content.WriteString(separator)
 	content.WriteString("\n\n")
 
 	// Fields
@@ -1413,12 +1561,12 @@ func (s *SettingsOverlay) renderInputDialog() string {
 
 			fieldStyle := lipgloss.NewStyle().
 				Foreground(types.BrightWhite).
-				Background(types.DarkBg).
 				Padding(0, 1).
 				Width(fieldWidth)
 
+			// Use flat borders for selected inputs to match design system
 			if isSelected {
-				fieldStyle = fieldStyle.Border(lipgloss.RoundedBorder()).
+				fieldStyle = fieldStyle.Border(lipgloss.NormalBorder()).
 					BorderForeground(types.SalmonPink)
 			}
 
@@ -1497,11 +1645,10 @@ func (s *SettingsOverlay) renderInputDialog() string {
 	buttonStyle := lipgloss.NewStyle().Foreground(types.MutedGray)
 	content.WriteString(buttonStyle.Render(buttonRow))
 
-	// Create dialog box with fixed width to prevent wrapping
+	// Create dialog box with flat border matching redesign
 	dialogStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(types.SalmonPink).
-		Background(types.DarkBg).
+		Border(lipgloss.NormalBorder()).
+		BorderForeground(types.MutedGray).
 		Padding(1, 2)
 
 	return dialogStyle.Render(content.String())
@@ -1515,11 +1662,18 @@ func (s *SettingsOverlay) renderConfirmDialog() string {
 
 	var content strings.Builder
 
-	// Title
-	titleStyle := lipgloss.NewStyle().
-		Foreground(types.SalmonPink).
-		Bold(true)
-	content.WriteString(titleStyle.Render(s.confirmDialog.title))
+	// Flat modal redesign: Title + separator
+	titleStyle := lipgloss.NewStyle().Foreground(types.SalmonPink).Bold(true)
+	titleText := titleStyle.Render(s.confirmDialog.title)
+	
+	// Create separator (fixed width dialog = 60 inner width, minus borders = 56)
+	sepStr := ""
+	for i:=0; i<56; i++ { sepStr += "─" }
+	separator := lipgloss.NewStyle().Foreground(types.MutedGray).Render(sepStr)
+	
+	content.WriteString(titleText)
+	content.WriteString("\n")
+	content.WriteString(separator)
 	content.WriteString("\n\n")
 
 	// Message
@@ -1541,11 +1695,10 @@ func (s *SettingsOverlay) renderConfirmDialog() string {
 	buttonStyle := lipgloss.NewStyle().Foreground(types.MutedGray)
 	content.WriteString(buttonStyle.Render(buttonRow))
 
-	// Create dialog box
+	// Create dialog box with flat border matching redesign
 	dialogStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(types.SalmonPink).
-		Background(types.DarkBg).
+		Border(lipgloss.NormalBorder()).
+		BorderForeground(types.MutedGray).
 		Padding(1, 2).
 		Width(60)
 
@@ -1572,13 +1725,8 @@ func (s *SettingsOverlay) renderError(message string) string {
 		Foreground(types.SalmonPink).
 		Bold(true)
 
-	boxStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(types.SalmonPink).
-		Background(types.DarkBg).
-		Padding(1, 2).
-		Width(s.width - 4).
-		Height(s.height - 4)
+	boxStyle := types.CreateOverlayContainerStyle(s.width).
+		Height(s.height)
 
 	content := errMsgStyle.Render("Error: ") + message
 

@@ -69,7 +69,6 @@ var (
 	// Container Styles
 	StatusBarStyle = lipgloss.NewStyle().
 			Foreground(MutedGray).
-			Background(DarkBg).
 			Padding(0, 1)
 
 	InputBoxStyle = lipgloss.NewStyle().
@@ -94,7 +93,10 @@ func GetAcceptButtonStyle(selected bool) lipgloss.Style {
 	if selected {
 		return CreateButtonStyle(Black, MintGreen)
 	}
-	return CreateButtonStyle(MutedGray, DarkBg)
+	return lipgloss.NewStyle().
+		Bold(true).
+		Padding(0, 2).
+		Foreground(MutedGray)
 }
 
 // GetRejectButtonStyle returns the style for a reject button based on selection state.
@@ -102,27 +104,53 @@ func GetRejectButtonStyle(selected bool) lipgloss.Style {
 	if selected {
 		return CreateButtonStyle(Black, SalmonPink)
 	}
-	return CreateButtonStyle(MutedGray, DarkBg)
+	return lipgloss.NewStyle().
+		Bold(true).
+		Padding(0, 2).
+		Foreground(MutedGray)
 }
 
-// CreateStyledSpacer creates a spacer with the dark background color.
-// Use this to create gaps between UI elements that match the container background.
+// CreateStyledSpacer creates a spacer.
+// Use this to create gaps between UI elements.
 func CreateStyledSpacer(width int) string {
-	spacerStyle := lipgloss.NewStyle().Background(DarkBg)
+	spacerStyle := lipgloss.NewStyle()
 	return spacerStyle.Render(lipgloss.PlaceHorizontal(width, lipgloss.Left, ""))
 }
 
 // Overlay Container Styles
 // CreateOverlayContainerStyle creates a standardized container style for all overlays.
-// This ensures consistent appearance across all overlay types (diff viewer, command execution, etc.)
+// Uses straight corners and mutedGray border to match the flat design language (ADR-0051).
 // Note: Only sets width, not height, to allow content to determine the container height naturally.
 func CreateOverlayContainerStyle(width int) lipgloss.Style {
 	return lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(SalmonPink).
-		Background(DarkBg).
-		Padding(1, 2).
+		Border(lipgloss.NormalBorder()).
+		BorderForeground(MutedGray).
+		Padding(0, 1).
 		Width(width)
+}
+
+// ComputeOverlayWidth returns a responsive overlay width clamped between minW and maxW.
+// factor is a fraction of the terminal width (e.g. 0.80 for 80%).
+func ComputeOverlayWidth(terminalWidth int, factor float64, minW, maxW int) int {
+	w := int(float64(terminalWidth) * factor)
+	if w < minW {
+		w = minW
+	}
+	if w > maxW {
+		w = maxW
+	}
+	return w
+}
+
+// ComputeViewportHeight returns the usable viewport height inside an overlay given the
+// terminal height and the number of fixed "chrome" rows the overlay needs outside the viewport
+// (title row, separator, footer rows, border rows, top/bottom margin).
+func ComputeViewportHeight(terminalHeight, chromeRows int) int {
+	h := terminalHeight - chromeRows - 4 // 2-line top margin + 2-line bottom margin
+	if h < 3 {
+		h = 3
+	}
+	return h
 }
 
 // Shared text styles for overlay content

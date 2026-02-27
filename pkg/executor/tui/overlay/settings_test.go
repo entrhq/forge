@@ -71,12 +71,21 @@ func TestNewSettingsOverlay(t *testing.T) {
 				t.Fatal("NewSettingsOverlay returned nil")
 			}
 
-			if overlay.width != tt.width {
-				t.Errorf("width = %d, want %d", overlay.width, tt.width)
+			// In redesign, settings overlay width uses ComputeOverlayWidth(width, 0.90, 60, 140)
+			// and height uses ComputeViewportHeight(height, 4)
+			expectedWidth := tt.width * 90 / 100
+			if expectedWidth < 60 { expectedWidth = 60 }
+			if expectedWidth > 140 { expectedWidth = 140 }
+			
+			expectedHeight := tt.height - 4 - 4 // terminal height - chrome - safe margin
+			if expectedHeight < 10 { expectedHeight = 10 }
+
+			if overlay.width != expectedWidth {
+				t.Errorf("width = %d, want %d", overlay.width, expectedWidth)
 			}
 
-			if overlay.height != tt.height {
-				t.Errorf("height = %d, want %d", overlay.height, tt.height)
+			if overlay.height != expectedHeight {
+				t.Errorf("height = %d, want %d", overlay.height, expectedHeight)
 			}
 
 			if !overlay.focused {
@@ -191,23 +200,29 @@ func TestSettingsOverlay_Focused(t *testing.T) {
 func TestSettingsOverlay_Dimensions(t *testing.T) {
 	overlay := NewSettingsOverlay(100, 50)
 
-	if overlay.Width() != 100 {
-		t.Errorf("Width() = %d, want 100", overlay.Width())
+	expectedWidth1 := 90 // 100 * 0.9
+	expectedHeight1 := 50 - 8
+
+	if overlay.Width() != expectedWidth1 {
+		t.Errorf("Width() = %d, want %d", overlay.Width(), expectedWidth1)
 	}
 
-	if overlay.Height() != 50 {
-		t.Errorf("Height() = %d, want 50", overlay.Height())
+	if overlay.Height() != expectedHeight1 {
+		t.Errorf("Height() = %d, want %d", overlay.Height(), expectedHeight1)
 	}
 
 	// Test with different dimensions
 	overlay2 := NewSettingsOverlay(80, 40)
 
-	if overlay2.Width() != 80 {
-		t.Errorf("Width() = %d, want 80", overlay2.Width())
+	expectedWidth2 := 72 // 80 * 0.9
+	expectedHeight2 := 40 - 8
+
+	if overlay2.Width() != expectedWidth2 {
+		t.Errorf("Width() = %d, want %d", overlay2.Width(), expectedWidth2)
 	}
 
-	if overlay2.Height() != 40 {
-		t.Errorf("Height() = %d, want 40", overlay2.Height())
+	if overlay2.Height() != expectedHeight2 {
+		t.Errorf("Height() = %d, want %d", overlay2.Height(), expectedHeight2)
 	}
 }
 
