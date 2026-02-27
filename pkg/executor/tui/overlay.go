@@ -136,8 +136,8 @@ func renderToastOverlay(baseView string, toastContent string) string {
 	toastHeight := len(toastLines)
 
 	// Position toast starting from a few lines above the bottom
-	// This puts it just above the input box
-	startLine := len(baseLines) - 5 - toastHeight
+	// This puts it directly above the input box (bottomBar + inputBox = 3 lines usually)
+	startLine := len(baseLines) - 3 - toastHeight
 	if startLine < 0 {
 		startLine = 0
 	}
@@ -147,11 +147,8 @@ func renderToastOverlay(baseView string, toastContent string) string {
 	for i, line := range baseLines {
 		toastLineIdx := i - startLine
 		if toastLineIdx >= 0 && toastLineIdx < len(toastLines) {
-			// Overlay the toast line, left-aligned with small padding
+			// Overlay the toast line, flush left
 			toastLine := toastLines[toastLineIdx]
-			padding := 2 // Left padding for spacing from edge
-			// Write toast with left padding
-			result.WriteString(strings.Repeat(" ", padding))
 			result.WriteString(toastLine)
 		} else {
 			result.WriteString(line)

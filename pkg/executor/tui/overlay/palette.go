@@ -1,6 +1,7 @@
 package overlay
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -18,6 +19,7 @@ type CommandPalette struct {
 	commands         []CommandItem
 	filteredCommands []CommandItem
 	selectedIndex    int
+	scrollOffset     int
 	filter           string
 	active           bool
 }
@@ -28,6 +30,7 @@ func NewCommandPalette(commands []CommandItem) *CommandPalette {
 		commands:         commands,
 		filteredCommands: commands,
 		selectedIndex:    0,
+		scrollOffset:     0,
 		active:           false,
 	}
 }
@@ -37,6 +40,7 @@ func (cp *CommandPalette) Activate() {
 	cp.active = true
 	cp.filter = ""
 	cp.selectedIndex = 0
+	cp.scrollOffset = 0
 	cp.updateFiltered()
 }
 
@@ -45,6 +49,7 @@ func (cp *CommandPalette) Deactivate() {
 	cp.active = false
 	cp.filter = ""
 	cp.selectedIndex = 0
+	cp.scrollOffset = 0
 }
 
 // UpdateFilter updates the filter string and refreshes filtered commands
@@ -54,6 +59,7 @@ func (cp *CommandPalette) UpdateFilter(filter string) {
 	if newFilter != cp.filter {
 		cp.filter = newFilter
 		cp.selectedIndex = 0
+		cp.scrollOffset = 0
 		cp.updateFiltered()
 	}
 }
@@ -90,6 +96,7 @@ func (cp *CommandPalette) updateFiltered() {
 	case cp.selectedIndex < 0:
 		cp.selectedIndex = 0
 	}
+	cp.scrollOffset = 0
 }
 
 // SelectNext moves selection down
@@ -122,7 +129,7 @@ func (cp *CommandPalette) GetSelected() *CommandItem {
 }
 
 // Render renders the command palette
-func (cp *CommandPalette) Render(width int) string {
+func (cp *CommandPalette) Render(width, height int) string {
 	if !cp.active || len(cp.filteredCommands) == 0 {
 		return ""
 	}
@@ -136,6 +143,32 @@ func (cp *CommandPalette) Render(width int) string {
 		innerWidth = 0
 	}
 
+	// Calculate maxVisible visually based on available height (up to approx 40% of screen)
+	maxVisible := height * 40 / 100
+	if maxVisible < 5 {
+		maxVisible = 5
+	}
+	if maxVisible > 12 {
+		maxVisible = 12
+	}
+
+	// Ensure selectedIndex is within viewable window by adjusting scrollOffset
+	if len(cp.filteredCommands) > 0 {
+		if cp.selectedIndex < cp.scrollOffset {
+			cp.scrollOffset = cp.selectedIndex
+		} else if cp.selectedIndex >= cp.scrollOffset + maxVisible {
+			cp.scrollOffset = cp.selectedIndex - maxVisible + 1
+		}
+	}
+
+	// Catch-all to keep scrollOffset strictly within bounds
+	if cp.scrollOffset > len(cp.filteredCommands)-maxVisible {
+		cp.scrollOffset = len(cp.filteredCommands) - maxVisible
+	}
+	if cp.scrollOffset < 0 {
+		cp.scrollOffset = 0
+	}
+
 	var lines []string
 
 	// Header: Title + Divider
@@ -143,15 +176,20 @@ func (cp *CommandPalette) Render(width int) string {
 	lines = append(lines, lipgloss.PlaceHorizontal(innerWidth, lipgloss.Center, title))
 	lines = append(lines, lipgloss.NewStyle().Foreground(types.MutedGray).Render(strings.Repeat("─", innerWidth)))
 
-	// Show up to 5 commands
-	maxVisible := 5
-	if len(cp.filteredCommands) < maxVisible {
-		maxVisible = len(cp.filteredCommands)
+	// Figure out how many items to legally draw (it might be fewer than maxVisible)
+	itemsToDraw := maxVisible
+	if len(cp.filteredCommands) < itemsToDraw {
+		itemsToDraw = len(cp.filteredCommands)
 	}
 
-	for i := 0; i < maxVisible; i++ {
-		cmd := cp.filteredCommands[i]
-		isSelected := i == cp.selectedIndex
+	for i := 0; i < itemsToDraw; i++ {
+		cmdIndex := cp.scrollOffset + i
+		if cmdIndex >= len(cp.filteredCommands) {
+			break
+		}
+
+		cmd := cp.filteredCommands[cmdIndex]
+		isSelected := cmdIndex == cp.selectedIndex
 
 		prefixStr := "  "
 		if isSelected {
@@ -177,17 +215,18 @@ func (cp *CommandPalette) Render(width int) string {
 		renderedName := cmdNameStyle.Render("/" + cmd.Name)
 		renderedDesc := descStyle.Render(cmd.Description)
 
-		line := renderedPrefix + renderedName + "  " + renderedDesc
-		lines = append(lines, line)
+		// Construct the line 
+		rawLine := renderedPrefix + renderedName + "  " + renderedDesc
+
+		// Append the simple format
+		lines = append(lines, rawLine)
 	}
 
-	// Footer hint + Divider
-	if len(cp.filteredCommands) > maxVisible {
-		lines = append(lines, lipgloss.NewStyle().Foreground(types.MutedGray).Render(strings.Repeat("─", innerWidth)))
-		
-		footerHint := "... and more. Keep typing to filter."
-		lines = append(lines, lipgloss.PlaceHorizontal(innerWidth, lipgloss.Center, types.OverlayHelpStyle.Render(footerHint)))
-	}
+	// Always show footer divider and hint for better context!
+	lines = append(lines, lipgloss.NewStyle().Foreground(types.MutedGray).Render(strings.Repeat("─", innerWidth)))
+	
+	footerHint := fmt.Sprintf("↑/↓ Nav • ↵ Select • %d of %d", cp.selectedIndex+1, len(cp.filteredCommands))
+	lines = append(lines, lipgloss.PlaceHorizontal(innerWidth, lipgloss.Center, types.OverlayHelpStyle.Render(footerHint)))
 
 	// Wrap in container style
 	containerStyle := types.CreateOverlayContainerStyle(paletteWidth)

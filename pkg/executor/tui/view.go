@@ -224,7 +224,7 @@ func (m *model) applyOverlays(baseView string) string {
 	}
 
 	if m.commandPalette.IsActive() {
-		paletteContent := m.commandPalette.Render(m.width)
+		paletteContent := m.commandPalette.Render(m.width, m.height)
 		baseView = renderToastOverlay(baseView, paletteContent)
 	}
 
