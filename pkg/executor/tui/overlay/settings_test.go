@@ -503,3 +503,271 @@ func TestConfirmDialog_Escape(t *testing.T) {
 		t.Error("Dialog should be closed after Escape")
 	}
 }
+
+func TestInputDialog_CharInput(t *testing.T) {
+	newOverlayWithTextField := func(maxLength int) *SettingsOverlay {
+		overlay := NewSettingsOverlay(100, 50)
+		overlay.activeDialog = &inputDialog{
+			title: "Test Dialog",
+			fields: []inputField{
+				{label: "API Key", key: "apiKey", value: "", fieldType: fieldTypeText, maxLength: maxLength},
+			},
+			selectedField: 0,
+		}
+		return overlay
+	}
+
+	t.Run("KeyRunes input is inserted into field", func(t *testing.T) {
+		overlay := newOverlayWithTextField(0)
+		result, _ := overlay.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")}, nil, nil)
+		overlay = result.(*SettingsOverlay)
+		if got := overlay.activeDialog.fields[0].value; got != "a" {
+			t.Errorf("field value = %q, want %q", got, "a")
+		}
+	})
+
+	t.Run("ctrl+c key is not inserted into field", func(t *testing.T) {
+		overlay := newOverlayWithTextField(0)
+		result, _ := overlay.Update(tea.KeyMsg{Type: tea.KeyCtrlC}, nil, nil)
+		overlay = result.(*SettingsOverlay)
+		if got := overlay.activeDialog.fields[0].value; got != "" {
+			t.Errorf("field value = %q, want empty (ctrl+c should not be typed)", got)
+		}
+	})
+
+	t.Run("ctrl+v key is not inserted as literal text", func(t *testing.T) {
+		overlay := newOverlayWithTextField(0)
+		result, _ := overlay.Update(tea.KeyMsg{Type: tea.KeyCtrlV}, nil, nil)
+		overlay = result.(*SettingsOverlay)
+		if got := overlay.activeDialog.fields[0].value; got != "" {
+			t.Errorf("field value = %q, want empty (ctrl+v should not type literal text)", got)
+		}
+	})
+
+	t.Run("maxLength is enforced using rune count not bytes", func(t *testing.T) {
+		overlay := newOverlayWithTextField(3)
+		overlay.activeDialog.fields[0].value = "ab"
+		// Multi-byte rune — should be accepted (value is 2 runes, limit is 3)
+		result, _ := overlay.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("é")}, nil, nil)
+		overlay = result.(*SettingsOverlay)
+		if got := overlay.activeDialog.fields[0].value; got != "abé" {
+			t.Errorf("field value = %q, want %q", got, "abé")
+		}
+		// Now at maxLength (3 runes) — further input should be dropped
+		result, _ = overlay.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("x")}, nil, nil)
+		overlay = result.(*SettingsOverlay)
+		if got := overlay.activeDialog.fields[0].value; got != "abé" {
+			t.Errorf("field value = %q, want %q (maxLength exceeded)", got, "abé")
+		}
+	})
+
+	t.Run("unicode rune input is inserted correctly", func(t *testing.T) {
+		overlay := newOverlayWithTextField(0)
+		result, _ := overlay.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("ñ")}, nil, nil)
+		overlay = result.(*SettingsOverlay)
+		if got := overlay.activeDialog.fields[0].value; got != "ñ" {
+			t.Errorf("field value = %q, want %q", got, "ñ")
+		}
+	})
+}
+
+func TestInputDialog_BracketedPaste(t *testing.T) {
+	newOverlayWithTextField := func(maxLength int) *SettingsOverlay {
+		overlay := NewSettingsOverlay(100, 50)
+		overlay.activeDialog = &inputDialog{
+			title: "Test Dialog",
+			fields: []inputField{
+				{label: "API Key", key: "apiKey", value: "", fieldType: fieldTypeText, maxLength: maxLength},
+			},
+			selectedField: 0,
+		}
+		return overlay
+	}
+
+	t.Run("pastes text into empty field", func(t *testing.T) {
+		overlay := newOverlayWithTextField(0)
+
+		result, _ := overlay.Update(tea.KeyMsg{
+			Type:  tea.KeyRunes,
+			Runes: []rune("sk-abc123"),
+			Paste: true,
+		}, nil, nil)
+		overlay = result.(*SettingsOverlay)
+
+		if got := overlay.activeDialog.fields[0].value; got != "sk-abc123" {
+			t.Errorf("field value = %q, want %q", got, "sk-abc123")
+		}
+	})
+
+	t.Run("appends to existing field value", func(t *testing.T) {
+		overlay := newOverlayWithTextField(0)
+		overlay.activeDialog.fields[0].value = "prefix-"
+
+		result, _ := overlay.Update(tea.KeyMsg{
+			Type:  tea.KeyRunes,
+			Runes: []rune("suffix"),
+			Paste: true,
+		}, nil, nil)
+		overlay = result.(*SettingsOverlay)
+
+		if got := overlay.activeDialog.fields[0].value; got != "prefix-suffix" {
+			t.Errorf("field value = %q, want %q", got, "prefix-suffix")
+		}
+	})
+
+	t.Run("strips newlines from pasted text", func(t *testing.T) {
+		overlay := newOverlayWithTextField(0)
+
+		result, _ := overlay.Update(tea.KeyMsg{
+			Type:  tea.KeyRunes,
+			Runes: []rune("line1\nline2\r\n"),
+			Paste: true,
+		}, nil, nil)
+		overlay = result.(*SettingsOverlay)
+
+		if got := overlay.activeDialog.fields[0].value; got != "line1line2" {
+			t.Errorf("field value = %q, want %q (newlines should be stripped)", got, "line1line2")
+		}
+	})
+
+	t.Run("strips tabs from pasted text", func(t *testing.T) {
+		overlay := newOverlayWithTextField(0)
+
+		result, _ := overlay.Update(tea.KeyMsg{
+			Type:  tea.KeyRunes,
+			Runes: []rune("col1\tcol2"),
+			Paste: true,
+		}, nil, nil)
+		overlay = result.(*SettingsOverlay)
+
+		if got := overlay.activeDialog.fields[0].value; got != "col1col2" {
+			t.Errorf("field value = %q, want %q (tabs should be stripped)", got, "col1col2")
+		}
+	})
+
+	t.Run("respects maxLength when pasting", func(t *testing.T) {
+		overlay := newOverlayWithTextField(10)
+
+		result, _ := overlay.Update(tea.KeyMsg{
+			Type:  tea.KeyRunes,
+			Runes: []rune("this-is-way-too-long"),
+			Paste: true,
+		}, nil, nil)
+		overlay = result.(*SettingsOverlay)
+
+		got := overlay.activeDialog.fields[0].value
+		if len([]rune(got)) > 10 {
+			t.Errorf("field value %q exceeds maxLength 10", got)
+		}
+		if got != "this-is-wa" {
+			t.Errorf("field value = %q, want %q", got, "this-is-wa")
+		}
+	})
+
+	t.Run("respects maxLength when field already has content", func(t *testing.T) {
+		overlay := newOverlayWithTextField(10)
+		overlay.activeDialog.fields[0].value = "12345"
+
+		result, _ := overlay.Update(tea.KeyMsg{
+			Type:  tea.KeyRunes,
+			Runes: []rune("abcdefgh"),
+			Paste: true,
+		}, nil, nil)
+		overlay = result.(*SettingsOverlay)
+
+		got := overlay.activeDialog.fields[0].value
+		if got != "12345abcde" {
+			t.Errorf("field value = %q, want %q", got, "12345abcde")
+		}
+	})
+
+	t.Run("paste only whitespace is a no-op", func(t *testing.T) {
+		overlay := newOverlayWithTextField(0)
+		overlay.activeDialog.fields[0].value = "existing"
+
+		result, _ := overlay.Update(tea.KeyMsg{
+			Type:  tea.KeyRunes,
+			Runes: []rune("\n\r\t"),
+			Paste: true,
+		}, nil, nil)
+		overlay = result.(*SettingsOverlay)
+
+		if got := overlay.activeDialog.fields[0].value; got != "existing" {
+			t.Errorf("field value = %q, want %q (whitespace-only paste should be no-op)", got, "existing")
+		}
+	})
+
+	t.Run("paste into password field works", func(t *testing.T) {
+		overlay := NewSettingsOverlay(100, 50)
+		overlay.activeDialog = &inputDialog{
+			title: "Test Dialog",
+			fields: []inputField{
+				{label: "Password", key: "pass", value: "", fieldType: fieldTypePassword},
+			},
+			selectedField: 0,
+		}
+
+		result, _ := overlay.Update(tea.KeyMsg{
+			Type:  tea.KeyRunes,
+			Runes: []rune("s3cr3t!"),
+			Paste: true,
+		}, nil, nil)
+		overlay = result.(*SettingsOverlay)
+
+		if got := overlay.activeDialog.fields[0].value; got != "s3cr3t!" {
+			t.Errorf("password field value = %q, want %q", got, "s3cr3t!")
+		}
+	})
+
+	t.Run("clears error message on successful paste", func(t *testing.T) {
+		overlay := newOverlayWithTextField(0)
+		overlay.activeDialog.fields[0].errorMsg = "previous error"
+
+		result, _ := overlay.Update(tea.KeyMsg{
+			Type:  tea.KeyRunes,
+			Runes: []rune("valid-input"),
+			Paste: true,
+		}, nil, nil)
+		overlay = result.(*SettingsOverlay)
+
+		if got := overlay.activeDialog.fields[0].errorMsg; got != "" {
+			t.Errorf("errorMsg = %q, want empty after successful paste", got)
+		}
+	})
+
+	t.Run("strips escape sequences from pasted text", func(t *testing.T) {
+		overlay := newOverlayWithTextField(0)
+
+		result, _ := overlay.Update(tea.KeyMsg{
+			Type:  tea.KeyRunes,
+			Runes: []rune("abc\x1b[31mred\x1b[0m"),
+			Paste: true,
+		}, nil, nil)
+		overlay = result.(*SettingsOverlay)
+
+		if got := overlay.activeDialog.fields[0].value; got != "abc[31mred[0m" {
+			t.Errorf("field value = %q, want %q (escape sequences should be stripped)", got, "abc[31mred[0m")
+		}
+	})
+
+	t.Run("maxLength uses rune count not byte count", func(t *testing.T) {
+		overlay := newOverlayWithTextField(5)
+		// Seed with 3 multi-byte runes (9 bytes, 3 runes)
+		overlay.activeDialog.fields[0].value = "éàü"
+
+		result, _ := overlay.Update(tea.KeyMsg{
+			Type:  tea.KeyRunes,
+			Runes: []rune("xy"),
+			Paste: true,
+		}, nil, nil)
+		overlay = result.(*SettingsOverlay)
+
+		got := overlay.activeDialog.fields[0].value
+		if len([]rune(got)) > 5 {
+			t.Errorf("field rune count %d exceeds maxLength 5", len([]rune(got)))
+		}
+		if got != "éàüxy" {
+			t.Errorf("field value = %q, want %q", got, "éàüxy")
+		}
+	})
+}
