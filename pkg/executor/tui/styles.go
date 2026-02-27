@@ -43,6 +43,9 @@ var (
 	errorStyle = lipgloss.NewStyle().
 			Foreground(salmonPink)
 
+	warningStyle = lipgloss.NewStyle().
+			Foreground(mutedGray)
+
 	bashPromptStyle = lipgloss.NewStyle().
 			Foreground(mintGreen).
 			Bold(true)

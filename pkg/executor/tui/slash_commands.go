@@ -7,10 +7,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/entrhq/forge/pkg/agent/git"
 	"github.com/entrhq/forge/pkg/executor/tui/approval"
 	"github.com/entrhq/forge/pkg/executor/tui/overlay"
@@ -248,32 +250,83 @@ func executeSlashCommand(m *model, commandName string, args []string) (*model, t
 
 // handleHelpCommand shows help information
 func handleHelpCommand(m *model, args []string) interface{} {
-	// Build help content
-	var helpContent strings.Builder
-	helpContent.WriteString("Available Commands:\n\n")
+	content := buildHelpContent()
+	helpOverlay := overlay.NewHelpOverlay("Help", content, m.width, m.height)
+	m.overlay.activate(tuitypes.OverlayModeHelp, helpOverlay)
+	return nil
+}
 
-	commands := getAllCommands()
-	for _, cmd := range commands {
-		helpContent.WriteString(fmt.Sprintf("  /%s\n", cmd.Name))
-		helpContent.WriteString(fmt.Sprintf("    %s\n\n", cmd.Description))
+// buildHelpContent constructs the styled help overlay content.
+func buildHelpContent() string {
+	var b strings.Builder
+
+	sectionStyle := lipgloss.NewStyle().Bold(true).Foreground(tuitypes.SalmonPink)
+	cmdStyle := lipgloss.NewStyle().Foreground(tuitypes.SalmonPink)
+	keyStyle := lipgloss.NewStyle().Foreground(tuitypes.BrightWhite)
+	descStyle := lipgloss.NewStyle().Foreground(tuitypes.MutedGray)
+
+	// --- Commands ---
+	cmds := getAllCommands()
+	sort.Slice(cmds, func(i, j int) bool { return cmds[i].Name < cmds[j].Name })
+
+	// Compute column width from longest command name (e.g. "/snapshot").
+	maxCmdLen := 0
+	for _, c := range cmds {
+		if l := len(c.Name) + 1; l > maxCmdLen { // +1 for leading "/"
+			maxCmdLen = l
+		}
+	}
+	cmdColWidth := maxCmdLen + 2 // 2-char gap between columns
+
+	b.WriteString(sectionStyle.Render("Commands"))
+	b.WriteString("\n")
+	for _, c := range cmds {
+		label := "/" + c.Name
+		pad := strings.Repeat(" ", cmdColWidth-len(label))
+		b.WriteString("  ")
+		b.WriteString(cmdStyle.Render(label))
+		b.WriteString(pad)
+		b.WriteString(descStyle.Render(c.Description))
+		b.WriteString("\n")
 	}
 
-	helpContent.WriteString("Keyboard Shortcuts:\n\n")
-	helpContent.WriteString("  Enter        Send message\n")
-	helpContent.WriteString("  Alt+Enter    New line\n")
-	helpContent.WriteString("  Ctrl+C       Exit\n")
-	helpContent.WriteString("  Ctrl+D       Show command help\n\n")
+	b.WriteString("\n")
 
-	helpContent.WriteString("Tips:\n\n")
-	helpContent.WriteString("  • Type / to see available commands\n")
-	helpContent.WriteString("  • Use arrow keys to navigate command palette\n")
-	helpContent.WriteString("  • Press Escape to cancel command entry\n")
+	// --- Keys ---
+	type keyBinding struct{ key, desc string }
+	keys := []keyBinding{
+		{"Enter", "Send message"},
+		{"Alt+Enter", "New line"},
+		{"Ctrl+K / Ctrl+P", "Command palette"},
+		{"Ctrl+L", "Result history"},
+		{"Cmd+V / Shift+Ins", "Paste"},
+		{"Ctrl+Y", "Copy to clipboard"},
+		{"PgUp", "Scroll up (lock follow)"},
+		{"PgDn", "Scroll down"},
+		{"Esc", "Cancel / dismiss overlay"},
+		{"Ctrl+C", "Quit"},
+	}
 
-	// Create and activate the help overlay
-	helpOverlay := overlay.NewHelpOverlay("Help", helpContent.String(), m.width, m.height)
-	m.overlay.activate(tuitypes.OverlayModeHelp, helpOverlay)
+	maxKeyLen := 0
+	for _, k := range keys {
+		if l := len(k.key); l > maxKeyLen {
+			maxKeyLen = l
+		}
+	}
+	keyColWidth := maxKeyLen + 2
 
-	return nil
+	b.WriteString(sectionStyle.Render("Keys"))
+	b.WriteString("\n")
+	for _, k := range keys {
+		pad := strings.Repeat(" ", keyColWidth-len(k.key))
+		b.WriteString("  ")
+		b.WriteString(keyStyle.Render(k.key))
+		b.WriteString(pad)
+		b.WriteString(descStyle.Render(k.desc))
+		b.WriteString("\n")
+	}
+
+	return b.String()
 }
 
 // handleStopCommand stops the current agent operation

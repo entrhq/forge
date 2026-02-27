@@ -200,15 +200,40 @@ func wordWrap(text string, width int) string {
 }
 
 // ansiEscape matches common ANSI terminal escape sequences (color codes, cursor
-// movement commands, etc.). Used by stripANSI to clean up content before it is
-// written to the OS clipboard.
-var ansiEscape = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
+// movement commands, OSC sequences, etc.). Used by stripANSI to clean up content.
+var ansiEscape = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]|\x1b\][^[:cntrl:]]*\x07|\x1b\][^\x1b]*\x1b\\`)
 
 // stripANSI removes ANSI escape sequences from s and returns plain text.
 // The conversation buffer is rendered with lipgloss color codes, so we must
 // strip them before writing to the clipboard to avoid garbled pastes.
 func stripANSI(s string) string {
 	return ansiEscape.ReplaceAllString(s, "")
+}
+
+// sanitizeOutput strips ANSI codes and non-printable control characters 
+// to prevent lipgloss text measurement and line wrapping from breaking.
+func sanitizeOutput(s string) string {
+	s = stripANSI(s)
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, ch := range s {
+		// Keep newlines, tabs, and printable characters
+		if ch < 0x20 && ch != '\n' && ch != '\t' && ch != '\r' {
+			continue
+		}
+		b.WriteRune(ch)
+	}
+	return b.String()
+}
+
+// truncateLines truncates a string to a maximum number of lines,
+// appending a truncation indicator if lines were dropped.
+func truncateLines(s string, maxLines int) string {
+	lines := strings.Split(s, "\n")
+	if len(lines) <= maxLines {
+		return s
+	}
+	return strings.Join(lines[:maxLines], "\n") + "\n  ... [truncated for readability]"
 }
 
 // updateTextAreaHeight dynamically adjusts the textarea height based on content

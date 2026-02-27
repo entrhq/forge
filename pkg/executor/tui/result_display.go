@@ -52,11 +52,6 @@ func (c *ToolResultClassifier) ClassifyToolResult(toolName string, result string
 		return TierFullInline
 	}
 
-	// Command execution uses overlay (already implemented)
-	if toolName == "execute_command" {
-		return TierOverlayOnly
-	}
-
 	// Count lines in result
 	lineCount := strings.Count(result, "\n") + 1
 
@@ -88,9 +83,11 @@ func (c *ToolResultClassifier) ClassifyToolResult(toolName string, result string
 
 // GetPreviewLines extracts the first N lines from a result
 func (c *ToolResultClassifier) GetPreviewLines(result string) string {
-	lines := strings.Split(result, "\n")
+	// Sanitize output to strip problematic control chars and ANSI
+	sanitized := sanitizeOutput(result)
+	lines := strings.Split(sanitized, "\n")
 	if len(lines) <= c.previewLines {
-		return result
+		return sanitized
 	}
 
 	preview := strings.Join(lines[:c.previewLines], "\n")
@@ -112,6 +109,14 @@ func (s *ToolResultSummarizer) GenerateSummary(toolName string, result string) s
 	sizeKB := float64(len(result)) / 1024.0
 
 	switch toolName {
+	case "execute_command":
+		if exitCode, found := s.extractExitCode(result); found {
+			if exitCode == 0 {
+				return fmt.Sprintf("Command completed successfully (%d lines, %.1f KB) [Ctrl+V to view]", lineCount, sizeKB)
+			}
+			return fmt.Sprintf("Command failed with exit code %d (%d lines, %.1f KB) [Ctrl+V to view]", exitCode, lineCount, sizeKB)
+		}
+		return fmt.Sprintf("Command executed (%d lines, %.1f KB) [Ctrl+V to view]", lineCount, sizeKB)
 	case "read_file":
 		// Extract filename from result if possible (first line often has it in comments)
 		filename := s.extractFilename(result)
@@ -147,6 +152,23 @@ func (s *ToolResultSummarizer) GenerateSummary(toolName string, result string) s
 		// Generic summary for unknown tools
 		return fmt.Sprintf("%s completed (%d lines, %.1f KB) [Ctrl+V to view]", toolName, lineCount, sizeKB)
 	}
+}
+
+// extractExitCode attempts to determine if a command result string embeds "Exit code: X"
+func (s *ToolResultSummarizer) extractExitCode(result string) (int, bool) {
+	// Our execute_command tool generally prefixes or appends exit codes in its structured output.
+	// But as a fallback, we just look for common patterns to give a cleaner UI summary.
+	if strings.Contains(result, "Exit code: ") {
+		var code int
+		// Let's grab the last line usually
+		lines := strings.Split(result, "\n")
+		for _, line := range lines {
+			if _, err := fmt.Sscanf(line, "Exit code: %d", &code); err == nil {
+				return code, true
+			}
+		}
+	}
+	return 0, false
 }
 
 // extractFilename attempts to extract a filename from tool result using

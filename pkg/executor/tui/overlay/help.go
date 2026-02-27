@@ -120,9 +120,8 @@ func (h *HelpOverlay) renderHeader() string {
 // renderFooter renders the help overlay footer
 func (h *HelpOverlay) renderFooter() string {
 	contentWidth := h.BaseOverlay.Viewport().Width
-	hint := "Esc or Enter to close"
+	hint := "ESC or Enter to close • ↑/↓ to scroll"
 
-	// For padding, we need width of string inside
 	hintLen := lipgloss.Width(hint)
 	hintPadding := max(0, (contentWidth-hintLen)/2)
 	padStr := ""
@@ -130,7 +129,7 @@ func (h *HelpOverlay) renderFooter() string {
 		padStr += " "
 	}
 
-	return "\n\n" + padStr + types.OverlayHelpStyle.Render(hint)
+	return "\n" + padStr + types.OverlayHelpStyle.Render(hint)
 }
 
 // View renders the help overlay

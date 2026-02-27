@@ -450,7 +450,8 @@ func (m *model) handleToast(msg toastMsg) (tea.Model, tea.Cmd) {
 
 // handleAgentError processes agent error messages
 func (m *model) handleAgentError(msg agentErrMsg) (tea.Model, tea.Cmd) {
-	m.content.WriteString(errorStyle.Render(fmt.Sprintf("  ✗ Error: %v", msg.err)))
+	errMsg := truncateLines(fmt.Sprintf("%v", msg.err), 2)
+	m.content.WriteString(warningStyle.Render(fmt.Sprintf("  ⚠ %s", sanitizeOutput(errMsg))))
 	m.content.WriteString("\n\n")
 	m.viewport.SetContent(m.content.String())
 	m.scrollToBottomOrMark() // ADR-0048

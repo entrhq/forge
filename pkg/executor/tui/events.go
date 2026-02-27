@@ -140,7 +140,8 @@ func (m *model) handleThinkingContent(event *pkgtypes.AgentEvent) {
 	if event.Content == "" {
 		return
 	}
-	m.thinkingBuffer.WriteString(event.Content)
+	content := sanitizeOutput(event.Content)
+	m.thinkingBuffer.WriteString(content)
 	// Indent the entire block (header + every wrapped line) by one space
 	header := "⸫ "
 	formatted := formatEntry("", m.thinkingBuffer.String(), thinkingStyle, m.width, false)
@@ -169,6 +170,7 @@ func (m *model) handleToolCallStart(event *pkgtypes.AgentEvent) {
 	// Check if we have early tool name detection in metadata
 	if toolName, ok := event.Metadata["tool_name"].(string); ok && toolName != "" && !m.toolNameDisplayed {
 		// Display the tool name immediately when detected early
+		toolName = sanitizeOutput(toolName)
 		formatted := formatEntry("✎ ", toolName, toolStyle, m.width, false)
 		m.content.WriteString(formatted)
 		m.content.WriteString("\n")
@@ -182,7 +184,8 @@ func (m *model) handleToolCallStart(event *pkgtypes.AgentEvent) {
 func (m *model) handleToolCall(event *pkgtypes.AgentEvent) {
 	// Only display if we haven't already shown it from early detection
 	if !m.toolNameDisplayed {
-		formatted := formatEntry("✎ ", event.ToolName, toolStyle, m.width, false)
+		toolName := sanitizeOutput(event.ToolName)
+		formatted := formatEntry("✎ ", toolName, toolStyle, m.width, false)
 		m.content.WriteString(formatted)
 		m.content.WriteString("\n")
 	}
@@ -199,7 +202,7 @@ func (m *model) handleToolCall(event *pkgtypes.AgentEvent) {
 }
 
 func (m *model) handleToolResult(event *pkgtypes.AgentEvent) {
-	resultStr := fmt.Sprintf("%v", event.ToolOutput)
+	resultStr := sanitizeOutput(fmt.Sprintf("%v", event.ToolOutput))
 
 	// Classify the tool result to determine display strategy
 	tier := m.resultClassifier.ClassifyToolResult(m.lastToolName, resultStr)
@@ -242,6 +245,7 @@ func (m *model) handleMessageStart() {
 }
 
 func (m *model) handleMessageContent(content string) bool {
+	content = sanitizeOutput(content)
 	if strings.TrimSpace(content) != "" && !m.hasMessageContentStarted {
 		m.hasMessageContentStarted = true
 	}
@@ -271,7 +275,8 @@ func (m *model) handleMessageEnd() {
 // Error and state handlers
 
 func (m *model) handleError(event *pkgtypes.AgentEvent) {
-	m.content.WriteString(errorStyle.Render(fmt.Sprintf("  ✗ Error: %v", event.Error)))
+	errMsg := truncateLines(fmt.Sprintf("%v", event.Error), 2)
+	m.content.WriteString(warningStyle.Render(fmt.Sprintf(" ⚠ Agent encountered: %s", sanitizeOutput(errMsg))))
 	m.content.WriteString("\n\n")
 }
 
@@ -344,14 +349,14 @@ func (m *model) handleToolApprovalGranted() {
 
 func (m *model) handleToolApprovalRejected() {
 	// Approval rejected - log it
-	formatted := formatEntry("  ✗ ", "Tool rejected by user", errorStyle, m.width, false)
+	formatted := formatEntry("  ✗ ", "Tool rejected by user", warningStyle, m.width, false)
 	m.content.WriteString(formatted)
 	m.content.WriteString("\n")
 }
 
 func (m *model) handleToolApprovalTimeout() {
 	// Approval timeout - log it
-	formatted := formatEntry("  ⏱ ", "Tool approval timed out", errorStyle, m.width, false)
+	formatted := formatEntry("  ⏱ ", "Tool approval timed out", warningStyle, m.width, false)
 	m.content.WriteString(formatted)
 	m.content.WriteString("\n")
 }
@@ -380,7 +385,8 @@ func (m *model) handleTokenUsage(event *pkgtypes.AgentEvent) {
 func (m *model) handleCommandExecutionStart(event *pkgtypes.AgentEvent) {
 	// Show command execution started message
 	if event.CommandExecution != nil {
-		formatted := formatEntry("  ❯ ", fmt.Sprintf("Executing: %s", event.CommandExecution.Command), toolStyle, m.width, false)
+		command := sanitizeOutput(event.CommandExecution.Command)
+		formatted := formatEntry("  ❯ ", fmt.Sprintf("Executing: %s", command), toolStyle, m.width, false)
 		m.content.WriteString(formatted)
 		m.content.WriteString("\n")
 		m.viewport.SetContent(m.content.String())
@@ -398,25 +404,13 @@ func (m *model) handleCommandExecutionStart(event *pkgtypes.AgentEvent) {
 }
 
 func (m *model) handleCommandExecutionOutput(event *pkgtypes.AgentEvent) {
-	// Stream command output as it arrives
-	// Write output directly without styling to preserve formatting/indentation
-	if event.CommandExecution != nil && event.CommandExecution.Output != "" {
-		m.content.WriteString(event.CommandExecution.Output)
-	}
+	// Let overlay handle streaming directly; do not stream bulk to the chat output.
 }
 
 func (m *model) handleCommandExecutionComplete(event *pkgtypes.AgentEvent) {
-	// Show command completion status
-	if event.CommandExecution != nil {
-		if event.CommandExecution.ExitCode == 0 {
-			formatted := formatEntry("  ✓ ", "Command completed successfully", toolStyle, m.width, false)
-			m.content.WriteString(formatted)
-		} else {
-			formatted := formatEntry("  ✗ ", fmt.Sprintf("Command failed with exit code %d", event.CommandExecution.ExitCode), errorStyle, m.width, false)
-			m.content.WriteString(formatted)
-		}
-		m.content.WriteString("\n")
-	}
+	// Note: We don't write anything to m.content here for command execution complete
+	// because handleToolResult will catch the EventTypeToolResult that follows,
+	// and write out a clean, sanitized summary using tier logic (TierSummaryWithPreview).
 }
 
 // Context summarization handlers
