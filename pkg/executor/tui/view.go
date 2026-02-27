@@ -139,7 +139,23 @@ func (m *model) buildBottomBar() string {
 		left = lipgloss.NewStyle().Foreground(mintGreen).Bold(true).Render("bash mode")
 	}
 
-	right := m.buildTokenDisplay()
+	// Thinking state indicator — always visible so the user always knows the mode
+	var thinkingIndicator string
+	if m.showThinking {
+		thinkingIndicator = lipgloss.NewStyle().Foreground(mintGreen).Render("⸫ Thinking On")
+	} else {
+		thinkingIndicator = lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("⸫ Thinking Off")
+	}
+
+	tokenDisplay := m.buildTokenDisplay()
+
+	// Right side: thinking indicator + token display (if any)
+	var right string
+	if tokenDisplay != "" {
+		right = thinkingIndicator + "   " + tokenDisplay
+	} else {
+		right = thinkingIndicator
+	}
 
 	// Subtract 2 for the Padding(0, 1) on statusBarStyle (1 char each side)
 	gap := m.width - 2 - lipgloss.Width(left) - lipgloss.Width(right)

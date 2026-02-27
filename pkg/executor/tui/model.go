@@ -52,7 +52,9 @@ type model struct {
 	// Agent state
 	isThinking            bool
 	agentBusy             bool
-	bashMode              bool // Track if in bash mode
+	bashMode              bool      // Track if in bash mode
+	showThinking          bool      // Toggle display of extended thinking blocks
+	thinkingStartTime     time.Time // When the current thinking block began (for elapsed display)
 	currentLoadingMessage string
 	toolNameDisplayed     bool // Track if we've already displayed the tool name
 	pendingNotesRequest   bool // Track if we're waiting for notes data

@@ -136,6 +136,15 @@ func init() {
 		MinArgs:     0,
 		MaxArgs:     0,
 	})
+
+	registerCommand(&SlashCommand{
+		Name:        "thinking",
+		Description: "Toggle display of extended thinking blocks",
+		Type:        CommandTypeTUI,
+		Handler:     handleThinkingCommand,
+		MinArgs:     0,
+		MaxArgs:     0,
+	})
 }
 
 // registerCommand adds a command to the registry
@@ -611,6 +620,19 @@ func handleBashCommand(m *model, args []string) interface{} {
 	m.bashMode = true
 	m.updatePrompt()
 	m.showToast("Bash Mode", "Entered bash mode. Commands will be executed directly. Type 'exit' or press Ctrl+C to return.", "❯", false)
+	return nil
+}
+
+// handleThinkingCommand toggles the display of extended thinking blocks.
+// When disabled, only a collapsed "… Thinking" indicator is shown during
+// streaming; the full content is discarded after the thinking block ends.
+func handleThinkingCommand(m *model, args []string) interface{} {
+	m.showThinking = !m.showThinking
+	if m.showThinking {
+		m.showToast("Thinking visible", "Extended thinking blocks will be shown in full", "⸫", false)
+	} else {
+		m.showToast("Thinking hidden", "Only a collapsed indicator will be shown while the model thinks", "⸫", false)
+	}
 	return nil
 }
 

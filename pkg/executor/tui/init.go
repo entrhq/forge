@@ -57,6 +57,7 @@ func initialModel() model {
 		toast:            &toastNotification{},
 		spinner:          s,
 		agentBusy:        false,
+		showThinking:     true,  // Show thinking blocks by default
 		followScroll:     true,  // ADR-0048: auto-follow agent output by default
 		hasNewContent:    false, // ADR-0048: no new content initially
 		resultClassifier: NewToolResultClassifier(),

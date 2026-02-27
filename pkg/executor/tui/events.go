@@ -134,6 +134,7 @@ func (m *model) resumeFollowScroll() {
 func (m *model) handleThinkingStart() {
 	m.isThinking = true
 	m.thinkingBuffer.Reset()
+	m.thinkingStartTime = time.Now()
 }
 
 func (m *model) handleThinkingContent(event *pkgtypes.AgentEvent) {
@@ -142,22 +143,38 @@ func (m *model) handleThinkingContent(event *pkgtypes.AgentEvent) {
 	}
 	content := sanitizeOutput(event.Content)
 	m.thinkingBuffer.WriteString(content)
-	// Indent the entire block (header + every wrapped line) by one space
-	header := "⸫ "
-	formatted := formatEntry("", m.thinkingBuffer.String(), thinkingStyle, m.width, false)
-	block := header + formatted
-	indented := " " + strings.ReplaceAll(block, "\n", "\n ")
-	m.viewport.SetContent(m.content.String() + indented)
+
+	if m.showThinking {
+		// Indent the entire block (header + every wrapped line) by one space
+		header := "⸫ "
+		formatted := formatEntry("", m.thinkingBuffer.String(), thinkingStyle, m.width, false)
+		block := header + formatted
+		indented := " " + strings.ReplaceAll(block, "\n", "\n ")
+		m.viewport.SetContent(m.content.String() + indented)
+	} else {
+		// Show a collapsed one-line loading indicator with elapsed time ticking up
+		elapsed := int(time.Since(m.thinkingStartTime).Seconds())
+		collapsed := thinkingStyle.Render(fmt.Sprintf(" ⸫ Thinking (%ds)", elapsed))
+		m.viewport.SetContent(m.content.String() + collapsed)
+	}
 	m.scrollToBottomOrMark() // ADR-0048
 }
 
 func (m *model) handleThinkingEnd() {
 	if m.thinkingBuffer.Len() > 0 {
-		header := "⸫ "
-		formatted := formatEntry("", m.thinkingBuffer.String(), thinkingStyle, m.width, false)
-		block := header + formatted
-		indented := " " + strings.ReplaceAll(block, "\n", "\n ")
-		m.content.WriteString(indented)
+		if m.showThinking {
+			header := "⸫ "
+			formatted := formatEntry("", m.thinkingBuffer.String(), thinkingStyle, m.width, false)
+			block := header + formatted
+			indented := " " + strings.ReplaceAll(block, "\n", "\n ")
+			m.content.WriteString(indented)
+		} else {
+			// Commit a compact "Thought for Xs" summary line so the block
+			// doesn't vanish entirely — the user can see how long the model thought.
+			elapsed := int(time.Since(m.thinkingStartTime).Seconds())
+			summary := thinkingStyle.Render(fmt.Sprintf(" ⸫ Thought for %ds", elapsed))
+			m.content.WriteString(summary)
+		}
 	}
 	m.content.WriteString("\n\n")
 	m.isThinking = false
