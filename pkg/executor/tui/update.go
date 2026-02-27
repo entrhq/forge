@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/bubbles/cursor"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
@@ -509,6 +510,9 @@ func (m *model) handleKeyPress(msg tea.KeyMsg, vpCmd, tiCmd, spinnerCmd tea.Cmd)
 	case tea.KeyCtrlP:
 		return m.handleCtrlP()
 
+	case tea.KeyCtrlY:
+		return m.handleCopyToClipboard()
+
 	case tea.KeyEnter:
 		if msg.Alt {
 			m.textarea.InsertString("\n")
@@ -727,3 +731,21 @@ func (m *model) recalculateLayout() {
 	m.viewport.SetContent(m.content.String())
 	m.scrollToBottomOrMark() // ADR-0048: respect scroll-lock during layout recalculation
 }
+
+// handleCopyToClipboard copies the full conversation buffer to the OS clipboard
+// and shows a brief toast confirmation (ADR-0050).
+// It uses m.content (the raw conversation string builder) rather than
+// m.viewport.View() so the user always gets the complete history, not just the
+// visible window. ANSI escape codes are stripped so the clipboard contains
+// plain text.
+func (m *model) handleCopyToClipboard() (tea.Model, tea.Cmd) {
+	content := stripANSI(m.content.String())
+	if err := clipboard.WriteAll(content); err != nil {
+		m.showToast("Clipboard unavailable", "Use Ctrl+T to select text instead", "⚠", true)
+		return m, nil
+	}
+	m.showToast("Copied to clipboard", "", "✓", false)
+	return m, nil
+}
+
+
