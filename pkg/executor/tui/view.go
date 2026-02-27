@@ -260,56 +260,25 @@ func (m *model) renderSummarizationStatus() string {
 	content.WriteString("\n")
 
 	sepStr := ""
-	for i := 0; i < boxWidth; i++ {
+	innerWidth := boxWidth - 4 // Account for borders (2) and padding (2)
+	for i := 0; i < innerWidth; i++ {
 		sepStr += "─"
 	}
 	content.WriteString(lipgloss.NewStyle().Foreground(mutedGray).Render(sepStr))
 	content.WriteString("\n\n")
 
-	// Progress bar
-	barWidth := boxWidth - 10
-	if barWidth < 20 {
-		barWidth = 20
+	// Render the spinner alongside the loading text
+	spinnerStr := m.spinner.View()
+	textStyle := lipgloss.NewStyle().Foreground(mutedGray)
+
+	statusText := "Summarizing older messages to free up context..."
+	if m.summarization.maxTokens > 0 && m.summarization.currentTokens > 0 {
+		statusText = fmt.Sprintf("Summarizing %s / %s tokens to free up context...",
+			formatTokenCount(m.summarization.currentTokens),
+			formatTokenCount(m.summarization.maxTokens))
 	}
 
-	filledWidth := int(float64(barWidth) * m.summarization.progressPercent / 100.0)
-	if filledWidth > barWidth {
-		filledWidth = barWidth
-	}
-	emptyWidth := barWidth - filledWidth
-
-	// Use solid block for filled, sparse block for empty
-	progressStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#A8E6CF")) // Mint green
-	emptyStyle := lipgloss.NewStyle().Foreground(mutedGray)
-
-	barFilled := ""
-	for i := 0; i < filledWidth; i++ {
-		barFilled += "█"
-	}
-	for i := 0; i < emptyWidth; i++ {
-		barFilled += "░"
-	}
-
-	bar := progressStyle.Render(barFilled[:filledWidth*3]) + emptyStyle.Render(barFilled[filledWidth*3:])
-
-	// Show both item count and percentage
-	if m.summarization.totalItems > 0 {
-		progressLine := fmt.Sprintf("%s %d/%d items (%.0f%%)",
-			bar, m.summarization.itemsProcessed, m.summarization.totalItems, m.summarization.progressPercent)
-		content.WriteString(progressLine)
-	} else {
-		progressLine := fmt.Sprintf("%s %.0f%%", bar, m.summarization.progressPercent)
-		content.WriteString(progressLine)
-	}
-	content.WriteString("\n")
-
-	// Current item description
-	if m.summarization.currentItem != "" {
-		content.WriteString(lipgloss.NewStyle().Foreground(mutedGray).Render(m.summarization.currentItem))
-	} else if m.summarization.totalItems > 0 {
-		content.WriteString(lipgloss.NewStyle().Foreground(mutedGray).Render(fmt.Sprintf("Processing item %d of %d...",
-			m.summarization.itemsProcessed, m.summarization.totalItems)))
-	}
+	content.WriteString(fmt.Sprintf("%s %s\n", spinnerStr, textStyle.Render(statusText)))
 
 	// Create styled box
 	boxStyle := lipgloss.NewStyle().

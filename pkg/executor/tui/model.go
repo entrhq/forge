@@ -125,15 +125,11 @@ type toastMsg struct {
 
 // summarizationStatus tracks an active context summarization operation
 type summarizationStatus struct {
-	active          bool
-	strategy        string
-	currentTokens   int
-	maxTokens       int
-	itemsProcessed  int
-	totalItems      int
-	currentItem     string
-	progressPercent float64
-	startTime       time.Time
+	active        bool
+	strategy      string
+	currentTokens int
+	maxTokens     int
+	startTime     time.Time
 }
 
 // toastNotification represents a temporary notification message

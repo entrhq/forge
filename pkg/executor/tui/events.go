@@ -428,18 +428,11 @@ func (m *model) handleContextSummarizationStart(event *pkgtypes.AgentEvent) {
 		m.summarization.strategy = event.ContextSummarization.Strategy
 		m.summarization.currentTokens = event.ContextSummarization.CurrentTokens
 		m.summarization.maxTokens = event.ContextSummarization.MaxTokens
-		m.summarization.totalItems = event.ContextSummarization.TotalItems
 	}
 }
 
 func (m *model) handleContextSummarizationProgress(event *pkgtypes.AgentEvent) {
-	if event.ContextSummarization != nil {
-		m.summarization.itemsProcessed = event.ContextSummarization.ItemsProcessed
-		// Calculate progress percentage from items processed
-		if event.ContextSummarization.TotalItems > 0 {
-			m.summarization.progressPercent = float64(event.ContextSummarization.ItemsProcessed) / float64(event.ContextSummarization.TotalItems) * 100
-		}
-	}
+	// Progress details have been removed, wait for completion
 }
 
 func (m *model) handleContextSummarizationComplete(event *pkgtypes.AgentEvent) {
