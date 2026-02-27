@@ -188,8 +188,13 @@ func (m *model) handleToolCall(event *pkgtypes.AgentEvent) {
 	}
 	// Track tool call for result display
 	m.lastToolName = event.ToolName
-	// Generate a simple cache key using timestamp + tool name
-	m.lastToolCallID = fmt.Sprintf("%d_%s", time.Now().UnixNano(), event.ToolName)
+	// Use the stable tool call ID for caching result views
+	if event.ToolCallID != "" {
+		m.lastToolCallID = event.ToolCallID
+	} else {
+		// Fallback for tools executed outside normal flow or synthetic events
+		m.lastToolCallID = fmt.Sprintf("%d_%s", time.Now().UnixNano(), event.ToolName)
+	}
 	m.toolNameDisplayed = false // Reset for next tool call
 }
 

@@ -60,6 +60,9 @@ type AgentEvent struct {
 	// ToolName is the name of the tool being called (for tool events).
 	ToolName string
 
+	// ToolCallID is a unique identifier for the tool call.
+	ToolCallID string
+
 	// Type indicates the kind of event.
 	Type AgentEventType
 
@@ -240,19 +243,21 @@ func NewMessageEndEvent() *AgentEvent {
 }
 
 // NewToolCallEvent creates a tool call event.
-func NewToolCallEvent(toolName string, toolInput map[string]interface{}) *AgentEvent {
+func NewToolCallEvent(toolCallID string, toolName string, toolInput map[string]interface{}) *AgentEvent {
 	return &AgentEvent{
-		Type:      EventTypeToolCall,
-		ToolName:  toolName,
-		ToolInput: toolInput,
-		Metadata:  make(map[string]interface{}),
+		Type:       EventTypeToolCall,
+		ToolCallID: toolCallID,
+		ToolName:   toolName,
+		ToolInput:  toolInput,
+		Metadata:   make(map[string]interface{}),
 	}
 }
 
 // NewToolResultEvent creates a tool result event.
-func NewToolResultEvent(toolName string, output interface{}) *AgentEvent {
+func NewToolResultEvent(toolCallID string, toolName string, output interface{}) *AgentEvent {
 	return &AgentEvent{
 		Type:       EventTypeToolResult,
+		ToolCallID: toolCallID,
 		ToolName:   toolName,
 		ToolOutput: output,
 		Metadata:   make(map[string]interface{}),
@@ -260,12 +265,13 @@ func NewToolResultEvent(toolName string, output interface{}) *AgentEvent {
 }
 
 // NewToolResultErrorEvent creates a tool result error event.
-func NewToolResultErrorEvent(toolName string, err error) *AgentEvent {
+func NewToolResultErrorEvent(toolCallID string, toolName string, err error) *AgentEvent {
 	return &AgentEvent{
-		Type:     EventTypeToolResultError,
-		ToolName: toolName,
-		Error:    err,
-		Metadata: make(map[string]interface{}),
+		Type:       EventTypeToolResultError,
+		ToolCallID: toolCallID,
+		ToolName:   toolName,
+		Error:      err,
+		Metadata:   make(map[string]interface{}),
 	}
 }
 

@@ -87,7 +87,7 @@ func NewNotesOverlay(notes []pkgtypes.NoteData, width, height int) *NotesOverlay
 	delegate := newNoteListDelegate()
 
 	l := list.New([]list.Item{}, delegate, 0, 0)
-	l.Title = "" 
+	l.Title = ""
 	l.SetShowTitle(false)
 	l.SetShowStatusBar(true)
 	l.SetFilteringEnabled(false)
@@ -172,7 +172,7 @@ func (o *NotesOverlay) View() string {
 	}
 
 	title := fmt.Sprintf("Scratchpad Notes (%d)", len(o.notes))
-	
+
 	listContent := o.list.View()
 
 	// Title pad logic matches help/context
@@ -184,10 +184,14 @@ func (o *NotesOverlay) View() string {
 
 	headerLen := lipgloss.Width(headerStr)
 	titlePad := ""
-	for i:=0; i<max(0, (innerWidth-headerLen)/2); i++ { titlePad += " " }
-	
+	for i := 0; i < max(0, (innerWidth-headerLen)/2); i++ {
+		titlePad += " "
+	}
+
 	sepStr := ""
-	for i:=0; i<innerWidth; i++ { sepStr += "─" }
+	for i := 0; i < innerWidth; i++ {
+		sepStr += "─"
+	}
 	separator := lipgloss.NewStyle().Foreground(types.MutedGray).Render(sepStr)
 
 	content := titlePad + headerStr + "\n" + separator + "\n" + listContent

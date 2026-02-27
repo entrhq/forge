@@ -220,9 +220,9 @@ func (c *ContextOverlay) Update(msg tea.Msg, state types.StateProvider, actions 
 	case tea.WindowSizeMsg:
 		newOverlayWidth := types.ComputeOverlayWidth(msg.Width, 0.80, 56, 100)
 		vpHeight := types.ComputeViewportHeight(msg.Height, 5)
-		
+
 		c.SetDimensions(newOverlayWidth, vpHeight+5)
-		
+
 		vp := c.BaseOverlay.Viewport()
 		vp.Width = newOverlayWidth - 4
 		vp.Height = vpHeight
@@ -240,11 +240,15 @@ func (c *ContextOverlay) renderHeader() string {
 	titlePadding := max(0, (contentWidth-titleLen)/2)
 
 	titleStr := ""
-	for i:=0; i<titlePadding; i++ { titleStr+=" " }
+	for i := 0; i < titlePadding; i++ {
+		titleStr += " "
+	}
 	titleStr += types.OverlayTitleStyle.Render(c.title)
 
 	sepStr := ""
-	for i:=0; i<contentWidth; i++ { sepStr+="─" }
+	for i := 0; i < contentWidth; i++ {
+		sepStr += "─"
+	}
 	separator := lipgloss.NewStyle().Foreground(types.MutedGray).Render(sepStr)
 
 	return titleStr + "\n" + separator + "\n"
@@ -258,7 +262,9 @@ func (c *ContextOverlay) renderFooter() string {
 	hintLen := lipgloss.Width(hint)
 	hintPadding := max(0, (contentWidth-hintLen)/2)
 	padStr := ""
-	for i:=0; i<hintPadding; i++ { padStr+=" " }
+	for i := 0; i < hintPadding; i++ {
+		padStr += " "
+	}
 
 	return "\n" + padStr + types.OverlayHelpStyle.Render(hint)
 }

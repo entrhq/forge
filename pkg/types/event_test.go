@@ -147,7 +147,7 @@ func TestNewToolEvents(t *testing.T) {
 		"query": "weather in San Francisco",
 	}
 
-	call := NewToolCallEvent("weather_api", toolInput)
+	call := NewToolCallEvent("test-id-123", "weather_api", toolInput)
 	if call.Type != EventTypeToolCall {
 		t.Errorf("ToolCall type = %v, want %v", call.Type, EventTypeToolCall)
 	}
@@ -158,7 +158,7 @@ func TestNewToolEvents(t *testing.T) {
 		t.Error("ToolCall input not set correctly")
 	}
 
-	result := NewToolResultEvent("weather_api", "Sunny, 72°F")
+	result := NewToolResultEvent("test-id-123", "weather_api", "Sunny, 72°F")
 	if result.Type != EventTypeToolResult {
 		t.Errorf("ToolResult type = %v, want %v", result.Type, EventTypeToolResult)
 	}
@@ -170,7 +170,7 @@ func TestNewToolEvents(t *testing.T) {
 	}
 
 	err := errors.New("API timeout")
-	errEvent := NewToolResultErrorEvent("weather_api", err)
+	errEvent := NewToolResultErrorEvent("test-id-123", "weather_api", err)
 	if errEvent.Type != EventTypeToolResultError {
 		t.Errorf("ToolResultError type = %v, want %v", errEvent.Type, EventTypeToolResultError)
 	}
@@ -304,7 +304,7 @@ func TestAgentEventHelpers(t *testing.T) {
 		},
 		{
 			name:       "tool_call",
-			event:      NewToolCallEvent("test", nil),
+			event:      NewToolCallEvent("test-id-123", "test", nil),
 			isThinking: false,
 			isMessage:  false,
 			isTool:     true,

@@ -136,7 +136,7 @@ func (cp *CommandPalette) Render(width, height int) string {
 
 	// Calculate palette width (70% standard)
 	paletteWidth := types.ComputeOverlayWidth(width, 0.70, 40, 90)
-	
+
 	// innerWidth accounts for border (2) and padding (2)
 	innerWidth := paletteWidth - 4
 	if innerWidth < 0 {
@@ -156,7 +156,7 @@ func (cp *CommandPalette) Render(width, height int) string {
 	if len(cp.filteredCommands) > 0 {
 		if cp.selectedIndex < cp.scrollOffset {
 			cp.scrollOffset = cp.selectedIndex
-		} else if cp.selectedIndex >= cp.scrollOffset + maxVisible {
+		} else if cp.selectedIndex >= cp.scrollOffset+maxVisible {
 			cp.scrollOffset = cp.selectedIndex - maxVisible + 1
 		}
 	}
@@ -215,7 +215,7 @@ func (cp *CommandPalette) Render(width, height int) string {
 		renderedName := cmdNameStyle.Render("/" + cmd.Name)
 		renderedDesc := descStyle.Render(cmd.Description)
 
-		// Construct the line 
+		// Construct the line
 		rawLine := renderedPrefix + renderedName + "  " + renderedDesc
 
 		// Append the simple format
@@ -224,16 +224,16 @@ func (cp *CommandPalette) Render(width, height int) string {
 
 	// Always show footer divider and hint for better context!
 	lines = append(lines, lipgloss.NewStyle().Foreground(types.MutedGray).Render(strings.Repeat("─", innerWidth)))
-	
+
 	footerHint := fmt.Sprintf("↑/↓ Nav • ↵ Select • %d of %d", cp.selectedIndex+1, len(cp.filteredCommands))
 	lines = append(lines, lipgloss.PlaceHorizontal(innerWidth, lipgloss.Center, types.OverlayHelpStyle.Render(footerHint)))
 
 	// Wrap in container style
 	containerStyle := types.CreateOverlayContainerStyle(paletteWidth)
-	
+
 	// Join lines to explicitly control newlines and prevent lipgloss padded blank lines
 	content := strings.Join(lines, "\n")
-	
+
 	return containerStyle.Render(content)
 }
 

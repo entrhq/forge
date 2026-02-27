@@ -500,7 +500,7 @@ func (s *SettingsOverlay) navigateUp() {
 			s.selectedItem = len(s.sections[s.selectedSection].items) - 1
 		}
 	}
-	
+
 	// Adjust scroll if necessary
 	itemLine := s.calculateItemSelectedLine()
 	if itemLine < s.scrollOffset {
@@ -521,7 +521,7 @@ func (s *SettingsOverlay) navigateDown() {
 		s.selectedSection++
 		s.selectedItem = 0
 	}
-	
+
 	// Adjust scroll if necessary
 	itemLine := s.calculateItemSelectedLine()
 	maxHeight := s.getVisibleBodyHeight()
@@ -773,7 +773,7 @@ func (s *SettingsOverlay) View() string {
 		padLeft++
 	}
 	title := strings.Repeat(" ", padLeft) + types.OverlayTitleStyle.Render("Settings")
-	
+
 	header.WriteString(title)
 	header.WriteString("\n")
 	header.WriteString(lipgloss.NewStyle().Foreground(types.MutedGray).Render(strings.Repeat("─", innerWidth)))
@@ -781,7 +781,7 @@ func (s *SettingsOverlay) View() string {
 
 	// ==================== FOOTER ====================
 	var footer strings.Builder
-	
+
 	// Status bar
 	if s.hasChanges {
 		saveHint := lipgloss.NewStyle().
@@ -791,7 +791,7 @@ func (s *SettingsOverlay) View() string {
 		footer.WriteString(saveHint)
 		footer.WriteString("\n")
 	}
-	
+
 	footer.WriteString(lipgloss.NewStyle().Foreground(types.MutedGray).Render(strings.Repeat("─", innerWidth)))
 	footer.WriteString("\n")
 
@@ -804,7 +804,7 @@ func (s *SettingsOverlay) View() string {
 	if padLeftHelp < 0 {
 		padLeftHelp = 0
 	}
-	
+
 	// Force truncate help text if it overflows to prevent line wrap breaking the height calculation
 	displayHelp := helpText
 	if lipgloss.Width(displayHelp) > innerWidth && innerWidth > 0 {
@@ -813,7 +813,7 @@ func (s *SettingsOverlay) View() string {
 			displayHelp = string(runes[:innerWidth])
 		}
 	}
-	
+
 	helpStr := strings.Repeat(" ", padLeftHelp) + types.OverlaySubtitleStyle.Render(displayHelp)
 	footer.WriteString(helpStr)
 
@@ -829,9 +829,9 @@ func (s *SettingsOverlay) View() string {
 	// Viewport logic
 	bodyStr := strings.TrimRight(body.String(), "\n")
 	lines := strings.Split(bodyStr, "\n")
-	
+
 	maxHeight := s.getVisibleBodyHeight()
-	
+
 	startIdx := s.scrollOffset
 	if startIdx+maxHeight > len(lines) {
 		startIdx = len(lines) - maxHeight
@@ -839,7 +839,7 @@ func (s *SettingsOverlay) View() string {
 	if startIdx < 0 {
 		startIdx = 0
 	}
-	
+
 	// Ensure we preserve scroll bounds going forward
 	s.scrollOffset = startIdx
 
@@ -851,7 +851,7 @@ func (s *SettingsOverlay) View() string {
 			visibleLines = append(visibleLines, "")
 		}
 	}
-	
+
 	var content strings.Builder
 	content.WriteString(header.String())
 	content.WriteString(strings.Join(visibleLines, "\n"))
@@ -1533,12 +1533,14 @@ func (s *SettingsOverlay) renderInputDialog() string {
 	// Flat modal redesign: Title + separator
 	titleStyle := lipgloss.NewStyle().Foreground(types.SalmonPink).Bold(true)
 	titleText := titleStyle.Render(s.activeDialog.title)
-	
+
 	// Create separator (fixed width dialog = 60 inner width, minus borders = 56)
 	sepStr := ""
-	for i:=0; i<56; i++ { sepStr += "─" }
+	for i := 0; i < 56; i++ {
+		sepStr += "─"
+	}
 	separator := lipgloss.NewStyle().Foreground(types.MutedGray).Render(sepStr)
-	
+
 	content.WriteString(titleText)
 	content.WriteString("\n")
 	content.WriteString(separator)
@@ -1665,12 +1667,14 @@ func (s *SettingsOverlay) renderConfirmDialog() string {
 	// Flat modal redesign: Title + separator
 	titleStyle := lipgloss.NewStyle().Foreground(types.SalmonPink).Bold(true)
 	titleText := titleStyle.Render(s.confirmDialog.title)
-	
+
 	// Create separator (fixed width dialog = 60 inner width, minus borders = 56)
 	sepStr := ""
-	for i:=0; i<56; i++ { sepStr += "─" }
+	for i := 0; i < 56; i++ {
+		sepStr += "─"
+	}
 	separator := lipgloss.NewStyle().Foreground(types.MutedGray).Render(sepStr)
-	
+
 	content.WriteString(titleText)
 	content.WriteString("\n")
 	content.WriteString(separator)

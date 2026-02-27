@@ -360,17 +360,10 @@ func (m *model) calculateViewportHeight() int {
 }
 
 func (m *model) handleWindowResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+
 	// Update viewport on window resize
 	m.viewport, _ = m.viewport.Update(msg)
-
-	// Also update result list if active
-	if m.resultList.IsActive() {
-		updated, listCmd := m.resultList.Update(msg, m, m)
-		if rl, ok := updated.(*overlay.ResultListModel); ok {
-			m.resultList = *rl
-		}
-		return m, listCmd
-	}
 
 	m.width = msg.Width
 	m.height = msg.Height
@@ -389,7 +382,17 @@ func (m *model) handleWindowResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 	m.textarea.SetWidth(m.width - 8)
 	m.ready = true
 	m.recalculateLayout()
-	return m, nil
+
+	// Also update result list if active
+	if m.resultList.IsActive() {
+		updated, listCmd := m.resultList.Update(msg, m, m)
+		if rl, ok := updated.(*overlay.ResultListModel); ok {
+			m.resultList = *rl
+		}
+		cmd = listCmd
+	}
+
+	return m, cmd
 }
 
 // handleSlashCommandComplete processes slash command completion

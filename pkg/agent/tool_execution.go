@@ -20,7 +20,7 @@ func (a *DefaultAgent) executeToolCall(ctx context.Context, tool tools.Tool, too
 		// If parsing fails, emit empty map - the actual tool execution will handle the raw XML
 		argsMap = make(map[string]interface{})
 	}
-	a.emitEvent(types.NewToolCallEvent(toolCall.ToolName, argsMap))
+	a.emitEvent(types.NewToolCallEvent(toolCall.ID, toolCall.ToolName, argsMap))
 
 	// Inject event emitter and command registry into context for tools that support streaming events
 	ctxWithEmitter := context.WithValue(ctx, coding.EventEmitterKey, coding.EventEmitter(a.emitEvent))
@@ -30,7 +30,7 @@ func (a *DefaultAgent) executeToolCall(ctx context.Context, tool tools.Tool, too
 	result, metadata, toolErr := tool.Execute(ctxWithRegistry, toolCall.GetArgumentsXML())
 
 	if toolErr != nil {
-		a.emitEvent(types.NewToolResultErrorEvent(toolCall.ToolName, toolErr))
+		a.emitEvent(types.NewToolResultErrorEvent(toolCall.ID, toolCall.ToolName, toolErr))
 		errMsg := prompts.BuildErrorRecoveryMessage(prompts.ErrorRecoveryContext{
 			Type:     prompts.ErrorTypeToolExecution,
 			ToolName: toolCall.ToolName,
@@ -53,7 +53,7 @@ func (a *DefaultAgent) executeToolCall(ctx context.Context, tool tools.Tool, too
 // processToolResult handles successful tool execution results
 // Returns (shouldContinue, errorContext)
 func (a *DefaultAgent) processToolResult(tool tools.Tool, toolCall tools.ToolCall, result string, metadata map[string]interface{}) (bool, string) {
-	event := types.NewToolResultEvent(toolCall.ToolName, result)
+	event := types.NewToolResultEvent(toolCall.ID, toolCall.ToolName, result)
 	// Add metadata to the event if present
 	if len(metadata) > 0 {
 		maps.Copy(event.Metadata, metadata)

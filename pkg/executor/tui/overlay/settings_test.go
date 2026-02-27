@@ -74,11 +74,17 @@ func TestNewSettingsOverlay(t *testing.T) {
 			// In redesign, settings overlay width uses ComputeOverlayWidth(width, 0.90, 60, 140)
 			// and height uses ComputeViewportHeight(height, 4)
 			expectedWidth := tt.width * 90 / 100
-			if expectedWidth < 60 { expectedWidth = 60 }
-			if expectedWidth > 140 { expectedWidth = 140 }
-			
+			if expectedWidth < 60 {
+				expectedWidth = 60
+			}
+			if expectedWidth > 140 {
+				expectedWidth = 140
+			}
+
 			expectedHeight := tt.height - 4 - 4 // terminal height - chrome - safe margin
-			if expectedHeight < 10 { expectedHeight = 10 }
+			if expectedHeight < 10 {
+				expectedHeight = 10
+			}
 
 			if overlay.width != expectedWidth {
 				t.Errorf("width = %d, want %d", overlay.width, expectedWidth)

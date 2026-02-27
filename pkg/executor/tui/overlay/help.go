@@ -1,8 +1,8 @@
 package overlay
 
 import (
-	"github.com/charmbracelet/lipgloss"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/entrhq/forge/pkg/executor/tui/types"
 )
 
@@ -15,7 +15,7 @@ type HelpOverlay struct {
 // NewHelpOverlay creates a new help overlay
 func NewHelpOverlay(title, content string, termWidth, termHeight int) *HelpOverlay {
 	overlayWidth := types.ComputeOverlayWidth(termWidth, 0.80, 56, 100)
-	
+
 	// chromeRows = title+sep (2) + blank (1) + footer (1) + blank (1) = 5
 	viewportHeight := types.ComputeViewportHeight(termHeight, 5)
 	overlayHeight := viewportHeight + 5
@@ -70,7 +70,7 @@ func (h *HelpOverlay) Update(msg tea.Msg, state types.StateProvider, actions typ
 		}
 		return h, cmd
 	}
-	
+
 	// Handle additional keys/events
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
@@ -80,13 +80,13 @@ func (h *HelpOverlay) Update(msg tea.Msg, state types.StateProvider, actions typ
 	case tea.WindowSizeMsg:
 		newOverlayWidth := types.ComputeOverlayWidth(msg.Width, 0.80, 56, 100)
 		vpHeight := types.ComputeViewportHeight(msg.Height, 5)
-		
-		h.SetDimensions(newOverlayWidth, vpHeight + 5)
-		
+
+		h.SetDimensions(newOverlayWidth, vpHeight+5)
+
 		vp := h.BaseOverlay.Viewport()
 		vp.Width = newOverlayWidth - 4
 		vp.Height = vpHeight
-		
+
 		// Re-initialize content when viewport resizes so it wraps correctly over new width
 		h.BaseOverlay.SetContent(h.BaseOverlay.Viewport().View())
 	}
@@ -102,12 +102,16 @@ func (h *HelpOverlay) renderHeader() string {
 	titleLen := len(h.title)
 	titlePadding := max(0, (contentWidth-titleLen)/2)
 	titleStr := ""
-	for i:=0; i<titlePadding; i++ { titleStr+=" " }
+	for i := 0; i < titlePadding; i++ {
+		titleStr += " "
+	}
 	titleStr += types.OverlayTitleStyle.Render(h.title)
 
 	// Separator
 	sepStr := ""
-	for i:=0; i<contentWidth; i++ { sepStr+="─" }
+	for i := 0; i < contentWidth; i++ {
+		sepStr += "─"
+	}
 	separator := lipgloss.NewStyle().Foreground(types.MutedGray).Render(sepStr)
 
 	return titleStr + "\n" + separator + "\n"
@@ -117,12 +121,14 @@ func (h *HelpOverlay) renderHeader() string {
 func (h *HelpOverlay) renderFooter() string {
 	contentWidth := h.BaseOverlay.Viewport().Width
 	hint := "Esc or Enter to close"
-	
+
 	// For padding, we need width of string inside
 	hintLen := lipgloss.Width(hint)
 	hintPadding := max(0, (contentWidth-hintLen)/2)
 	padStr := ""
-	for i:=0; i<hintPadding; i++ { padStr+=" " }
+	for i := 0; i < hintPadding; i++ {
+		padStr += " "
+	}
 
 	return "\n\n" + padStr + types.OverlayHelpStyle.Render(hint)
 }

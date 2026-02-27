@@ -142,8 +142,9 @@ func wordWrap(text string, width int) string {
 		currentLine := leadingSpace // Start first line with leading space
 
 		for _, word := range words {
+			wordLen := lipgloss.Width(word)
 			// If a single word is longer than width, break it up
-			if len(word) > width {
+			if wordLen > width {
 				// First, flush current line if it has content
 				if currentLine != "" {
 					result.WriteString(currentLine)
@@ -151,24 +152,34 @@ func wordWrap(text string, width int) string {
 					currentLine = ""
 				}
 
-				// Break the long word into chunks
-				for len(word) > 0 {
-					chunkSize := width
-					if len(word) < chunkSize {
-						chunkSize = len(word)
+				// Break the long word into chunks safely using visual width
+				runes := []rune(word)
+				for len(runes) > 0 {
+					chunk := ""
+					chunkWidth := 0
+					chunkLen := 0
+					for _, r := range runes {
+						rw := lipgloss.Width(string(r))
+						if chunkWidth+rw > width && chunkWidth > 0 {
+							break
+						}
+						chunk += string(r)
+						chunkWidth += rw
+						chunkLen++
 					}
-					result.WriteString(word[:chunkSize])
+					result.WriteString(chunk)
 					result.WriteString("\n")
-					word = word[chunkSize:]
+					runes = runes[chunkLen:]
 				}
 				continue
 			}
 
 			// Check if adding this word would exceed width
+			currentLineLen := lipgloss.Width(currentLine)
 			switch {
 			case currentLine == "" || currentLine == leadingSpace:
 				currentLine = leadingSpace + word
-			case len(currentLine)+1+len(word) > width:
+			case currentLineLen+1+wordLen > width:
 				// Write current line and start new one
 				result.WriteString(currentLine)
 				result.WriteString("\n")
@@ -233,7 +244,7 @@ func (m *model) updateTextAreaHeight() {
 			visualLines++ // Empty line still counts as 1 visual line
 		} else {
 			// Calculate how many visual lines this logical line takes
-			lineLen := len(line)
+			lineLen := lipgloss.Width(line)
 			wrappedLines := (lineLen + effectiveWidth - 1) / effectiveWidth
 			if wrappedLines == 0 {
 				wrappedLines = 1

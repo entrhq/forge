@@ -66,9 +66,9 @@ func (a *GenericApprovalOverlay) Update(msg tea.Msg, state types.StateProvider, 
 	if sizeMsg, ok := msg.(tea.WindowSizeMsg); ok {
 		newOverlayWidth := types.ComputeOverlayWidth(sizeMsg.Width, 0.90, 60, 140)
 		vpHeight := types.ComputeViewportHeight(sizeMsg.Height, 8)
-		
+
 		a.SetDimensions(newOverlayWidth, vpHeight+8)
-		
+
 		vp := a.BaseOverlay.Viewport()
 		vp.Width = newOverlayWidth - 4
 		vp.Height = vpHeight
@@ -109,7 +109,9 @@ func (a *GenericApprovalOverlay) renderHeader() string {
 
 	var header strings.Builder
 	p1 := ""
-	for i:=0; i<titlePadding; i++ { p1 += " " }
+	for i := 0; i < titlePadding; i++ {
+		p1 += " "
+	}
 	header.WriteString(p1 + types.OverlayTitleStyle.Render(title))
 
 	return header.String()
@@ -120,9 +122,11 @@ func (a *GenericApprovalOverlay) renderFooter() string {
 	contentWidth := a.Viewport().Width
 
 	var footer strings.Builder
-	
+
 	sepStr := ""
-	for i:=0; i<contentWidth; i++ { sepStr += "─" }
+	for i := 0; i < contentWidth; i++ {
+		sepStr += "─"
+	}
 	separator := lipgloss.NewStyle().Foreground(types.MutedGray).Render(sepStr)
 
 	// Since we are nested inside the footer call, we prepend our own rendered diff
@@ -134,7 +138,9 @@ func (a *GenericApprovalOverlay) renderFooter() string {
 	buttonsLen := lipgloss.Width(buttonsRow)
 	buttonsPadding := max(0, (contentWidth-buttonsLen)/2)
 	pad1 := ""
-	for i:=0; i<buttonsPadding; i++ { pad1 += " " }
+	for i := 0; i < buttonsPadding; i++ {
+		pad1 += " "
+	}
 	footer.WriteString(pad1 + buttonsRow)
 	footer.WriteString("\n")
 
@@ -143,7 +149,9 @@ func (a *GenericApprovalOverlay) renderFooter() string {
 	hintsLen := lipgloss.Width(hints)
 	hintsPadding := max(0, (contentWidth-hintsLen)/2)
 	pad2 := ""
-	for i:=0; i<hintsPadding; i++ { pad2 += " " }
+	for i := 0; i < hintsPadding; i++ {
+		pad2 += " "
+	}
 	footer.WriteString(pad2 + hints)
 
 	return footer.String()

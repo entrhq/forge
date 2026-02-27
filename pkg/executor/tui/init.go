@@ -27,7 +27,8 @@ func initialModel() model {
 	ta.FocusedStyle.Prompt = lipgloss.NewStyle().Foreground(salmonPink)
 	ta.FocusedStyle.Text = lipgloss.NewStyle().Foreground(brightWhite)
 
-	vp := viewport.New(80, 20)
+	// Viewport initialization: wait to receive tea.WindowSizeMsg to set actual dimensions
+	vp := viewport.New(0, 0)
 	vp.Style = lipgloss.NewStyle().Padding(0, 2)
 
 	s := spinner.New()

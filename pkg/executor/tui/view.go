@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
-	
+
 	"github.com/entrhq/forge/pkg/executor/tui/types"
 )
 
@@ -258,28 +258,38 @@ func (m *model) renderSummarizationStatus() string {
 	title := fmt.Sprintf("Optimizing context... [%s]", m.summarization.strategy)
 	content.WriteString(headerStyle.Render(title))
 	content.WriteString("\n")
-	
+
 	sepStr := ""
-	for i := 0; i < boxWidth; i++ { sepStr += "─" }
+	for i := 0; i < boxWidth; i++ {
+		sepStr += "─"
+	}
 	content.WriteString(lipgloss.NewStyle().Foreground(mutedGray).Render(sepStr))
 	content.WriteString("\n\n")
 
 	// Progress bar
 	barWidth := boxWidth - 10
-	if barWidth < 20 { barWidth = 20 }
-	
+	if barWidth < 20 {
+		barWidth = 20
+	}
+
 	filledWidth := int(float64(barWidth) * m.summarization.progressPercent / 100.0)
-	if filledWidth > barWidth { filledWidth = barWidth }
+	if filledWidth > barWidth {
+		filledWidth = barWidth
+	}
 	emptyWidth := barWidth - filledWidth
 
 	// Use solid block for filled, sparse block for empty
 	progressStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#A8E6CF")) // Mint green
 	emptyStyle := lipgloss.NewStyle().Foreground(mutedGray)
-	
+
 	barFilled := ""
-	for i := 0; i < filledWidth; i++ { barFilled += "█" }
-	for i := 0; i < emptyWidth; i++ { barFilled += "░" }
-	
+	for i := 0; i < filledWidth; i++ {
+		barFilled += "█"
+	}
+	for i := 0; i < emptyWidth; i++ {
+		barFilled += "░"
+	}
+
 	bar := progressStyle.Render(barFilled[:filledWidth*3]) + emptyStyle.Render(barFilled[filledWidth*3:])
 
 	// Show both item count and percentage
@@ -330,7 +340,7 @@ func (m *model) renderToast() string {
 
 	// Icon and message
 	header := fmt.Sprintf("%s %s", m.toast.icon, m.toast.message)
-	
+
 	// If no details, render as flat boxless string (Option B)
 	if m.toast.details == "" {
 		flatStyle := lipgloss.NewStyle().
@@ -342,7 +352,7 @@ func (m *model) renderToast() string {
 
 	content.WriteString(header)
 	content.WriteString("\n")
-	
+
 	// Details (Option C: Normal border)
 	detailStyle := lipgloss.NewStyle().Foreground(mutedGray)
 	content.WriteString(detailStyle.Render(m.toast.details))

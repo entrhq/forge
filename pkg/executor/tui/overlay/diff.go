@@ -125,14 +125,18 @@ func (d *DiffViewer) renderHeader() string {
 	subtitlePadding := max(0, (contentWidth-subtitleLen)/2)
 
 	var header strings.Builder
-	
+
 	p1 := ""
-	for i:=0; i<titlePadding; i++ { p1 += " " }
+	for i := 0; i < titlePadding; i++ {
+		p1 += " "
+	}
 	header.WriteString(p1 + types.OverlayTitleStyle.Render(title))
 	header.WriteString("\n")
-	
+
 	p2 := ""
-	for i:=0; i<subtitlePadding; i++ { p2 += " " }
+	for i := 0; i < subtitlePadding; i++ {
+		p2 += " "
+	}
 	header.WriteString(p2 + types.OverlaySubtitleStyle.Render(subtitle))
 
 	return header.String()
@@ -145,7 +149,9 @@ func (d *DiffViewer) renderFooter() string {
 	var footer strings.Builder
 
 	sepStr := ""
-	for i:=0; i<contentWidth; i++ { sepStr += "─" }
+	for i := 0; i < contentWidth; i++ {
+		sepStr += "─"
+	}
 	separator := lipgloss.NewStyle().Foreground(types.MutedGray).Render(sepStr)
 
 	// In the flat design, viewport is inline.
@@ -157,7 +163,9 @@ func (d *DiffViewer) renderFooter() string {
 	buttonsLen := lipgloss.Width(buttonsRow)
 	buttonsPadding := max(0, (contentWidth-buttonsLen)/2)
 	pad1 := ""
-	for i:=0; i<buttonsPadding; i++ { pad1 += " "}
+	for i := 0; i < buttonsPadding; i++ {
+		pad1 += " "
+	}
 	footer.WriteString(pad1 + buttonsRow)
 	footer.WriteString("\n")
 
@@ -166,7 +174,9 @@ func (d *DiffViewer) renderFooter() string {
 	hintsLen := lipgloss.Width(hints)
 	hintsPadding := max(0, (contentWidth-hintsLen)/2)
 	pad2 := ""
-	for i:=0; i<hintsPadding; i++ { pad2 += " "}
+	for i := 0; i < hintsPadding; i++ {
+		pad2 += " "
+	}
 	footer.WriteString(pad2 + hints)
 
 	return footer.String()
