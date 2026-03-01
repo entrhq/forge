@@ -149,13 +149,14 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Only update textarea if no overlay or result list is active
 	// This prevents the textarea from capturing scroll events when an overlay is open
 	if !m.overlay.isActive() && !m.resultList.IsActive() {
-		// Store old textarea height to detect changes
-		oldHeight := m.textarea.Height()
+		// Compare live line count before/after update so that calculateViewportHeight()
+		// always reads the latest content (ADR-0051 §1.6 — use strings.Count not Height()).
+		oldLines := strings.Count(m.textarea.Value(), "\n") + 1
 		m.textarea, tiCmd = m.textarea.Update(msg)
-		newHeight := m.textarea.Height()
+		newLines := strings.Count(m.textarea.Value(), "\n") + 1
 
-		// If textarea height changed, recalculate viewport height
-		if oldHeight != newHeight && m.ready {
+		// If the line count changed, recalculate viewport height
+		if oldLines != newLines && m.ready {
 			m.recalculateLayout()
 		}
 
@@ -338,8 +339,12 @@ func (m *model) calculateViewportHeight() int {
 	// ADR-0051: compact header bar + separator + hints + blank spacer = 4 lines (static)
 	const headerHeight = 4
 
-	// ADR-0051: Option B input zone is dynamic: rule (1) + live textarea lines
-	inputZoneHeight := 1 + m.textarea.Height() // rule + textarea lines
+	// ADR-0051: Option B input zone is dynamic: rule (1) + live textarea lines.
+	// Use strings.Count on the actual value so the height is always in sync with
+	// the content in the same tick — avoids the one-frame lag from textarea.Height()
+	// which reflects the allocated component size, not the live content line count.
+	liveLines := strings.Count(m.textarea.Value(), "\n") + 1
+	inputZoneHeight := 1 + liveLines // rule + live content lines
 
 	statusBarHeight := 1
 	loadingHeight := 0

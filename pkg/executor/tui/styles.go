@@ -12,6 +12,7 @@ var (
 	mintGreen   = lipgloss.Color("#A8E6CF") // Soft mint green - success/accept states
 	mutedGray   = lipgloss.Color("#6B7280") // Muted gray - secondary text
 	brightWhite = lipgloss.Color("#F9FAFB") // Bright white - primary text
+	dimSep      = lipgloss.Color("#374151") // Dim separator - slightly lighter than bg, used for rules and dividers
 )
 
 // Common Styles
@@ -51,6 +52,11 @@ var (
 	statusBarStyle = lipgloss.NewStyle().
 			Foreground(mutedGray).
 			Padding(0, 1)
+
+	// inputRuleStyle renders the horizontal rule above the input field and the
+	// header separator (Option B design, ADR-0051 Step 2 / Step 5).
+	inputRuleStyle = lipgloss.NewStyle().
+			Foreground(dimSep)
 
 	// inputPromptStyle styles the ❯ glyph in the Option B input zone
 	inputPromptStyle = lipgloss.NewStyle().

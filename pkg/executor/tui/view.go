@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/entrhq/forge/pkg/executor/tui/types"
+	"github.com/entrhq/forge/pkg/version"
 )
 
 // View renders the entire TUI interface.
@@ -56,7 +57,7 @@ func (m *model) buildHeader() string {
 
 	left := headerStyle.Render("⬡ forge")
 	mid := tipsStyle.Render(cwd)
-	right := tipsStyle.Render(modelName)
+	right := tipsStyle.Render(modelName + "  v" + version.Version)
 
 	totalUsed := lipgloss.Width(left) + lipgloss.Width(mid) + lipgloss.Width(right)
 	gap := (m.width - totalUsed) / 2
@@ -66,7 +67,7 @@ func (m *model) buildHeader() string {
 	pad := strings.Repeat(" ", gap)
 
 	bar := left + pad + mid + pad + right
-	separator := tipsStyle.Render(strings.Repeat("─", m.width))
+	separator := inputRuleStyle.Render(strings.Repeat("─", m.width))
 	return bar + "\n" + separator
 }
 
@@ -121,7 +122,7 @@ func (m *model) buildLoadingIndicator() string {
 //	──────────────────────── (rule, full width)
 //	❯ <textarea>
 func (m *model) buildInputBox() string {
-	rule := tipsStyle.Render(strings.Repeat("─", m.width))
+	rule := inputRuleStyle.Render(strings.Repeat("─", m.width))
 	var prompt string
 	if m.bashMode {
 		prompt = bashPromptStyle.Render("❯")
