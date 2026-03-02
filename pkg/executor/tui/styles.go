@@ -27,8 +27,12 @@ var (
 	tipsStyle = lipgloss.NewStyle().
 			Foreground(mutedGray)
 
-	userStyle = lipgloss.NewStyle().
-			Foreground(coralPink).
+	userIconStyle = lipgloss.NewStyle().
+			Foreground(salmonPink).
+			Bold(true)
+
+	userTextStyle = lipgloss.NewStyle().
+			Foreground(brightWhite).
 			Bold(true)
 
 	thinkingStyle = lipgloss.NewStyle().

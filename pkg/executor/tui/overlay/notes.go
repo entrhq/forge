@@ -157,7 +157,7 @@ func (o *NotesOverlay) Update(msg tea.Msg, state types.StateProvider, actions ty
 	case tea.WindowSizeMsg:
 		o.width = types.ComputeOverlayWidth(msg.Width, 0.80, 56, 100)
 		o.height = types.ComputeViewportHeight(msg.Height, 2)
-		o.list.SetSize(o.width-4, o.height-2)
+		o.list.SetSize(o.width-4, o.height-4)
 	}
 
 	var cmd tea.Cmd

@@ -14,7 +14,7 @@ func newScrollTestModel() *model {
 	// Fill with enough content that the viewport is not trivially at the bottom.
 	vp.SetContent(strings.Repeat("line\n", 50))
 	vp.GotoBottom()
-	
+
 	// Create model with messages so scrollToBottomOrMark will actually scroll
 	m := &model{
 		viewport:      vp,
@@ -23,7 +23,7 @@ func newScrollTestModel() *model {
 		width:         80,
 		height:        20,
 	}
-	
+
 	// Add messages that will trigger the scroll logic
 	// Generate enough content to exceed viewport height
 	for i := 0; i < 20; i++ {
@@ -32,7 +32,7 @@ func newScrollTestModel() *model {
 			Trailing: "\n",
 		})
 	}
-	
+
 	return m
 }
 

@@ -226,7 +226,7 @@ func (c *ContextOverlay) Update(msg tea.Msg, state types.StateProvider, actions 
 		vp := c.Viewport()
 		vp.Width = newOverlayWidth - 4
 		vp.Height = vpHeight
-		c.SetContent(vp.View())
+		// Viewport will re-wrap content automatically when dimensions change
 	}
 
 	return c, nil

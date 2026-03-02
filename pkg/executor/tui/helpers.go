@@ -82,25 +82,14 @@ func formatTokenCount(count int) string {
 }
 
 // formatEntry formats a content entry with an icon and optional styling
-func formatEntry(icon string, text string, style lipgloss.Style, width int, iconOnly bool) string {
+func formatEntry(icon string, text string, style lipgloss.Style, width int) string {
 	// Calculate wrap width (full width minus small padding)
 	wrapWidth := width - 4
 	if wrapWidth <= 0 {
 		wrapWidth = 80
 	}
 
-	if iconOnly {
-		// Style only the icon, keep text white
-		styledIcon := style.Render(icon)
-		fullText := icon + text // Use unstyled for wrapping calculation
-		wrapped := wordWrap(fullText, wrapWidth)
-
-		// Replace the unstyled icon with styled icon in first occurrence
-		wrapped = strings.Replace(wrapped, icon, styledIcon, 1)
-		return wrapped
-	}
-
-	// Style everything (default behavior)
+	// Style the full text (icon + content)
 	fullText := icon + text
 	wrapped := wordWrap(fullText, wrapWidth)
 	return style.Render(wrapped)
@@ -221,8 +210,8 @@ func sanitizeOutput(s string) string {
 	var b strings.Builder
 	b.Grow(len(s))
 	for _, ch := range s {
-		// Keep newlines, tabs, and printable characters
-		if ch < 0x20 && ch != '\n' && ch != '\t' && ch != '\r' {
+		// Keep newlines, tabs, and printable characters (but filter \r)
+		if ch < 0x20 && ch != '\n' && ch != '\t' {
 			continue
 		}
 		b.WriteRune(ch)
@@ -243,23 +232,56 @@ func truncateLines(s string, maxLines int) string {
 // updateTextAreaHeight dynamically adjusts the textarea height based on content
 // accounting for line wrapping and multi-line input
 func (m *model) updateTextAreaHeight() {
-	// The textarea component manages its own visual height internally.
-	// We trust textarea.Height() which already accounts for wrapping.
-	// Just call recalculateLayout() if the height changed.
-	currentHeight := m.textarea.Height()
-	
-	// Clamp between 1 and MaxHeight
-	targetHeight := currentHeight
-	if targetHeight < 1 {
-		targetHeight = 1
-	}
-	if targetHeight > m.textarea.MaxHeight {
-		targetHeight = m.textarea.MaxHeight
+	value := m.textarea.Value()
+	if value == "" {
+		if m.textarea.Height() != 1 {
+			m.textarea.SetHeight(1)
+			m.recalculateLayout()
+		}
+		return
 	}
 
-	// Only recalculate if height changed
-	if targetHeight != currentHeight {
-		m.textarea.SetHeight(targetHeight)
+	// Calculate visual lines accounting for wrapping
+	width := m.textarea.Width()
+	if width <= 0 {
+		width = 80 // default width
+	}
+
+	// Account for prompt glyph width ("❯ " = 2 chars, rendered externally in buildInputBox)
+	effectiveWidth := width - promptWidth
+	if effectiveWidth <= 0 {
+		effectiveWidth = 78
+	}
+
+	// Split by actual newlines first
+	textLines := strings.Split(value, "\n")
+	visualLines := 0
+
+	for _, line := range textLines {
+		if line == "" {
+			visualLines++ // Empty line still counts as 1 visual line
+		} else {
+			// Calculate how many visual lines this logical line takes
+			lineLen := lipgloss.Width(line)
+			wrappedLines := (lineLen + effectiveWidth - 1) / effectiveWidth
+			if wrappedLines == 0 {
+				wrappedLines = 1
+			}
+			visualLines += wrappedLines
+		}
+	}
+
+	// Clamp between 1 and MaxHeight
+	if visualLines < 1 {
+		visualLines = 1
+	}
+	if visualLines > m.textarea.MaxHeight {
+		visualLines = m.textarea.MaxHeight
+	}
+
+	// Only update if height changed to avoid unnecessary recalculation
+	if visualLines != m.textarea.Height() {
+		m.textarea.SetHeight(visualLines)
 		m.recalculateLayout()
 	}
 }

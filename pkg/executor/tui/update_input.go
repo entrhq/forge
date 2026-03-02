@@ -75,7 +75,20 @@ func (m *model) handleSingleShotBash(input string, tiCmd, vpCmd, spinnerCmd tea.
 
 // handleAgentMessage sends a regular user message to the agent.
 func (m *model) handleAgentMessage(input string, tiCmd, vpCmd, spinnerCmd tea.Cmd) (tea.Model, tea.Cmd) {
-	m.appendMsg(newEntryMsg("❯ ", input, userStyle, "\n\n"))
+	// Style icon and text separately for user messages
+	styledIcon := userIconStyle.Render("❯ ")
+	styledText := userTextStyle.Render(input)
+	m.appendMsg(DisplayMessage{
+		RenderFn: func(width int) string {
+			wrapWidth := width - 4
+			if wrapWidth <= 0 {
+				wrapWidth = 80
+			}
+			wrapped := wordWrap(styledText, wrapWidth)
+			return styledIcon + wrapped
+		},
+		Trailing: "\n\n",
+	})
 	m.textarea.Reset()
 
 	m.agentBusy = true

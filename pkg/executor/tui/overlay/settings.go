@@ -382,6 +382,8 @@ func tickCursorBlink() tea.Cmd {
 func (s *SettingsOverlay) Update(msg tea.Msg, state types.StateProvider, actions types.ActionHandler) (types.Overlay, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
+		s.termWidth = msg.Width
+		s.termHeight = msg.Height
 		s.width = types.ComputeOverlayWidth(msg.Width, 0.90, 60, 140)
 		s.height = types.ComputeViewportHeight(msg.Height, 4)
 		// Return without handling further

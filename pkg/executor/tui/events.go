@@ -9,11 +9,8 @@ import (
 	"github.com/entrhq/forge/pkg/agent/tools"
 	"github.com/entrhq/forge/pkg/executor/tui/overlay"
 	"github.com/entrhq/forge/pkg/executor/tui/types"
-	"github.com/entrhq/forge/pkg/logging"
 	pkgtypes "github.com/entrhq/forge/pkg/types"
 )
-
-var debugLog, _ = logging.NewLogger("tui-debug")
 
 // handleAgentEvent processes events from the agent event stream.
 // This is the main event handler that updates the UI based on agent activity.
@@ -110,12 +107,11 @@ func (m *model) scrollToBottomOrMark() {
 		// Only scroll to bottom if there's actual content that exceeds viewport height.
 		// Calling GotoBottom() when content fits entirely in viewport causes rendering
 		// corruption where the terminal scrolls the entire TUI frame upward.
+		// Use YPosition + Height to check if we need to scroll without re-rendering.
 		if len(m.messages) > 0 {
-			// Check if content actually needs scrolling
-			renderedContent := m.renderMessages(m.viewport.Width)
-			contentLines := strings.Count(renderedContent, "\n") + 1
-			needsScroll := contentLines > m.viewport.Height
-			
+			totalHeight := m.viewport.TotalLineCount()
+			needsScroll := totalHeight > m.viewport.Height
+
 			if needsScroll {
 				m.viewport.GotoBottom()
 			}
@@ -157,7 +153,7 @@ func (m *model) handleThinkingContent(event *pkgtypes.AgentEvent) {
 	base := m.renderMessages(m.viewport.Width)
 	if m.showThinking {
 		header := "⸫ "
-		formatted := formatEntry("", m.thinkingBuffer.String(), thinkingStyle, m.width, false)
+		formatted := formatEntry("", m.thinkingBuffer.String(), thinkingStyle, m.width)
 		block := header + formatted
 		indented := " " + strings.ReplaceAll(block, "\n", "\n ")
 		m.viewport.SetContent(base + indented)
@@ -179,7 +175,7 @@ func (m *model) handleThinkingEnd() {
 			m.appendMsg(DisplayMessage{
 				RenderFn: func(width int) string {
 					header := "⸫ "
-					formatted := formatEntry("", thinkingText, thinkingStyle, width, false)
+					formatted := formatEntry("", thinkingText, thinkingStyle, width)
 					block := header + formatted
 					return " " + strings.ReplaceAll(block, "\n", "\n ")
 				},
@@ -267,7 +263,7 @@ func (m *model) handleMessageContent(content string) bool {
 	// Ephemeral streaming preview — committed messages form the base; the
 	// in-progress message fragment is appended temporarily at the current width.
 	base := m.renderMessages(m.viewport.Width)
-	fragment := formatEntry("", m.messageBuffer.String(), lipgloss.NewStyle(), m.width, false)
+	fragment := formatEntry("", m.messageBuffer.String(), lipgloss.NewStyle(), m.width)
 	m.viewport.SetContent(base + fragment)
 	m.scrollToBottomOrMark() // ADR-0048
 

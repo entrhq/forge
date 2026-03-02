@@ -51,7 +51,7 @@ func (m *model) appendMsg(msg DisplayMessage) {
 func newEntryMsg(icon, text string, style lipgloss.Style, trailing string) DisplayMessage {
 	return DisplayMessage{
 		RenderFn: func(width int) string {
-			return formatEntry(icon, text, style, width, false)
+			return formatEntry(icon, text, style, width)
 		},
 		Trailing: trailing,
 	}

@@ -125,13 +125,13 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Only update textarea if no overlay or result list is active.
 	// This prevents the textarea from capturing scroll events when an overlay is open.
 	if !m.overlay.isActive() && !m.resultList.IsActive() {
-		oldHeight := m.textarea.Height()
-		
 		m.textarea, tiCmd = m.textarea.Update(msg)
-		newHeight := m.textarea.Height()
-		
-		if m.ready && oldHeight != newHeight {
-			m.recalculateLayout()
+
+		// Update height based on visual wrapping after every update.
+		// updateTextAreaHeight() calls recalculateLayout() internally when height changes,
+		// so no need to call it again here.
+		if m.ready {
+			m.updateTextAreaHeight()
 		}
 
 		// Handle command palette activation/deactivation based on input.
@@ -205,19 +205,6 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleApprovalRequest(msg)
 
 	case *types.AgentEvent:
-		// Log only significant events (not streaming content or routine outputs).
-		switch msg.Type {
-		case types.EventTypeError,
-			types.EventTypeToolApprovalRequest,
-			types.EventTypeToolApprovalGranted,
-			types.EventTypeToolApprovalRejected,
-			types.EventTypeToolApprovalTimeout,
-			types.EventTypeCommandExecutionStart,
-			types.EventTypeCommandExecutionComplete,
-			types.EventTypeCommandExecutionFailed,
-			types.EventTypeTurnEnd:
-
-		}
 		// Note: AgentEvent forwarding to overlay is handled in the early forwarding section above.
 		m.viewport, vpCmd = m.viewport.Update(msg)
 		m.handleAgentEvent(msg)
@@ -240,7 +227,6 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "ctrl+d", "esc", "enter", "tab", "up", "down", "pgup", "pgdown":
-
 		}
 		return m.handleKeyPress(msg, vpCmd, tiCmd, spinnerCmd)
 
@@ -257,7 +243,6 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
 		}
 	}
-
 	// Do NOT pass tea.KeyMsg to viewport.Update. The bubbles viewport has its own
 	// built-in space/arrow key bindings that scroll independently of our layout —
 	// forwarding key events here causes the viewport to scroll on Space/arrow presses
@@ -298,7 +283,7 @@ func (m *model) calculateViewportHeight() int {
 
 	// Visual spacer line between header and viewport (assembleBaseView line 231 adds "")
 	const spacerHeight = 1
-	viewportHeight := max(m.height - headerHeight - spacerHeight - inputZoneHeight - statusBarHeight - loadingHeight - scrollIndicatorHeight, 1)
+	viewportHeight := max(m.height-headerHeight-spacerHeight-inputZoneHeight-statusBarHeight-loadingHeight-scrollIndicatorHeight, 1)
 	return viewportHeight
 }
 
@@ -313,7 +298,7 @@ func (m *model) handleWindowResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 	// viewport to snap/jump on the next recalculateLayout call (e.g. when space
 	// causes word-wrap after a height resize). We own the viewport dimensions
 	// directly; no need to delegate WindowSizeMsg to the component itself.
-	
+
 	m.width = msg.Width
 	m.height = msg.Height
 
@@ -323,7 +308,7 @@ func (m *model) handleWindowResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 	}
 	m.textarea.MaxHeight = maxInputLines
 
-	m.textarea.SetWidth(m.width - textareaHorizontalPadding)
+	m.textarea.SetWidth(m.width - textareaHorizontalPadding - promptWidth)
 	m.viewport.Width = m.width - viewportHorizontalPadding
 	m.ready = true
 
@@ -354,9 +339,9 @@ func (m *model) recalculateLayout() {
 	newVpHeight := m.calculateViewportHeight()
 
 	m.viewport.Height = newVpHeight
-	
+
 	renderedContent := m.renderMessages(m.viewport.Width)
-	
+
 	m.viewport.SetContent(renderedContent)
 	// ADR-0048: scrollToBottomOrMark updates viewport.Height itself on the
 	// first false→true transition of hasNewContent, so no second call needed.

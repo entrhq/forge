@@ -152,7 +152,7 @@ func TestStreamingPreview_DoesNotMutateMessages(t *testing.T) {
 
 	// Simulate what handleMessageContent does on every streaming tick.
 	base := m.renderMessages(m.width)
-	fragment := formatEntry("", "...streaming...", lipgloss.NewStyle(), m.width, false)
+	fragment := formatEntry("", "...streaming...", lipgloss.NewStyle(), m.width)
 	_ = base + fragment // combined string set on viewport — never stored
 
 	after := len(m.messages)

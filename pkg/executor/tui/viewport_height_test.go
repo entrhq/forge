@@ -16,7 +16,7 @@ func newHeightTestModel(terminalHeight int) *model {
 	ta := textarea.New()
 	ta.SetWidth(80)
 	ta.SetHeight(1) // Default to 1-line height for baseline tests
-	
+
 	return &model{
 		viewport:       vp,
 		textarea:       ta,
@@ -40,56 +40,56 @@ func newHeightTestModel(terminalHeight int) *model {
 // This test prevents regression of the bug fixed in ADR-0052.
 func TestCalculateViewportHeight_AccountsForSpacer(t *testing.T) {
 	tests := []struct {
-		name              string
-		terminalHeight    int
-		textareaLines     int
-		agentBusy         bool
-		hasNewContent     bool
-		expectedViewport  int
+		name             string
+		terminalHeight   int
+		textareaLines    int
+		agentBusy        bool
+		hasNewContent    bool
+		expectedViewport int
 	}{
 		{
-			name:             "baseline 20-line terminal, 1-line textarea",
-			terminalHeight:   20,
-			textareaLines:    1,
-			agentBusy:        false,
-			hasNewContent:    false,
+			name:           "baseline 20-line terminal, 1-line textarea",
+			terminalHeight: 20,
+			textareaLines:  1,
+			agentBusy:      false,
+			hasNewContent:  false,
 			// Formula: height - headerHeight(4) - spacerHeight(1) - inputZoneHeight(1+textareaH) - statusBarHeight(1)
 			// 20 - 4 - 1 - 2 - 1 = 12
 			expectedViewport: 12,
 		},
 		{
-			name:             "with loading indicator",
-			terminalHeight:   20,
-			textareaLines:    1,
-			agentBusy:        true,
-			hasNewContent:    false,
+			name:           "with loading indicator",
+			terminalHeight: 20,
+			textareaLines:  1,
+			agentBusy:      true,
+			hasNewContent:  false,
 			// 20 - 4 - 1 - 2 - 1 - 1(loading) = 11
 			expectedViewport: 11,
 		},
 		{
-			name:             "with scroll indicator",
-			terminalHeight:   20,
-			textareaLines:    1,
-			agentBusy:        false,
-			hasNewContent:    true,
+			name:           "with scroll indicator",
+			terminalHeight: 20,
+			textareaLines:  1,
+			agentBusy:      false,
+			hasNewContent:  true,
 			// 20 - 4 - 1 - 2 - 1 - 1(scroll) = 11
 			expectedViewport: 11,
 		},
 		{
-			name:             "with multi-line textarea",
-			terminalHeight:   20,
-			textareaLines:    3,
-			agentBusy:        false,
-			hasNewContent:    false,
+			name:           "with multi-line textarea",
+			terminalHeight: 20,
+			textareaLines:  3,
+			agentBusy:      false,
+			hasNewContent:  false,
 			// 20 - 4 - 1 - 4(1+3) - 1 = 10
 			expectedViewport: 10,
 		},
 		{
-			name:             "small terminal",
-			terminalHeight:   10,
-			textareaLines:    1,
-			agentBusy:        false,
-			hasNewContent:    false,
+			name:           "small terminal",
+			terminalHeight: 10,
+			textareaLines:  1,
+			agentBusy:      false,
+			hasNewContent:  false,
 			// 10 - 4 - 1 - 2 - 1 = 2
 			expectedViewport: 2,
 		},
@@ -109,7 +109,7 @@ func TestCalculateViewportHeight_AccountsForSpacer(t *testing.T) {
 			m.agentBusy = tt.agentBusy
 			m.hasNewContent = tt.hasNewContent
 			m.followScroll = !tt.hasNewContent // scroll indicator only shows when locked
-			
+
 			// Set textarea to have the specified number of lines
 			// Set textarea to have the specified number of lines
 			if tt.textareaLines > 1 {
@@ -134,15 +134,15 @@ func TestCalculateViewportHeight_AccountsForSpacer(t *testing.T) {
 // constant is defined and equals 1, as required by the fix in ADR-0052.
 func TestCalculateViewportHeight_SpacerConstant(t *testing.T) {
 	m := newHeightTestModel(20)
-	
+
 	// The spacer is a constant inside calculateViewportHeight, but we can verify
 	// its effect by checking that the calculation matches our expected formula.
 	// For a 20-line terminal with 1-line textarea and no indicators:
 	// viewport = 20 - 4(header) - 1(spacer) - 2(input) - 1(status) = 12
-	
+
 	expected := 12
 	got := m.calculateViewportHeight()
-	
+
 	if got != expected {
 		t.Errorf("calculateViewportHeight() with baseline config = %d, want %d (spacer may not be accounted for)", got, expected)
 	}
@@ -182,23 +182,23 @@ func TestViewportHeight_NoOverflow(t *testing.T) {
 			m := newHeightTestModel(tt.terminalHeight)
 			m.agentBusy = tt.agentBusy
 			m.textarea.SetValue(tt.textareaValue)
-			
+
 			// Set viewport content so it's not empty
 			m.viewport.SetContent(strings.Repeat("content line\n", 50))
-			
+
 			// Recalculate layout to update viewport height
 			m.recalculateLayout()
-			
+
 			// Render the full view
 			view := m.View()
-			
+
 			// Count actual lines in output
 			actualLines := strings.Count(view, "\n") + 1
-			
+
 			if actualLines > tt.terminalHeight {
 				t.Errorf("View() overflow: produced %d lines for terminal height %d (overflow=%d)",
 					actualLines, tt.terminalHeight, actualLines-tt.terminalHeight)
-				
+
 				// Debug: show which component heights were calculated
 				t.Logf("Debug: viewport.Height=%d, textarea.Height()=%d, agentBusy=%v",
 					m.viewport.Height, m.textarea.Height(), m.agentBusy)

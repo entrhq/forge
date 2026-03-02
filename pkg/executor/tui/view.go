@@ -37,7 +37,7 @@ func (m *model) View() string {
 
 	// Layer overlays
 	finalView := m.applyOverlays(baseView)
-	
+
 	return finalView
 }
 
@@ -54,7 +54,12 @@ func (m *model) buildHeader() string {
 		cwd = abs
 	}
 	if m.width > 0 && lipgloss.Width(cwd) > m.width/2 {
-		cwd = "…" + cwd[len(cwd)-(m.width/2):]
+		// Use rune-aware truncation instead of byte-slice truncation
+		runes := []rune(cwd)
+		targetWidth := m.width / 2
+		if len(runes) > targetWidth {
+			cwd = "…" + string(runes[len(runes)-targetWidth:])
+		}
 	}
 
 	left := headerStyle.Render("⬡ forge")
@@ -132,7 +137,7 @@ func (m *model) buildInputBox() string {
 		prompt = inputPromptStyle.Render("❯")
 	}
 	input := m.textarea.View()
-	
+
 	result := rule + "\n" + prompt + " " + input
 	return result
 }

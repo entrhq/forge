@@ -74,7 +74,7 @@ func (a *GenericApprovalOverlay) Update(msg tea.Msg, state types.StateProvider, 
 		vp := a.Viewport()
 		vp.Width = newOverlayWidth - 4
 		vp.Height = vpHeight
-		a.SetContent(vp.View())
+		// Viewport will re-wrap content automatically when dimensions change
 	}
 
 	// Check if this is an approval/rejection key before delegating to base

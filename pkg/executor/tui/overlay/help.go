@@ -88,9 +88,7 @@ func (h *HelpOverlay) Update(msg tea.Msg, state types.StateProvider, actions typ
 		vp := h.Viewport()
 		vp.Width = newOverlayWidth - 4
 		vp.Height = vpHeight
-
-		// Re-initialize content when viewport resizes so it wraps correctly over new width
-		h.SetContent(h.Viewport().View())
+		// Viewport will re-wrap content automatically when dimensions change
 	}
 
 	return h, nil
