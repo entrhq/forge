@@ -93,6 +93,9 @@ func (m *model) handleAgentMessage(input string, tiCmd, vpCmd, spinnerCmd tea.Cm
 
 	m.agentBusy = true
 	m.currentLoadingMessage = getRandomLoadingMessage()
+
+	// Sending a message is explicit user intent to resume scroll-following
+	m.resumeFollowScroll()
 	m.recalculateLayout()
 
 	userInput := types.NewUserInput(input)
