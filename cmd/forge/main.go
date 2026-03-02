@@ -24,6 +24,7 @@ import (
 	"github.com/entrhq/forge/pkg/executor/tui"
 	"github.com/entrhq/forge/pkg/llm"
 	"github.com/entrhq/forge/pkg/llm/openai"
+	frameworkVersion "github.com/entrhq/forge/pkg/version"
 
 	"github.com/entrhq/forge/pkg/security/workspace"
 	"github.com/entrhq/forge/pkg/tools/browser"
@@ -33,7 +34,7 @@ import (
 )
 
 const (
-	version      = "0.1.0"                       // Version of the Forge coding agent
+	version      = frameworkVersion.Version      // Version of the Forge coding agent
 	defaultModel = "anthropic/claude-sonnet-4.5" // Default model to use
 
 	// Context management defaults for coding sessions

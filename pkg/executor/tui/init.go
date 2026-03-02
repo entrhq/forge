@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/entrhq/forge/pkg/config"
 	"github.com/entrhq/forge/pkg/executor/tui/overlay"
 )
 
@@ -17,7 +18,7 @@ func initialModel() model {
 	ta := textarea.New()
 	ta.Placeholder = "Type your message..."
 	ta.Focus()
-	ta.Prompt = "> "
+	ta.Prompt = "" // ADR-0051: prompt glyph rendered externally in buildInputBox
 	ta.CharLimit = 0
 	ta.SetHeight(1)
 	ta.MaxHeight = 10 // Allow up to 10 lines
@@ -27,7 +28,8 @@ func initialModel() model {
 	ta.FocusedStyle.Prompt = lipgloss.NewStyle().Foreground(salmonPink)
 	ta.FocusedStyle.Text = lipgloss.NewStyle().Foreground(brightWhite)
 
-	vp := viewport.New(80, 20)
+	// Viewport initialization: wait to receive tea.WindowSizeMsg to set actual dimensions
+	vp := viewport.New(0, 0)
 	vp.Style = lipgloss.NewStyle().Padding(0, 2)
 
 	s := spinner.New()
@@ -47,7 +49,7 @@ func initialModel() model {
 	return model{
 		viewport:         vp,
 		textarea:         ta,
-		content:          &strings.Builder{},
+		messages:         nil,
 		thinkingBuffer:   &strings.Builder{},
 		messageBuffer:    &strings.Builder{},
 		overlay:          newOverlayState(),
@@ -56,13 +58,24 @@ func initialModel() model {
 		toast:            &toastNotification{},
 		spinner:          s,
 		agentBusy:        false,
-		followScroll:     true,  // ADR-0048: auto-follow agent output by default
-		hasNewContent:    false, // ADR-0048: no new content initially
+		showThinking:     loadShowThinkingSetting(), // Persisted in config
+		followScroll:     true,                      // ADR-0048: auto-follow agent output by default
+		hasNewContent:    false,                     // ADR-0048: no new content initially
 		resultClassifier: NewToolResultClassifier(),
 		resultSummarizer: NewToolResultSummarizer(),
 		resultCache:      newResultCache(20),
 		resultList:       overlay.NewResultListModel(),
 	}
+}
+
+// loadShowThinkingSetting reads the show_thinking preference from config.
+// Falls back to true (default) if config is not yet initialized.
+func loadShowThinkingSetting() bool {
+	ui := config.GetUI()
+	if ui == nil {
+		return true
+	}
+	return ui.IsShowThinking()
 }
 
 // Init is the first function that will be called by Bubble Tea.

@@ -44,6 +44,7 @@ type Tool interface {
 
 // ToolCall represents a parsed tool invocation from the LLM's response
 type ToolCall struct {
+	ID         string         `xml:"-"` // Generated ID, not from XML
 	XMLName    xml.Name       `xml:"tool"`
 	ServerName string         `xml:"server_name"`
 	ToolName   string         `xml:"tool_name"`

@@ -2,12 +2,14 @@ package tui
 
 import (
 	"fmt"
-	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/entrhq/forge/pkg/ui"
+
+	"github.com/entrhq/forge/pkg/executor/tui/types"
+	"github.com/entrhq/forge/pkg/version"
 )
 
 // View renders the entire TUI interface.
@@ -20,7 +22,6 @@ func (m *model) View() string {
 	// Build header and status sections
 	header := m.buildHeader()
 	tips := m.buildTips()
-	topStatus := m.buildTopStatus()
 	loadingIndicator := m.buildLoadingIndicator()
 	inputBox := m.buildInputBox()
 	bottomBar := m.buildBottomBar()
@@ -32,35 +33,70 @@ func (m *model) View() string {
 	scrollIndicator := m.buildScrollLockIndicator()
 
 	// Assemble the base UI
-	baseView := m.assembleBaseView(header, tips, topStatus, viewportSection, scrollIndicator, loadingIndicator, inputBox, bottomBar)
+	baseView := m.assembleBaseView(header, tips, viewportSection, scrollIndicator, loadingIndicator, inputBox, bottomBar)
 
 	// Layer overlays
-	return m.applyOverlays(baseView)
+	finalView := m.applyOverlays(baseView)
+
+	return finalView
 }
 
-// buildHeader renders the ASCII art header
-// Generates ASCII art from the header text provided to the executor
+// buildHeader renders the compact single-line header bar.
+// Total height: 2 lines (bar + separator).
 func (m *model) buildHeader() string {
-	// Generate ASCII art from the header text
-	asciiArt := ui.GenerateASCIIArt(m.header)
-	return headerStyle.Render(asciiArt)
+	modelName := ""
+	if m.provider != nil {
+		modelName = m.provider.GetModel()
+	}
+
+	cwd := m.workspaceDir
+	if abs, err := filepath.Abs(cwd); err == nil {
+		cwd = abs
+	}
+	if m.width > 0 && lipgloss.Width(cwd) > m.width/2 {
+		// Use rune-aware truncation instead of byte-slice truncation
+		runes := []rune(cwd)
+		targetWidth := m.width / 2
+		if len(runes) > targetWidth {
+			cwd = "…" + string(runes[len(runes)-targetWidth:])
+		}
+	}
+
+	left := headerStyle.Render("⬡ forge")
+	mid := tipsStyle.Render(cwd)
+	right := tipsStyle.Render(modelName + "  v" + version.Version)
+
+	totalUsed := lipgloss.Width(left) + lipgloss.Width(mid) + lipgloss.Width(right)
+	gap := (m.width - totalUsed) / 2
+	if gap < 1 {
+		gap = 1
+	}
+	pad := strings.Repeat(" ", gap)
+
+	bar := left + pad + mid + pad + right
+	separator := inputRuleStyle.Render(strings.Repeat("─", m.width))
+	return bar + "\n" + separator
 }
 
-// buildTips renders context-sensitive usage tips
+// buildTips returns a single-line hints string adapted to the current TUI state.
 func (m *model) buildTips() string {
-	if m.bashMode {
-		return tipsStyle.Render(`  Bash Mode: Commands execute directly • Type 'exit' or Ctrl+C to return • Enter to run`)
-	}
-	return tipsStyle.Render(`  Tips: Ask questions • Alt+Enter for new line • Enter to send • !cmd for bash • /bash for mode • Ctrl+V to view last tool result • Ctrl+L for result history • Ctrl+Y to copy • Ctrl+C to exit`)
-}
+	switch {
+	case m.overlay.isActive():
+		return tipsStyle.Render("  Esc · close   Tab · next field   Enter · confirm")
 
-// buildTopStatus renders the working directory status bar
-func (m *model) buildTopStatus() string {
-	cwd, err := os.Getwd()
-	if err != nil {
-		cwd = "~"
+	case m.agentBusy:
+		hints := "  Ctrl+C · interrupt"
+		if !m.followScroll {
+			hints += "   G · follow output"
+		}
+		return tipsStyle.Render(hints)
+
+	case m.bashMode:
+		return tipsStyle.Render("  Enter · run   exit · return to normal   Ctrl+C · cancel")
+
+	default:
+		return tipsStyle.Render("  Enter · send   Alt+Enter · new line   / · commands   Ctrl+Y · copy   Ctrl+C · exit")
 	}
-	return statusBarStyle.Render(fmt.Sprintf(" Working directory: %s", cwd))
 }
 
 // buildScrollLockIndicator renders a "↓ New content below" hint when the user
@@ -88,65 +124,105 @@ func (m *model) buildLoadingIndicator() string {
 	return loadingStyle.Render(loadingMsg)
 }
 
-// buildInputBox renders the text input area
+// buildInputBox renders the Option B input zone:
+//
+//	──────────────────────── (rule, full width)
+//	❯ <textarea>
 func (m *model) buildInputBox() string {
-	return inputBoxStyle.Width(m.width - 4).Render(m.textarea.View())
+	rule := inputRuleStyle.Render(strings.Repeat("─", m.width))
+	var prompt string
+	if m.bashMode {
+		prompt = bashPromptStyle.Render("❯")
+	} else {
+		prompt = inputPromptStyle.Render("❯")
+	}
+	input := m.textarea.View()
+
+	result := rule + "\n" + prompt + " " + input
+	return result
 }
 
-// buildBottomBar renders the bottom status bar with token usage
+// buildBottomBar renders the bottom status bar: mode indicator (left) + token usage (right).
 func (m *model) buildBottomBar() string {
-	bottomLeft := "~/forge"
-	bottomCenter := "Enter to send • Alt+Enter for new line"
+	var left string
 	if m.bashMode {
-		bottomCenter = "🔧 BASH MODE • Enter to run • 'exit' to return"
+		left = lipgloss.NewStyle().Foreground(mintGreen).Bold(true).Render("bash mode")
 	}
-	bottomRight := m.buildTokenDisplay()
 
-	totalUsed := len(bottomLeft) + len(bottomCenter) + len(bottomRight)
-	leftPadding := (m.width - totalUsed) / 3
-	rightPadding := m.width - totalUsed - leftPadding*2
-	if leftPadding < 2 {
-		leftPadding = 2
+	// Thinking state indicator — always visible so the user always knows the mode
+	var thinkingIndicator string
+	if m.showThinking {
+		thinkingIndicator = lipgloss.NewStyle().Foreground(mintGreen).Render("⸫ Thinking On")
+	} else {
+		thinkingIndicator = lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("⸫ Thinking Hidden")
 	}
-	if rightPadding < 2 {
-		rightPadding = 2
+
+	tokenDisplay := m.buildTokenDisplay()
+
+	// Right side: thinking indicator + token display (if any)
+	var right string
+	if tokenDisplay != "" {
+		right = thinkingIndicator + "   " + tokenDisplay
+	} else {
+		right = thinkingIndicator
+	}
+
+	// Subtract 2 for the Padding(0, 1) on statusBarStyle (1 char each side)
+	gap := m.width - 2 - lipgloss.Width(left) - lipgloss.Width(right)
+	if gap < 1 {
+		gap = 1
 	}
 
 	return statusBarStyle.Width(m.width).Render(
-		bottomLeft +
-			strings.Repeat(" ", leftPadding) +
-			bottomCenter +
-			strings.Repeat(" ", rightPadding) +
-			bottomRight,
+		left + strings.Repeat(" ", gap) + right,
 	)
 }
 
-// buildTokenDisplay renders the token usage statistics
+// buildTokenDisplay renders the token usage statistics with a context progress bar.
+// Format: ctx ████░░░░ 12k / 128k
 func (m *model) buildTokenDisplay() string {
 	if m.totalTokens == 0 {
-		return "Forge Agent"
+		return ""
 	}
 
-	contextStr := formatTokenCount(m.currentContextTokens)
+	var ctxPart string
 	if m.maxContextTokens > 0 {
-		contextStr = fmt.Sprintf("%s/%s", contextStr, formatTokenCount(m.maxContextTokens))
-		percentage := float64(m.currentContextTokens) / float64(m.maxContextTokens) * 100
-		if percentage >= 80 {
-			contextStr = lipgloss.NewStyle().Foreground(lipgloss.Color("203")).Render(contextStr)
+		pct := float64(m.currentContextTokens) / float64(m.maxContextTokens)
+
+		// 8-cell progress bar
+		const barWidth = 8
+		filled := int(pct * barWidth)
+		if filled > barWidth {
+			filled = barWidth
 		}
+		bar := strings.Repeat("█", filled) + strings.Repeat("░", barWidth-filled)
+
+		// Color bar by usage level
+		var barColor lipgloss.Color
+		switch {
+		case pct >= 0.95:
+			barColor = lipgloss.Color("203") // red
+		case pct >= 0.80:
+			barColor = lipgloss.Color("214") // orange
+		default:
+			barColor = lipgloss.Color("#A8E6CF") // mintGreen
+		}
+
+		barStr := lipgloss.NewStyle().Foreground(barColor).Render(bar)
+		ctxPart = fmt.Sprintf("ctx %s %s / %s",
+			barStr,
+			formatTokenCount(m.currentContextTokens),
+			formatTokenCount(m.maxContextTokens))
+	} else {
+		ctxPart = fmt.Sprintf("ctx %s", formatTokenCount(m.currentContextTokens))
 	}
 
-	return fmt.Sprintf("◆ Context: %s | Input: %s | Output: %s | Total: %s",
-		contextStr,
-		formatTokenCount(m.totalPromptTokens),
-		formatTokenCount(m.totalCompletionTokens),
-		formatTokenCount(m.totalTokens))
+	return ctxPart
 }
 
 // assembleBaseView combines all UI components into the base view.
 // scrollIndicator is the ADR-0048 "new content" banner (empty string when not needed).
-func (m *model) assembleBaseView(header, tips, topStatus, viewportSection, scrollIndicator, loadingIndicator, inputBox, bottomBar string) string {
-	// Collect the rows that always appear between the viewport and the input box
+func (m *model) assembleBaseView(header, tips, viewportSection, scrollIndicator, loadingIndicator, inputBox, bottomBar string) string {
 	var middle []string
 	middle = append(middle, viewportSection)
 	if scrollIndicator != "" {
@@ -156,10 +232,13 @@ func (m *model) assembleBaseView(header, tips, topStatus, viewportSection, scrol
 		middle = append(middle, loadingIndicator)
 	}
 
-	rows := []string{header, tips, topStatus, ""}
+	// Visual spacer between header and content
+	rows := []string{header, tips, ""}
 	rows = append(rows, middle...)
 	rows = append(rows, inputBox, bottomBar)
-	return lipgloss.JoinVertical(lipgloss.Left, rows...)
+
+	result := lipgloss.JoinVertical(lipgloss.Left, rows...)
+	return result
 }
 
 // applyOverlays layers all active overlays on top of the base view
@@ -173,7 +252,7 @@ func (m *model) applyOverlays(baseView string) string {
 	}
 
 	if m.commandPalette.IsActive() {
-		paletteContent := m.commandPalette.Render(m.width)
+		paletteContent := m.commandPalette.Render(m.width, m.height)
 		baseView = renderToastOverlay(baseView, paletteContent)
 	}
 
@@ -197,54 +276,42 @@ func (m *model) renderSummarizationStatus() string {
 		return ""
 	}
 
-	// Create box with border
-	boxWidth := m.width - 4
-	if boxWidth < 40 {
-		boxWidth = 40
-	}
+	// Calculate width matching redesign
+	boxWidth := types.ComputeOverlayWidth(m.width, 0.70, 40, 90)
 
 	var content strings.Builder
 
-	// Header line with brain icon and message
-	header := fmt.Sprintf("🧠 Optimizing context... [%s]", m.summarization.strategy)
-	content.WriteString(header)
+	// Header - Redesign to match mockups: salmon title + muted gray separator line
+	headerStyle := lipgloss.NewStyle().Foreground(salmonPink).Bold(true)
+	title := fmt.Sprintf("Optimizing context... [%s]", m.summarization.strategy)
+	content.WriteString(headerStyle.Render(title))
 	content.WriteString("\n")
 
-	// Progress bar
-	barWidth := boxWidth - 10 // Leave room for percentage
-	if barWidth < 20 {
-		barWidth = 20
+	sepStr := ""
+	innerWidth := boxWidth - 4 // Account for borders (2) and padding (2)
+	for i := 0; i < innerWidth; i++ {
+		sepStr += "─"
 	}
-
-	filledWidth := int(float64(barWidth) * m.summarization.progressPercent / 100.0)
-	if filledWidth > barWidth {
-		filledWidth = barWidth
-	}
-
-	bar := strings.Repeat("━", filledWidth) + strings.Repeat("━", barWidth-filledWidth)
-	// Show both item count and percentage
-	if m.summarization.totalItems > 0 {
-		progressLine := fmt.Sprintf("%s %d/%d items (%.0f%%)",
-			bar, m.summarization.itemsProcessed, m.summarization.totalItems, m.summarization.progressPercent)
-		content.WriteString(progressLine)
-	} else {
-		progressLine := fmt.Sprintf("%s %.0f%%", bar, m.summarization.progressPercent)
-		content.WriteString(progressLine)
-	}
+	content.WriteString(lipgloss.NewStyle().Foreground(mutedGray).Render(sepStr))
 	content.WriteString("\n")
 
-	// Current item description
-	if m.summarization.currentItem != "" {
-		content.WriteString(m.summarization.currentItem)
-	} else if m.summarization.totalItems > 0 {
-		content.WriteString(fmt.Sprintf("Processing item %d of %d...",
-			m.summarization.itemsProcessed, m.summarization.totalItems))
+	// Render the spinner alongside the loading text
+	spinnerStr := m.spinner.View()
+	textStyle := lipgloss.NewStyle().Foreground(mutedGray)
+
+	statusText := "Summarizing older messages to free up context..."
+	if m.summarization.maxTokens > 0 && m.summarization.currentTokens > 0 {
+		statusText = fmt.Sprintf("Summarizing %s / %s tokens to free up context...",
+			formatTokenCount(m.summarization.currentTokens),
+			formatTokenCount(m.summarization.maxTokens))
 	}
+
+	content.WriteString(fmt.Sprintf("%s %s", spinnerStr, textStyle.Render(statusText)))
 
 	// Create styled box
 	boxStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(salmonPink).
+		Border(lipgloss.NormalBorder()).
+		BorderForeground(mutedGray).
 		Padding(0, 1).
 		Width(boxWidth)
 
@@ -257,33 +324,40 @@ func (m *model) renderToast() string {
 		return ""
 	}
 
-	// Create box with border
-	boxWidth := m.width - 4
-	if boxWidth < 40 {
-		boxWidth = 40
-	}
+	// Calculate width matching redesign
+	boxWidth := types.ComputeOverlayWidth(m.width, 0.70, 40, 90)
 
 	var content strings.Builder
 
+	// Determine base style per type
+	baseColor := mutedGray
+	if m.toast.isError {
+		baseColor = lipgloss.Color("203") // Red color for errors
+	}
+
 	// Icon and message
 	header := fmt.Sprintf("%s %s", m.toast.icon, m.toast.message)
+
+	// If no details, render as flat boxless string (Option B)
+	if m.toast.details == "" {
+		flatStyle := lipgloss.NewStyle().
+			Foreground(baseColor).
+			Padding(0, 1).
+			Width(boxWidth)
+		return "\n" + flatStyle.Render(header) + "\n"
+	}
+
 	content.WriteString(header)
 	content.WriteString("\n")
 
-	// Details
-	if m.toast.details != "" {
-		content.WriteString(m.toast.details)
-	}
+	// Details (Option C: Normal border)
+	detailStyle := lipgloss.NewStyle().Foreground(mutedGray)
+	content.WriteString(detailStyle.Render(m.toast.details))
 
 	// Create styled box
-	borderColor := salmonPink
-	if m.toast.isError {
-		borderColor = lipgloss.Color("203") // Red color for errors
-	}
-
 	boxStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(borderColor).
+		Border(lipgloss.NormalBorder()).
+		BorderForeground(baseColor).
 		Padding(0, 1).
 		Width(boxWidth)
 

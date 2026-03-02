@@ -261,7 +261,7 @@ func TestPRRequest_OnReject(t *testing.T) {
 		t.Error("Expected IsError to be false for cancel message")
 	}
 
-	if toastMsg.Icon != "ℹ️" {
+	if toastMsg.Icon != "i" {
 		t.Errorf("Expected info icon, got %q", toastMsg.Icon)
 	}
 }

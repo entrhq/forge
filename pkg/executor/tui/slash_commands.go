@@ -7,11 +7,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/entrhq/forge/pkg/agent/git"
+	"github.com/entrhq/forge/pkg/config"
 	"github.com/entrhq/forge/pkg/executor/tui/approval"
 	"github.com/entrhq/forge/pkg/executor/tui/overlay"
 	tuitypes "github.com/entrhq/forge/pkg/executor/tui/types"
@@ -134,6 +137,15 @@ func init() {
 		MinArgs:     0,
 		MaxArgs:     0,
 	})
+
+	registerCommand(&SlashCommand{
+		Name:        "thinking",
+		Description: "Toggle display of extended thinking blocks",
+		Type:        CommandTypeTUI,
+		Handler:     handleThinkingCommand,
+		MinArgs:     0,
+		MaxArgs:     0,
+	})
 }
 
 // registerCommand adds a command to the registry
@@ -187,17 +199,17 @@ func executeSlashCommand(m *model, commandName string, args []string) (*model, t
 	cmd, exists := getCommand(commandName)
 	if !exists {
 		// Unknown command - show error toast
-		m.showToast("Unknown command", fmt.Sprintf("Command '/%s' not found. Type /help for available commands.", commandName), "❌", true)
+		m.showToast("Unknown command", fmt.Sprintf("Command '/%s' not found. Type /help for available commands.", commandName), "✗", true)
 		return m, nil
 	}
 
 	// Validate argument count
 	if len(args) < cmd.MinArgs {
-		m.showToast("Invalid arguments", fmt.Sprintf("Command '/%s' requires at least %d argument(s)", commandName, cmd.MinArgs), "❌", true)
+		m.showToast("Invalid arguments", fmt.Sprintf("Command '/%s' requires at least %d argument(s)", commandName, cmd.MinArgs), "✗", true)
 		return m, nil
 	}
 	if cmd.MaxArgs != -1 && len(args) > cmd.MaxArgs {
-		m.showToast("Invalid arguments", fmt.Sprintf("Command '/%s' accepts at most %d argument(s)", commandName, cmd.MaxArgs), "❌", true)
+		m.showToast("Invalid arguments", fmt.Sprintf("Command '/%s' accepts at most %d argument(s)", commandName, cmd.MaxArgs), "✗", true)
 		return m, nil
 	}
 
@@ -238,7 +250,7 @@ func executeSlashCommand(m *model, commandName string, args []string) (*model, t
 			return m, nil
 		default:
 			// Unknown return type - show error
-			m.showToast("Command Error", fmt.Sprintf("Command '/%s' returned unexpected type", commandName), "❌", true)
+			m.showToast("Command Error", fmt.Sprintf("Command '/%s' returned unexpected type", commandName), "✗", true)
 			return m, nil
 		}
 	}
@@ -248,32 +260,83 @@ func executeSlashCommand(m *model, commandName string, args []string) (*model, t
 
 // handleHelpCommand shows help information
 func handleHelpCommand(m *model, args []string) interface{} {
-	// Build help content
-	var helpContent strings.Builder
-	helpContent.WriteString("Available Commands:\n\n")
+	content := buildHelpContent()
+	helpOverlay := overlay.NewHelpOverlay("Help", content, m.width, m.height)
+	m.overlay.activate(tuitypes.OverlayModeHelp, helpOverlay)
+	return nil
+}
 
-	commands := getAllCommands()
-	for _, cmd := range commands {
-		helpContent.WriteString(fmt.Sprintf("  /%s\n", cmd.Name))
-		helpContent.WriteString(fmt.Sprintf("    %s\n\n", cmd.Description))
+// buildHelpContent constructs the styled help overlay content.
+func buildHelpContent() string {
+	var b strings.Builder
+
+	sectionStyle := lipgloss.NewStyle().Bold(true).Foreground(tuitypes.SalmonPink)
+	cmdStyle := lipgloss.NewStyle().Foreground(tuitypes.SalmonPink)
+	keyStyle := lipgloss.NewStyle().Foreground(tuitypes.BrightWhite)
+	descStyle := lipgloss.NewStyle().Foreground(tuitypes.MutedGray)
+
+	// --- Commands ---
+	cmds := getAllCommands()
+	sort.Slice(cmds, func(i, j int) bool { return cmds[i].Name < cmds[j].Name })
+
+	// Compute column width from longest command name (e.g. "/snapshot").
+	maxCmdLen := 0
+	for _, c := range cmds {
+		if l := len(c.Name) + 1; l > maxCmdLen { // +1 for leading "/"
+			maxCmdLen = l
+		}
+	}
+	cmdColWidth := maxCmdLen + 2 // 2-char gap between columns
+
+	b.WriteString(sectionStyle.Render("Commands"))
+	b.WriteString("\n")
+	for _, c := range cmds {
+		label := "/" + c.Name
+		pad := strings.Repeat(" ", cmdColWidth-len(label))
+		b.WriteString("  ")
+		b.WriteString(cmdStyle.Render(label))
+		b.WriteString(pad)
+		b.WriteString(descStyle.Render(c.Description))
+		b.WriteString("\n")
 	}
 
-	helpContent.WriteString("Keyboard Shortcuts:\n\n")
-	helpContent.WriteString("  Enter        Send message\n")
-	helpContent.WriteString("  Alt+Enter    New line\n")
-	helpContent.WriteString("  Ctrl+C       Exit\n")
-	helpContent.WriteString("  Ctrl+D       Show command help\n\n")
+	b.WriteString("\n")
 
-	helpContent.WriteString("Tips:\n\n")
-	helpContent.WriteString("  • Type / to see available commands\n")
-	helpContent.WriteString("  • Use arrow keys to navigate command palette\n")
-	helpContent.WriteString("  • Press Escape to cancel command entry\n")
+	// --- Keys ---
+	type keyBinding struct{ key, desc string }
+	keys := []keyBinding{
+		{"Enter", "Send message"},
+		{"Alt+Enter", "New line"},
+		{"Ctrl+K / Ctrl+P", "Command palette"},
+		{"Ctrl+L", "Result history"},
+		{"Cmd+V / Shift+Ins", "Paste"},
+		{"Ctrl+Y", "Copy to clipboard"},
+		{"PgUp", "Scroll up (lock follow)"},
+		{"PgDn", "Scroll down"},
+		{"Esc", "Cancel / dismiss overlay"},
+		{"Ctrl+C", "Quit"},
+	}
 
-	// Create and activate the help overlay
-	helpOverlay := overlay.NewHelpOverlay("Help", helpContent.String())
-	m.overlay.activate(tuitypes.OverlayModeHelp, helpOverlay)
+	maxKeyLen := 0
+	for _, k := range keys {
+		if l := len(k.key); l > maxKeyLen {
+			maxKeyLen = l
+		}
+	}
+	keyColWidth := maxKeyLen + 2
 
-	return nil
+	b.WriteString(sectionStyle.Render("Keys"))
+	b.WriteString("\n")
+	for _, k := range keys {
+		pad := strings.Repeat(" ", keyColWidth-len(k.key))
+		b.WriteString("  ")
+		b.WriteString(keyStyle.Render(k.key))
+		b.WriteString(pad)
+		b.WriteString(descStyle.Render(k.desc))
+		b.WriteString("\n")
+	}
+
+	return b.String()
 }
 
 // handleStopCommand stops the current agent operation
@@ -281,7 +344,7 @@ func handleStopCommand(m *model, args []string) interface{} {
 	if m.channels != nil {
 		// Send cancel input to agent
 		m.channels.Input <- types.NewCancelInput()
-		m.showToast("Stopping", "Sent stop signal to agent", "⏹️", false)
+		m.showToast("Stopping", "Sent stop signal to agent", "■", false)
 	}
 	return nil
 }
@@ -289,7 +352,7 @@ func handleStopCommand(m *model, args []string) interface{} {
 // handleCommitCommand creates a git commit with preview
 func handleCommitCommand(m *model, args []string) interface{} {
 	if m.slashHandler == nil {
-		m.showToast("Error", "Git operations not available", "❌", true)
+		m.showToast("Error", "Git operations not available", "✗", true)
 		return nil
 	}
 
@@ -305,7 +368,7 @@ func handleCommitCommand(m *model, args []string) interface{} {
 			return toastMsg{
 				message: "Commit Failed",
 				details: fmt.Sprintf("Failed to get modified files: %v", err),
-				icon:    "❌",
+				icon:    "✗",
 				isError: true,
 			}
 		}
@@ -314,7 +377,7 @@ func handleCommitCommand(m *model, args []string) interface{} {
 			return toastMsg{
 				message: "Nothing to Commit",
 				details: "No modified files found",
-				icon:    "ℹ️",
+				icon:    "i",
 				isError: false,
 			}
 		}
@@ -330,7 +393,7 @@ func handleCommitCommand(m *model, args []string) interface{} {
 				return toastMsg{
 					message: "Commit Failed",
 					details: fmt.Sprintf("Failed to generate commit message: %v", err),
-					icon:    "❌",
+					icon:    "✗",
 					isError: true,
 				}
 			}
@@ -386,7 +449,7 @@ func getDiffForFiles(workingDir string, files []string) string {
 // handlePRCommand creates a pull request with preview
 func handlePRCommand(m *model, args []string) interface{} {
 	if m.slashHandler == nil {
-		m.showToast("Error", "Git operations not available", "❌", true)
+		m.showToast("Error", "Git operations not available", "✗", true)
 		return nil
 	}
 
@@ -401,7 +464,7 @@ func handlePRCommand(m *model, args []string) interface{} {
 			return toastMsg{
 				message: "PR Failed",
 				details: fmt.Sprintf("Failed to detect base branch: %v", err),
-				icon:    "❌",
+				icon:    "✗",
 				isError: true,
 			}
 		}
@@ -412,7 +475,7 @@ func handlePRCommand(m *model, args []string) interface{} {
 			return toastMsg{
 				message: "PR Failed",
 				details: fmt.Sprintf("Failed to get current branch: %v", err),
-				icon:    "❌",
+				icon:    "✗",
 				isError: true,
 			}
 		}
@@ -423,7 +486,7 @@ func handlePRCommand(m *model, args []string) interface{} {
 			return toastMsg{
 				message: "PR Failed",
 				details: fmt.Sprintf("Failed to get commits: %v", err),
-				icon:    "❌",
+				icon:    "✗",
 				isError: true,
 			}
 		}
@@ -432,7 +495,7 @@ func handlePRCommand(m *model, args []string) interface{} {
 			return toastMsg{
 				message: "Nothing to PR",
 				details: "No commits found for pull request",
-				icon:    "ℹ️",
+				icon:    "i",
 				isError: false,
 			}
 		}
@@ -443,7 +506,7 @@ func handlePRCommand(m *model, args []string) interface{} {
 			return toastMsg{
 				message: "PR Failed",
 				details: fmt.Sprintf("Failed to get diff summary: %v", err),
-				icon:    "❌",
+				icon:    "✗",
 				isError: true,
 			}
 		}
@@ -454,7 +517,7 @@ func handlePRCommand(m *model, args []string) interface{} {
 			return toastMsg{
 				message: "PR Failed",
 				details: fmt.Sprintf("Failed to generate PR content: %v", err),
-				icon:    "❌",
+				icon:    "✗",
 				isError: true,
 			}
 		}
@@ -497,6 +560,15 @@ func handleSettingsCommand(m *model, args []string) interface{} {
 	}
 
 	settingsOverlay := overlay.NewSettingsOverlayWithCallback(m.width, m.height, onLLMSettingsChange, m.provider)
+
+	// Sync runtime showThinking after UI settings are saved in the overlay
+	settingsOverlay.SetOnUISettingsChange(func() error {
+		if ui := config.GetUI(); ui != nil {
+			m.showThinking = ui.IsShowThinking()
+		}
+		return nil
+	})
+
 	m.overlay.activateAndClearStack(tuitypes.OverlayModeSettings, settingsOverlay)
 
 	return nil
@@ -506,7 +578,7 @@ func handleSettingsCommand(m *model, args []string) interface{} {
 func handleContextCommand(m *model, args []string) interface{} {
 	// Get context info from agent
 	if m.agent == nil {
-		m.showToast("Error", "Agent not available", "❌", true)
+		m.showToast("Error", "Agent not available", "✗", true)
 		return nil
 	}
 
@@ -557,7 +629,30 @@ func handleContextCommand(m *model, args []string) interface{} {
 func handleBashCommand(m *model, args []string) interface{} {
 	m.bashMode = true
 	m.updatePrompt()
-	m.showToast("Bash Mode", "Entered bash mode. Commands will be executed directly. Type 'exit' or press Ctrl+C to return.", "🔧", false)
+	m.showToast("Bash Mode", "Entered bash mode. Commands will be executed directly. Type 'exit' or press Ctrl+C to return.", "❯", false)
+	return nil
+}
+
+// handleThinkingCommand toggles the display of extended thinking blocks.
+// When disabled, only a collapsed "… Thinking" indicator is shown during
+// streaming; the full content is discarded after the thinking block ends.
+func handleThinkingCommand(m *model, args []string) interface{} {
+	m.showThinking = !m.showThinking
+
+	// Persist to config so the preference survives restarts
+	if ui := config.GetUI(); ui != nil {
+		ui.SetShowThinking(m.showThinking)
+		if err := config.Global().SaveAll(); err != nil {
+			m.showToast("Save failed", "Could not persist thinking setting: "+err.Error(), "⚠", true)
+			return nil
+		}
+	}
+
+	if m.showThinking {
+		m.showToast("Thinking visible", "Extended thinking blocks will be shown in full", "⸫", false)
+	} else {
+		m.showToast("Thinking hidden", "Only a collapsed indicator will be shown while the model thinks", "⸫", false)
+	}
 	return nil
 }
 
@@ -603,7 +698,7 @@ type contextSnapshot struct {
 // JSON file in <workspace>/.forge/context/ and shows a toast with the output path.
 func handleSnapshotCommand(m *model, args []string) interface{} {
 	if m.agent == nil {
-		m.showToast("Error", "Agent not available", "❌", true)
+		m.showToast("Error", "Agent not available", "✗", true)
 		return nil
 	}
 
@@ -612,7 +707,7 @@ func handleSnapshotCommand(m *model, args []string) interface{} {
 	// Ensure the output directory exists.
 	outDir := filepath.Join(m.workspaceDir, ".forge", "context")
 	if err := os.MkdirAll(outDir, 0o750); err != nil {
-		m.showToast("Export failed", fmt.Sprintf("Could not create directory: %v", err), "❌", true)
+		m.showToast("Export failed", fmt.Sprintf("Could not create directory: %v", err), "✗", true)
 		return nil
 	}
 
@@ -622,16 +717,16 @@ func handleSnapshotCommand(m *model, args []string) interface{} {
 
 	data, err := json.MarshalIndent(snapshot, "", "  ")
 	if err != nil {
-		m.showToast("Export failed", fmt.Sprintf("Could not marshal JSON: %v", err), "❌", true)
+		m.showToast("Export failed", fmt.Sprintf("Could not marshal JSON: %v", err), "✗", true)
 		return nil
 	}
 
 	if err := os.WriteFile(outPath, data, 0o600); err != nil {
-		m.showToast("Export failed", fmt.Sprintf("Could not write file: %v", err), "❌", true)
+		m.showToast("Export failed", fmt.Sprintf("Could not write file: %v", err), "✗", true)
 		return nil
 	}
 
-	m.showToast("Context exported", outPath, "📄", false)
+	m.showToast("Context exported", outPath, "✓", false)
 	return nil
 }
 

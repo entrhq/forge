@@ -81,10 +81,14 @@ type NotesOverlay struct {
 
 // NewNotesOverlay creates a new notes overlay
 func NewNotesOverlay(notes []pkgtypes.NoteData, width, height int) *NotesOverlay {
+	overlayWidth := types.ComputeOverlayWidth(width, 0.80, 56, 100)
+	overlayHeight := types.ComputeViewportHeight(height, 2)
+
 	delegate := newNoteListDelegate()
 
 	l := list.New([]list.Item{}, delegate, 0, 0)
-	l.Title = "📝 Scratchpad Notes"
+	l.Title = ""
+	l.SetShowTitle(false)
 	l.SetShowStatusBar(true)
 	l.SetFilteringEnabled(false)
 
@@ -118,13 +122,13 @@ func NewNotesOverlay(notes []pkgtypes.NoteData, width, height int) *NotesOverlay
 	}
 
 	l.SetItems(items)
-	l.SetSize(width-4, height-4)
+	l.SetSize(overlayWidth-4, overlayHeight-4)
 
 	return &NotesOverlay{
 		list:   l,
 		notes:  notes,
-		width:  width,
-		height: height,
+		width:  overlayWidth,
+		height: overlayHeight,
 		active: true,
 	}
 }
@@ -151,9 +155,9 @@ func (o *NotesOverlay) Update(msg tea.Msg, state types.StateProvider, actions ty
 			}
 		}
 	case tea.WindowSizeMsg:
-		o.width = msg.Width
-		o.height = msg.Height
-		o.list.SetSize(msg.Width-4, msg.Height-4)
+		o.width = types.ComputeOverlayWidth(msg.Width, 0.80, 56, 100)
+		o.height = types.ComputeViewportHeight(msg.Height, 2)
+		o.list.SetSize(o.width-4, o.height-4)
 	}
 
 	var cmd tea.Cmd
@@ -167,15 +171,28 @@ func (o *NotesOverlay) View() string {
 		return ""
 	}
 
-	// Create a bordered container for the list
-	boxStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(types.SalmonPink).
-		Padding(1, 2).
-		Width(o.width - 4).
-		Height(o.height - 4)
+	title := fmt.Sprintf("Scratchpad Notes (%d)", len(o.notes))
 
-	return boxStyle.Render(o.list.View())
+	listContent := o.list.View()
+
+	// Title pad logic matches help/context
+	headerStr := types.OverlayTitleStyle.Render(title)
+	innerWidth := o.width - 4
+	if innerWidth < 0 {
+		innerWidth = 0
+	}
+
+	headerLen := lipgloss.Width(headerStr)
+	titlePad := ""
+	for i := 0; i < max(0, (innerWidth-headerLen)/2); i++ {
+		titlePad += " "
+	}
+
+	separator := lipgloss.NewStyle().Foreground(types.MutedGray).Render(strings.Repeat(sepChar, innerWidth))
+
+	content := titlePad + headerStr + "\n" + separator + "\n" + listContent
+
+	return types.CreateOverlayContainerStyle(o.width).Height(o.height).Render(content)
 }
 
 // Focused returns whether the notes overlay should handle input

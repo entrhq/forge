@@ -22,7 +22,7 @@ func (m *model) executeBashCommand(command string) tea.Cmd {
 			return toastMsg{
 				message: "Error",
 				details: "execute_command tool not available",
-				icon:    "❌",
+				icon:    "✗",
 				isError: true,
 			}
 		}
@@ -33,7 +33,7 @@ func (m *model) executeBashCommand(command string) tea.Cmd {
 			return toastMsg{
 				message: "Error",
 				details: "execute_command tool has invalid type",
-				icon:    "❌",
+				icon:    "✗",
 				isError: true,
 			}
 		}
@@ -55,7 +55,7 @@ func (m *model) executeBashCommand(command string) tea.Cmd {
 			return toastMsg{
 				message: "Command Failed",
 				details: fmt.Sprintf("Error: %v", err),
-				icon:    "❌",
+				icon:    "✗",
 				isError: true,
 			}
 		}
@@ -79,11 +79,11 @@ type bashCommandResultMsg struct {
 
 // updatePrompt changes the textarea prompt based on current mode
 func (m *model) updatePrompt() {
+	// ADR-0051: prompt glyph rendered externally in buildInputBox; clear textarea's own prompt
+	m.textarea.Prompt = ""
 	if m.bashMode {
-		m.textarea.Prompt = "bash> "
 		m.textarea.FocusedStyle.Prompt = lipgloss.NewStyle().Foreground(mintGreen)
 	} else {
-		m.textarea.Prompt = "> "
 		m.textarea.FocusedStyle.Prompt = lipgloss.NewStyle().Foreground(salmonPink)
 	}
 }

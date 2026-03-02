@@ -6,6 +6,8 @@ import (
 	"io"
 	"regexp"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 const (
@@ -75,6 +77,9 @@ func ParseToolCall(text string) (*ToolCall, string, error) {
 	if toolCall.ServerName == "" {
 		toolCall.ServerName = defaultServerName
 	}
+
+	// Generate a stable UUID for this parsed tool call to track it through execution
+	toolCall.ID = uuid.New().String()
 
 	// Remove the tool call from the text
 	remainingText := toolRegex.ReplaceAllString(text, "")

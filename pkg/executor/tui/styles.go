@@ -12,6 +12,7 @@ var (
 	mintGreen   = lipgloss.Color("#A8E6CF") // Soft mint green - success/accept states
 	mutedGray   = lipgloss.Color("#6B7280") // Muted gray - secondary text
 	brightWhite = lipgloss.Color("#F9FAFB") // Bright white - primary text
+	dimSep      = lipgloss.Color("#374151") // Dim separator - slightly lighter than bg, used for rules and dividers
 )
 
 // Common Styles
@@ -26,8 +27,12 @@ var (
 	tipsStyle = lipgloss.NewStyle().
 			Foreground(mutedGray)
 
-	userStyle = lipgloss.NewStyle().
+	userIconStyle = lipgloss.NewStyle().
 			Foreground(coralPink).
+			Bold(true)
+
+	userTextStyle = lipgloss.NewStyle().
+			Foreground(brightWhite).
 			Bold(true)
 
 	thinkingStyle = lipgloss.NewStyle().
@@ -40,8 +45,8 @@ var (
 	toolResultStyle = lipgloss.NewStyle().
 			Foreground(brightWhite)
 
-	errorStyle = lipgloss.NewStyle().
-			Foreground(salmonPink)
+	warningStyle = lipgloss.NewStyle().
+			Foreground(mutedGray)
 
 	bashPromptStyle = lipgloss.NewStyle().
 			Foreground(mintGreen).
@@ -52,10 +57,15 @@ var (
 			Foreground(mutedGray).
 			Padding(0, 1)
 
-	inputBoxStyle = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(salmonPink).
-			Padding(0, 1)
+	// inputRuleStyle renders the horizontal rule above the input field and the
+	// header separator (Option B design, ADR-0051 Step 2 / Step 5).
+	inputRuleStyle = lipgloss.NewStyle().
+			Foreground(dimSep)
+
+	// inputPromptStyle styles the ❯ glyph in the Option B input zone
+	inputPromptStyle = lipgloss.NewStyle().
+				Foreground(salmonPink).
+				Bold(true)
 
 	// OverlayTitleStyle is used for main overlay titles
 	OverlayTitleStyle = lipgloss.NewStyle().

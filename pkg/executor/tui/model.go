@@ -39,7 +39,10 @@ type model struct {
 	header string // Custom ASCII art header (empty means use default)
 
 	// Content buffers
-	content        *strings.Builder
+	// messages is the TUI-owned display history. Each entry stores raw text
+	// and a RenderFn that re-wraps at the current width, enabling correct
+	// reflow on window resize. Independent from the agent's conversation memory.
+	messages       []DisplayMessage
 	thinkingBuffer *strings.Builder
 	messageBuffer  *strings.Builder
 
@@ -52,7 +55,9 @@ type model struct {
 	// Agent state
 	isThinking            bool
 	agentBusy             bool
-	bashMode              bool // Track if in bash mode
+	bashMode              bool      // Track if in bash mode
+	showThinking          bool      // Toggle display of extended thinking blocks
+	thinkingStartTime     time.Time // When the current thinking block began (for elapsed display)
 	currentLoadingMessage string
 	toolNameDisplayed     bool // Track if we've already displayed the tool name
 	pendingNotesRequest   bool // Track if we're waiting for notes data
@@ -125,15 +130,11 @@ type toastMsg struct {
 
 // summarizationStatus tracks an active context summarization operation
 type summarizationStatus struct {
-	active          bool
-	strategy        string
-	currentTokens   int
-	maxTokens       int
-	itemsProcessed  int
-	totalItems      int
-	currentItem     string
-	progressPercent float64
-	startTime       time.Time
+	active        bool
+	strategy      string
+	currentTokens int
+	maxTokens     int
+	startTime     time.Time
 }
 
 // toastNotification represents a temporary notification message
