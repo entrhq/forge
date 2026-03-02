@@ -290,7 +290,10 @@ func (m *model) handleError(event *pkgtypes.AgentEvent) {
 
 func (m *model) handleTurnEnd() {
 	m.agentBusy = false
-	m.resumeFollowScroll()
+	// Don't unconditionally resume scroll-following here.
+	// Per ADR-0048, scroll resume should only happen on explicit user intent:
+	// G key, PgDn at bottom, mouse wheel down at bottom, or sending a message.
+	// If the user has scrolled up to review old content, we should preserve that state.
 	m.recalculateLayout()
 }
 

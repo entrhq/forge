@@ -241,14 +241,16 @@ func (m *model) updateTextAreaHeight() {
 		return
 	}
 
-	// Calculate visual lines accounting for wrapping
+	// Calculate visual lines accounting for wrapping.
+	// The textarea width is already set to (m.width - textareaHorizontalPadding - promptWidth)
+	// in handleWindowResize, so we use it directly without subtracting promptWidth again.
 	width := m.textarea.Width()
 	if width <= 0 {
 		width = 80 // default width
 	}
 
 	// Account for prompt glyph width ("❯ " = 2 chars, rendered externally in buildInputBox)
-	effectiveWidth := width - promptWidth
+	effectiveWidth := width - promptWidth*2
 	if effectiveWidth <= 0 {
 		effectiveWidth = 78
 	}

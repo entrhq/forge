@@ -81,8 +81,9 @@ func (m *model) handleScrollKey(msg tea.KeyMsg, vpCmd, tiCmd, spinnerCmd tea.Cmd
 		return true, m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
 	}
 
-	// Lowercase "g": jump to bottom and resume auto-follow (mirrors vim / less).
-	if msg.String() == "g" && !m.followScroll {
+	// "g" or "G": jump to bottom and resume auto-follow (mirrors vim / less).
+	key := msg.String()
+	if (key == "g" || key == "G") && !m.followScroll {
 		m.resumeFollowScroll()
 		m.viewport.GotoBottom()
 		return true, m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
