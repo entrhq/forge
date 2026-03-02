@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -51,11 +50,8 @@ func TestUpdate_OverlayClosingWithCommand(t *testing.T) {
 		textarea:       textarea.New(),
 		viewport:       viewport.New(80, 24),
 		commandPalette: overlay.NewCommandPalette(nil),
-		content:        &strings.Builder{},
 		// We need to initialize other fields to avoid nil panics in Update
 	}
-	// Initialize logging which Update uses
-	initDebugLog()
 
 	// Activate overlay
 	activeOverlay := &mockOverlay{

@@ -39,7 +39,10 @@ type model struct {
 	header string // Custom ASCII art header (empty means use default)
 
 	// Content buffers
-	content        *strings.Builder
+	// messages is the TUI-owned display history. Each entry stores raw text
+	// and a RenderFn that re-wraps at the current width, enabling correct
+	// reflow on window resize. Independent from the agent's conversation memory.
+	messages       []DisplayMessage
 	thinkingBuffer *strings.Builder
 	messageBuffer  *strings.Builder
 

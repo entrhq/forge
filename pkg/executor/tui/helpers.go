@@ -9,6 +9,10 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+const (
+	promptWidth = 2 // "❯ " prompt glyph width
+)
+
 // getRandomLoadingMessage returns a random loading message to display while agent is thinking
 func getRandomLoadingMessage() string {
 	messages := []string{
@@ -239,56 +243,23 @@ func truncateLines(s string, maxLines int) string {
 // updateTextAreaHeight dynamically adjusts the textarea height based on content
 // accounting for line wrapping and multi-line input
 func (m *model) updateTextAreaHeight() {
-	value := m.textarea.Value()
-	if value == "" {
-		if m.textarea.Height() != 1 {
-			m.textarea.SetHeight(1)
-			m.recalculateLayout()
-		}
-		return
-	}
-
-	// Calculate visual lines accounting for wrapping
-	width := m.textarea.Width()
-	if width <= 0 {
-		width = 80 // default width
-	}
-
-	// Account for prompt glyph width ("❯ " = 2 chars, rendered externally in buildInputBox)
-	effectiveWidth := width - 2
-	if effectiveWidth <= 0 {
-		effectiveWidth = 78
-	}
-
-	// Split by actual newlines first
-	textLines := strings.Split(value, "\n")
-	visualLines := 0
-
-	for _, line := range textLines {
-		if line == "" {
-			visualLines++ // Empty line still counts as 1 visual line
-		} else {
-			// Calculate how many visual lines this logical line takes
-			lineLen := lipgloss.Width(line)
-			wrappedLines := (lineLen + effectiveWidth - 1) / effectiveWidth
-			if wrappedLines == 0 {
-				wrappedLines = 1
-			}
-			visualLines += wrappedLines
-		}
-	}
-
+	// The textarea component manages its own visual height internally.
+	// We trust textarea.Height() which already accounts for wrapping.
+	// Just call recalculateLayout() if the height changed.
+	currentHeight := m.textarea.Height()
+	
 	// Clamp between 1 and MaxHeight
-	if visualLines < 1 {
-		visualLines = 1
+	targetHeight := currentHeight
+	if targetHeight < 1 {
+		targetHeight = 1
 	}
-	if visualLines > m.textarea.MaxHeight {
-		visualLines = m.textarea.MaxHeight
+	if targetHeight > m.textarea.MaxHeight {
+		targetHeight = m.textarea.MaxHeight
 	}
 
-	// Only update if height changed to avoid unnecessary recalculation
-	if visualLines != m.textarea.Height() {
-		m.textarea.SetHeight(visualLines)
+	// Only recalculate if height changed
+	if targetHeight != currentHeight {
+		m.textarea.SetHeight(targetHeight)
 		m.recalculateLayout()
 	}
 }

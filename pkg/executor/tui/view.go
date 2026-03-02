@@ -36,7 +36,9 @@ func (m *model) View() string {
 	baseView := m.assembleBaseView(header, tips, viewportSection, scrollIndicator, loadingIndicator, inputBox, bottomBar)
 
 	// Layer overlays
-	return m.applyOverlays(baseView)
+	finalView := m.applyOverlays(baseView)
+	
+	return finalView
 }
 
 // buildHeader renders the compact single-line header bar.
@@ -130,7 +132,9 @@ func (m *model) buildInputBox() string {
 		prompt = inputPromptStyle.Render("❯")
 	}
 	input := m.textarea.View()
-	return rule + "\n" + prompt + " " + input
+	
+	result := rule + "\n" + prompt + " " + input
+	return result
 }
 
 // buildBottomBar renders the bottom status bar: mode indicator (left) + token usage (right).
@@ -214,7 +218,6 @@ func (m *model) buildTokenDisplay() string {
 // assembleBaseView combines all UI components into the base view.
 // scrollIndicator is the ADR-0048 "new content" banner (empty string when not needed).
 func (m *model) assembleBaseView(header, tips, viewportSection, scrollIndicator, loadingIndicator, inputBox, bottomBar string) string {
-	// Collect the rows that always appear between the viewport and the input box
 	var middle []string
 	middle = append(middle, viewportSection)
 	if scrollIndicator != "" {
@@ -224,10 +227,13 @@ func (m *model) assembleBaseView(header, tips, viewportSection, scrollIndicator,
 		middle = append(middle, loadingIndicator)
 	}
 
+	// Visual spacer between header and content
 	rows := []string{header, tips, ""}
 	rows = append(rows, middle...)
 	rows = append(rows, inputBox, bottomBar)
-	return lipgloss.JoinVertical(lipgloss.Left, rows...)
+
+	result := lipgloss.JoinVertical(lipgloss.Left, rows...)
+	return result
 }
 
 // applyOverlays layers all active overlays on top of the base view

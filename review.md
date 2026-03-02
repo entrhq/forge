@@ -18,7 +18,11 @@ I've reviewed the current TUI implementation against the `docs/product/scratch/t
 - **Bug 5 (Unbounded Memory Growth):** `m.content`, `m.thinkingBuffer`, and `m.messageBuffer` in `model.go` remain raw `*strings.Builder` pointers (`init.go` lines 52–54). They have not been replaced with a `[]ConversationMessage` structured slice. Long sessions will grow these buffers indefinitely.
 
 ### 🟡 Outstanding Architectural & UX Debt
-- **Monolithic Message Loop:** `update.go` is still a single large file (650+ lines). The `tui-v2.md` mandate to decompose into `handlers/` and `components/` sub-packages is pending.
+- **Monolithic Message Loop:** ✅ `update.go` decomposed from 766 lines into 4 focused files:
+  - `update.go` (346 lines) — core dispatcher, `calculateViewportHeight`, `handleWindowResize`, `recalculateLayout`
+  - `update_messages.go` (115 lines) — event/message handlers (ViewResult, Toast, OperationComplete, AgentError, etc.)
+  - `update_keys.go` (156 lines) — keyboard handlers (KeyPress, ScrollKey, CtrlC/V/L/K/P, CopyToClipboard)
+  - `update_input.go` (103 lines) — input processing (BashMode, SlashCommand, SingleShotBash, AgentMessage)
 - **Dual Type Definitions:** Internal `toastMsg` struct coexists with external `tuitypes.ToastMsg`, requiring conversion boilerplate.
 - **No Semantic Theme System:** Colors are declared as raw `lipgloss.Color` vars in `styles.go`. A holistic `theme/` package with semantic tokens (Primary, Secondary, FgMuted, Border, etc.) was not implemented.
 - **Missing Bracketed Paste in Main TUI:** `tea.EnableBracketedPaste` is not returned from `Init()` in the main model, and `tea.PasteMsg` is not handled in `Update()`. (The settings overlay has bracketed paste tests, but the main input path does not support it.)

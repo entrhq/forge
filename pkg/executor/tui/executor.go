@@ -65,21 +65,15 @@ func (e *Executor) AddStartupWarning(message, details string, isError bool) {
 
 // Run starts the TUI executor and blocks until the user exits.
 func (e *Executor) Run(ctx context.Context) error {
-	// Initialize debug logging first
-	initDebugLog()
-	debugLog.Printf("TUI Executor starting...")
-
 	// Start the agent first
 	if err := e.agent.Start(ctx); err != nil {
 		return fmt.Errorf("failed to start agent: %w", err)
 	}
-	debugLog.Printf("Agent started successfully")
 
 	// Discover tools from agent and populate config
 	if err := config.DiscoverToolsFromAgent(e.agent); err != nil {
 		// Log error but don't fail - config system is optional
 		log.Printf("Warning: failed to discover tools from agent: %v", err)
-		debugLog.Printf("Warning: failed to discover tools from agent: %v", err)
 	}
 
 	m := initialModel()
@@ -89,7 +83,6 @@ func (e *Executor) Run(ctx context.Context) error {
 	m.workspaceDir = e.workspaceDir
 	m.header = e.header
 	m.startupWarnings = e.startupWarnings
-	debugLog.Printf("Model initialized, workspace: %s", e.workspaceDir)
 
 	// Initialize slash handler for git operations
 	if e.provider != nil && e.workspaceDir != "" {

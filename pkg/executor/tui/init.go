@@ -49,7 +49,7 @@ func initialModel() model {
 	return model{
 		viewport:         vp,
 		textarea:         ta,
-		content:          &strings.Builder{},
+		messages:         nil,
 		thinkingBuffer:   &strings.Builder{},
 		messageBuffer:    &strings.Builder{},
 		overlay:          newOverlayState(),
