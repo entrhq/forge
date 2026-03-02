@@ -251,12 +251,12 @@ func (t *ListFilesTool) formatEntries(entries []fileEntry) string {
 		}
 
 		if entry.IsDir {
-			builder.WriteString(fmt.Sprintf("📁 %s/\n", relPath))
+			builder.WriteString(fmt.Sprintf("▸ %s/\n", relPath))
 			totalDirs++
 		} else {
 			// Format file size
 			sizeStr := formatFileSize(entry.Size)
-			builder.WriteString(fmt.Sprintf("📄 %s (%s)\n", relPath, sizeStr))
+			builder.WriteString(fmt.Sprintf("· %s (%s)\n", relPath, sizeStr))
 			totalFiles++
 		}
 	}

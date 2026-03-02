@@ -1,6 +1,6 @@
 # 51. TUI Visual Redesign
 
-**Status:** Proposed
+**Status:** Implemented
 **Date:** 2025-01-26
 **Deciders:** Product Team, Engineering Team
 **Technical Story:** [TUI Visual Polish PRD](../product/features/tui-visual-polish.md) — compact header and input box design
@@ -126,7 +126,7 @@ Option 2 delivers the full visual improvement with a contained, reviewable diff.
 
 ### Neutral
 
-- `headerHeight` changes from `10` to `3` — must be updated in one place (`update.go:319`)
+- `headerHeight` changes from `10` to `4` — must be updated in one place (`calculateViewportHeight()` in `update.go`)
 - `buildHeader()` function is replaced in-place; callers do not change
 
 ---
@@ -140,47 +140,65 @@ Replace `buildHeader()` in `pkg/executor/tui/view.go`:
 ```go
 // buildHeader renders the compact single-line header bar.
 // Total height: 2 lines (bar + separator).
-func (m model) buildHeader() string {
-    // Truncate working directory to fit in available width
-    cwd := m.workingDir
+func (m *model) buildHeader() string {
+    // Resolve model name from the LLM provider at render time.
+    modelName := ""
+    if m.provider != nil {
+        modelName = m.provider.GetModel()
+    }
+
+    // Truncate working directory to fit in available width.
+    // Uses m.workspaceDir — the field name on the model struct.
+    cwd := m.workspaceDir
+    if abs, err := filepath.Abs(cwd); err == nil {
+        cwd = abs
+    }
     if m.width > 0 && lipgloss.Width(cwd) > m.width/2 {
         cwd = "…" + cwd[len(cwd)-(m.width/2):]
     }
 
-    left  := m.styles.brandStyle.Render("⬡ forge")
-    mid   := m.styles.mutedStyle.Render(cwd)
-    right := m.styles.mutedStyle.Render(m.modelName + "  " + version.Version)
+    // Package-level style vars — no m.styles struct exists.
+    left  := headerStyle.Render("⬡ forge")
+    mid   := tipsStyle.Render(cwd)
+    right := tipsStyle.Render(modelName + "  v" + version.Version)
 
-    // Fill space between left, mid, right
+    // Fill space between left, mid, right.
     totalUsed := lipgloss.Width(left) + lipgloss.Width(mid) + lipgloss.Width(right)
     gap       := (m.width - totalUsed) / 2
     if gap < 1 { gap = 1 }
     pad       := strings.Repeat(" ", gap)
 
     bar       := left + pad + mid + pad + right
-    separator := m.styles.dimStyle.Render(strings.Repeat("─", m.width))
+    separator := inputRuleStyle.Render(strings.Repeat("─", m.width))
     return bar + "\n" + separator
 }
 ```
 
-**`pkg/executor/tui/update.go:319`** — update `headerHeight`:
+**`pkg/executor/tui/update.go`** — update `headerHeight` in `calculateViewportHeight()`:
 
 ```go
-// headerHeight is the number of lines occupied by buildHeader() output.
-// Compact header: 1 line bar + 1 line separator = 2 lines.
-// Plus 1 line for the contextual hints = 3 total.
-headerHeight := 3
+// headerHeight is the number of lines occupied by chrome above the viewport.
+// Breakdown (see assembleBaseView):
+//   header   = buildHeader() = 2 lines (bar + separator)
+//   tips     = buildTips()   = 1 line
+//   spacer   = blank ""      = 1 line
+// Total = 4. Static — never grows.
+const headerHeight = 4
 ```
 
 ### Step 2 — Option B input box (styles.go + view.go, ~20 lines)
 
-**`pkg/executor/tui/styles.go`** — replace `inputBoxStyle` with `inputRuleStyle`:
+**`pkg/executor/tui/styles.go`** — add `dimSep` color and `inputRuleStyle`:
 
 ```go
-// inputRuleStyle renders the horizontal rule above the input field (Option B).
+// Color additions
+dimSep = lipgloss.Color("#374151") // dim separator — slightly lighter than bg, used for rules/dividers
+
+// inputRuleStyle renders the horizontal rule above the input field and
+// the header separator (Option B design, ADR-0051 Steps 2 & 5).
+// Uses dimSep (#374151) — darker than mutedGray so the rule recedes visually.
 inputRuleStyle = lipgloss.NewStyle().
-    Foreground(lipgloss.Color(mutedGray)).
-    Width(0) // width set dynamically in buildInputBox
+    Foreground(dimSep)
 
 // inputPromptStyle styles the ❯ glyph
 inputPromptStyle = lipgloss.NewStyle().
@@ -225,32 +243,37 @@ height on every recalculation — not a fixed number.
 
 ```go
 func (m *model) calculateViewportHeight() int {
-    // headerHeight: bar + separator + hints line. Static — never grows.
-    const headerHeight = 3
+    // headerHeight: bar (1) + separator (1) + tips (1) + blank spacer (1) = 4 lines.
+    // These are the rows prepended by assembleBaseView before the viewport.
+    // Static — never grows with content.
+    const headerHeight = 4
 
-    // inputZoneHeight is dynamic: rule (1) + live textarea lines + hints (1).
-    // Use live line count from the textarea value; cap at height/3 so a very
-    // long draft cannot reduce the viewport to zero.
+    // inputZoneHeight is dynamic: rule (1) + live textarea lines.
+    // Tips are already counted in headerHeight (rendered by buildTips() above).
+    // Use strings.Count on the actual textarea value so the height is in sync
+    // with content in the same tick — avoids the one-frame lag from textarea.Height()
+    // which reflects the allocated component height, not live content lines.
     liveLines := strings.Count(m.textarea.Value(), "\n") + 1
-    if liveLines < 1 {
-        liveLines = 1
-    }
-    maxInputLines := m.height / 3
-    if maxInputLines < 1 {
-        maxInputLines = 1
-    }
-    if liveLines > maxInputLines {
-        liveLines = maxInputLines
-    }
-    inputZoneHeight := 1 + liveLines + 1  // rule + textarea + hints
+    inputZoneHeight := 1 + liveLines // rule + live content lines
 
     const statusBarHeight = 1
 
-    available := m.height - headerHeight - inputZoneHeight - statusBarHeight
-    if available < 1 {
-        available = 1
+    // Reserve one line for the loading spinner when the agent is busy.
+    loadingHeight := 0
+    if m.agentBusy {
+        loadingHeight = 1
     }
-    return available
+    // ADR-0048: reserve one line for the scroll-lock "new content" indicator.
+    scrollIndicatorHeight := 0
+    if !m.followScroll && m.hasNewContent {
+        scrollIndicatorHeight = 1
+    }
+
+    viewportHeight := m.height - headerHeight - inputZoneHeight - statusBarHeight - loadingHeight - scrollIndicatorHeight
+    if viewportHeight < 5 {
+        viewportHeight = 5
+    }
+    return viewportHeight
 }
 ```
 
@@ -258,13 +281,15 @@ func (m *model) calculateViewportHeight() int {
 changes. In the textarea update branch of `Update()`:
 
 ```go
-prevLines := strings.Count(m.textarea.Value(), "\n")
-newTextarea, cmd := m.textarea.Update(msg)
-m.textarea = newTextarea
-if strings.Count(m.textarea.Value(), "\n") != prevLines {
+// Compare live line count before/after update so calculateViewportHeight()
+// always reads the latest content (ADR-0051 §2b).
+oldLines := strings.Count(m.textarea.Value(), "\n") + 1
+m.textarea, tiCmd = m.textarea.Update(msg)
+newLines := strings.Count(m.textarea.Value(), "\n") + 1
+
+if oldLines != newLines && m.ready {
     m.recalculateLayout()
 }
-return m, cmd
 ```
 
 This ensures the viewport shrinks when the user types a multiline draft and expands back when they
@@ -295,26 +320,31 @@ Replace the static `buildTips()` function with a state-aware version:
 
 ```go
 // buildTips returns a single-line hints string adapted to the current TUI state.
-func (m model) buildTips() string {
-    muted := m.styles.mutedStyle
-
+// Note: uses package-level tipsStyle (no m.styles struct); checks m.overlay.isActive()
+// not m.overlay != nil (overlayState always exists, may be inactive); uses m.agentBusy
+// not m.agentRunning; includes a bashMode case for the bash REPL sub-mode.
+func (m *model) buildTips() string {
     switch {
-    case m.overlay != nil:
-        // An overlay is open — show overlay-specific hints
-        return muted.Render("  Esc · close   Tab · next field   Enter · confirm")
+    case m.overlay.isActive():
+        // An overlay is open — show overlay-specific hints.
+        return tipsStyle.Render("  Esc · close   Tab · next field   Enter · confirm")
 
-    case m.agentRunning:
-        // Agent is active
+    case m.agentBusy:
+        // Agent is active — show interrupt hint.
         hints := "  Ctrl+C · interrupt"
         if !m.followScroll {
             hints += "   G · follow output"
         }
-        return muted.Render(hints)
+        return tipsStyle.Render(hints)
+
+    case m.bashMode:
+        // Bash REPL sub-mode — show bash-specific hints.
+        return tipsStyle.Render("  Enter · run   exit · return to normal   Ctrl+C · cancel")
 
     default:
-        // Idle
-        return muted.Render(
-            "  Enter · send   Alt+Enter · new line   / · commands   Ctrl+Y · copy   Ctrl+C",
+        // Idle — show full send/command hints.
+        return tipsStyle.Render(
+            "  Enter · send   Alt+Enter · new line   / · commands   Ctrl+Y · copy   Ctrl+C · exit",
         )
     }
 }
@@ -325,14 +355,17 @@ func (m model) buildTips() string {
 Add any missing style constants used above:
 
 ```go
-const (
+var (
     // existing
-    salmonPink  = "#FFB3BA"
-    mutedGray   = "#6B7280"
-    // new
-    dimSeparator = "#374151" // slightly lighter than background for rule/separator
+    salmonPink = lipgloss.Color("#FFB3BA")
+    mutedGray  = lipgloss.Color("#6B7280")
+    // new — dim separator, slightly lighter than background for rules and dividers
+    dimSep     = lipgloss.Color("#374151")
 )
 ```
+
+> **Note:** The constant in code is named `dimSep` (not `dimSeparator`). All color vars are
+> `lipgloss.Color` values (not raw strings), declared in a `var` block in `styles.go`.
 
 ### Migration Path
 

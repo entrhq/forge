@@ -236,8 +236,8 @@ For example, `ApplyDiffTool.Preview()` returns formatted diff output.
 
 - [ADR-0008](0008-agent-controlled-loop-termination.md) - Agent loop control flow
 - [ADR-0009](0009-tui-executor-design.md) - TUI executor architecture
-- ADR-0011 (upcoming) - Coding tools architecture
-- ADR-0012 (upcoming) - Enhanced TUI diff viewer
+- [ADR-0011](0011-coding-tools-architecture.md) - Coding tools architecture
+- [ADR-0012](0012-enhanced-tui-executor.md) - Enhanced TUI diff viewer
 
 ---
 

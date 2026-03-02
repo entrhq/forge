@@ -1,6 +1,6 @@
 # 12. Enhanced TUI Executor with Diff Viewer
 
-**Status:** Proposed
+**Status:** Implemented
 **Date:** 2025-01-05
 **Deciders:** Forge Core Team
 **Technical Story:** Extending the TUI executor to support coding workflows with diff preview, file navigation, and command output display

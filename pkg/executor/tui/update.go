@@ -1,34 +1,24 @@
 package tui
 
 import (
-	"fmt"
 	"strings"
 
-	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/bubbles/cursor"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/entrhq/forge/pkg/executor/tui/overlay"
 	tuitypes "github.com/entrhq/forge/pkg/executor/tui/types"
-	"github.com/entrhq/forge/pkg/logging"
 	"github.com/entrhq/forge/pkg/types"
 )
 
-var debugLog *logging.Logger
+const (
+	// Layout dimensions: horizontal padding for viewport and textarea
+	viewportHorizontalPadding = 4 // 2 chars left + 2 chars right border/margin
+	textareaHorizontalPadding = 8 // Wider padding for textarea (includes prompt space)
 
-func initDebugLog() {
-	if debugLog != nil {
-		return // Already initialized
-	}
-
-	var err error
-	debugLog, err = logging.NewLogger("tui")
-	if err != nil {
-		// Logger fell back to stderr due to initialization failure
-		debugLog.Warnf("Failed to initialize TUI logger, using stderr fallback: %v", err)
-	}
-	debugLog.Printf("Debug logging initialized")
-}
+	// Header layout: compact header + separator + hints + blank spacer
+	headerHeight = 4
+)
 
 // Update handles all state updates for the TUI model.
 // This is the main event loop handler for Bubble Tea.
@@ -44,36 +34,34 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	}
 
-	var (
-		tiCmd tea.Cmd
-		vpCmd tea.Cmd
-	)
-
-	// Handle spinner tick messages
-	var spinnerCmd tea.Cmd
+	var tiCmd, vpCmd, spinnerCmd tea.Cmd
 	m.spinner, spinnerCmd = m.spinner.Update(msg)
 
-	// Forward ALL messages to active overlay first (including custom messages like cursorBlinkMsg)
-	// This ensures overlays can handle their own custom message types
+	// Forward ALL messages to active overlay first (including custom messages like cursorBlinkMsg).
+	// This ensures overlays can handle their own custom message types.
 	if m.overlay.isActive() && m.overlay.overlay != nil {
 		updatedOverlay, overlayCmd := m.overlay.overlay.Update(msg, m, m)
 
-		// If overlay returns nil, it wants to close
+		// If overlay returns nil, it wants to close.
 		if updatedOverlay == nil {
 			m.ClearOverlay()
-			// Ensure any command returned by the closing overlay is executed
 			if overlayCmd != nil {
 				spinnerCmd = tea.Batch(spinnerCmd, overlayCmd)
 			}
-			// Continue processing the message in the main model
+			// Continue processing the message in the main model.
 		} else {
 			m.overlay.overlay = updatedOverlay
 
-			// For KeyMsg and MouseMsg, we still need to handle them in the main model too
-			// For other message types, the overlay handling is sufficient
+			// For KeyMsg and MouseMsg, we still need to handle them in the main model too.
+			// For other message types, the overlay handling is sufficient.
 			shouldFallThrough := false
 			switch msg.(type) {
 			case tea.KeyMsg, tea.MouseMsg:
+				shouldFallThrough = true
+			case tea.WindowSizeMsg:
+				// The overlay handles its own resize in its Update call above.
+				// The main model must also process WindowSizeMsg so m.width/m.height
+				// stay in sync and recalculateLayout re-wraps messages at new width.
 				shouldFallThrough = true
 			case *types.AgentEvent:
 				shouldFallThrough = true
@@ -88,35 +76,28 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			if !shouldFallThrough {
-				// Not a message type that needs global handling, overlay has fully handled it
 				return m, tea.Batch(overlayCmd, spinnerCmd)
 			}
 
-			// Key/Mouse messages continue to be processed by main model
-			// This allows textarea updates and other keyboard handling
 			spinnerCmd = tea.Batch(overlayCmd, spinnerCmd)
 		}
 	}
 
-	// Handle command palette keyboard input BEFORE updating textarea
-	// This prevents Enter from being processed by textarea when palette is active
+	// Handle command palette keyboard input BEFORE updating textarea.
+	// This prevents Enter from being processed by textarea when palette is active.
 	if keyMsg, ok := msg.(tea.KeyMsg); ok && m.commandPalette.IsActive() {
 		switch keyMsg.Type {
 		case tea.KeyEsc:
-			// Cancel command palette
 			m.commandPalette.Deactivate()
 			m.textarea.Reset()
 			return m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
 		case tea.KeyUp:
-			// Navigate up in palette, don't update textarea
 			m.commandPalette.SelectPrev()
 			return m, spinnerCmd
 		case tea.KeyDown:
-			// Navigate down in palette, don't update textarea
 			m.commandPalette.SelectNext()
 			return m, spinnerCmd
 		case tea.KeyTab:
-			// Autocomplete with selected command and close palette
 			selected := m.commandPalette.GetSelected()
 			if selected != nil {
 				m.textarea.SetValue("/" + selected.Name + " ")
@@ -125,62 +106,45 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.commandPalette.Deactivate()
 			return m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
 		case tea.KeyEnter:
-			// Autocomplete with the selected command and close the palette
 			selected := m.commandPalette.GetSelected()
 			if selected != nil {
-				m.textarea.SetValue("/" + selected.Name + " ")
-				m.textarea.CursorEnd()
+				m.textarea.SetValue("/" + selected.Name)
 			}
 			m.commandPalette.Deactivate()
-			return m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
+			return m.handleEnter(tiCmd, vpCmd, spinnerCmd)
 		}
-		// For other keys, continue to textarea update below
 	}
 
 	// ADR-0048: intercept 'g' key for scroll-lock BEFORE textarea update.
-	// When scroll-locked (!followScroll), pressing 'g' jumps to bottom and resumes
-	// auto-follow. This must happen before textarea.Update(msg) below, otherwise
-	// the textarea would add an unwanted 'g' character to the input field.
 	if keyMsg, ok := msg.(tea.KeyMsg); ok && !m.followScroll && keyMsg.String() == "g" {
-		m.followScroll = true
-		m.hasNewContent = false
+		m.resumeFollowScroll()
 		m.viewport.GotoBottom()
 		return m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
 	}
 
-	// Only update textarea if no overlay or result list is active
-	// This prevents the textarea from capturing scroll events when an overlay is open
+	// Only update textarea if no overlay or result list is active.
+	// This prevents the textarea from capturing scroll events when an overlay is open.
 	if !m.overlay.isActive() && !m.resultList.IsActive() {
-		// Store old textarea height to detect changes
-		oldHeight := m.textarea.Height()
 		m.textarea, tiCmd = m.textarea.Update(msg)
-		newHeight := m.textarea.Height()
 
-		// If textarea height changed, recalculate viewport height
-		if oldHeight != newHeight && m.ready {
-			m.recalculateLayout()
+		// Update height based on visual wrapping after every update.
+		// updateTextAreaHeight() calls recalculateLayout() internally when height changes,
+		// so no need to call it again here.
+		if m.ready {
+			m.updateTextAreaHeight()
 		}
 
-		// Check if we should activate/deactivate command palette based on input
+		// Handle command palette activation/deactivation based on input.
 		value := m.textarea.Value()
-
-		// Handle command palette activation/deactivation based on input
 		switch {
 		case value == "/" && !m.commandPalette.IsActive():
-			// Only activate palette if input is exactly "/" as first character
 			m.commandPalette.Activate()
 			m.commandPalette.UpdateFilter("")
 		case strings.HasPrefix(value, "/") && m.commandPalette.IsActive():
-			// Update filter if palette is already active
-			filter := strings.TrimPrefix(value, "/")
-			m.commandPalette.UpdateFilter(filter)
+			m.commandPalette.UpdateFilter(strings.TrimPrefix(value, "/"))
 		case !strings.HasPrefix(value, "/") && m.commandPalette.IsActive():
-			// Deactivate palette if input no longer starts with /
 			m.commandPalette.Deactivate()
 		}
-
-		// Auto-adjust textarea height based on content after any key press
-		m.updateTextAreaHeight()
 	}
 
 	switch msg := msg.(type) {
@@ -193,7 +157,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
 
 	case tea.WindowSizeMsg:
-		debugLog.Printf("Received tea.WindowSizeMsg: width=%d, height=%d", msg.Width, msg.Height)
+
 		return m.handleWindowResize(msg)
 
 	case slashCommandCompleteMsg:
@@ -203,14 +167,12 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleOperationStart(msg)
 
 	case tuitypes.OperationStartMsg:
-		// Convert to internal type
 		return m.handleOperationStart(operationStartMsg{message: msg.Message})
 
 	case operationCompleteMsg:
 		return m.handleOperationComplete(msg)
 
 	case tuitypes.OperationCompleteMsg:
-		// Convert to internal type
 		return m.handleOperationComplete(operationCompleteMsg{
 			result:       msg.Result,
 			err:          msg.Err,
@@ -224,7 +186,6 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleToast(msg)
 
 	case tuitypes.ToastMsg:
-		// Convert to internal type
 		return m.handleToast(toastMsg{
 			message: msg.Message,
 			details: msg.Details,
@@ -233,517 +194,156 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		})
 
 	case agentErrMsg:
-		debugLog.Printf("Received agentErrMsg: %v", msg.err)
+
 		return m.handleAgentError(msg)
 
 	case bashCommandResultMsg:
 		return m.handleBashCommandResult(msg)
 
 	case approvalRequestMsg:
-		debugLog.Printf("Received approvalRequestMsg")
+
 		return m.handleApprovalRequest(msg)
 
 	case *types.AgentEvent:
-		// Log only significant events (not streaming content or routine outputs)
-		switch msg.Type {
-		case types.EventTypeError,
-			types.EventTypeToolApprovalRequest,
-			types.EventTypeToolApprovalGranted,
-			types.EventTypeToolApprovalRejected,
-			types.EventTypeToolApprovalTimeout,
-			types.EventTypeCommandExecutionStart,
-			types.EventTypeCommandExecutionComplete,
-			types.EventTypeCommandExecutionFailed,
-			types.EventTypeTurnEnd:
-			debugLog.Printf("Received *types.AgentEvent: %s", msg.Type)
-		}
-
-		// Note: AgentEvent forwarding to overlay is now handled in the early message forwarding section
-		// Update viewport BEFORE handling event (important for streaming)
+		// Note: AgentEvent forwarding to overlay is handled in the early forwarding section above.
 		m.viewport, vpCmd = m.viewport.Update(msg)
 		m.handleAgentEvent(msg)
 		return m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
 
 	case tea.MouseMsg:
-		// Note: Mouse event forwarding to overlay is now handled in the early message forwarding section
-		// Route mouse events to viewport for scrolling (only if no overlay is active)
+		// Note: Mouse event forwarding to overlay is handled in the early forwarding section above.
 		if !m.overlay.isActive() {
-			// ADR-0048: track scroll direction before updating viewport
+			// ADR-0048: track scroll direction before updating viewport.
 			if msg.Button == tea.MouseButtonWheelUp {
 				m.followScroll = false
 			}
 			m.viewport, vpCmd = m.viewport.Update(msg)
-			// ADR-0048: if the user scrolled down and reached the bottom, resume following
 			if msg.Button == tea.MouseButtonWheelDown && m.viewport.AtBottom() {
-				m.followScroll = true
-				m.hasNewContent = false
+				m.resumeFollowScroll()
 			}
 		}
 		return m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
 
 	case tea.KeyMsg:
-		// Only log significant key events (not every character typed)
 		switch msg.String() {
 		case "ctrl+c", "ctrl+d", "esc", "enter", "tab", "up", "down", "pgup", "pgdown":
-			debugLog.Printf("Received tea.KeyMsg: %s", msg.String())
 		}
 		return m.handleKeyPress(msg, vpCmd, tiCmd, spinnerCmd)
 
 	default:
-		// Filter out high-frequency framework messages before passing to viewport
-		// to prevent excessive "unknown message type" logging from bubbles/viewport
+		// Filter out high-frequency framework messages to prevent excessive
+		// "unknown message type" logging from bubbles/viewport.
 		switch msg.(type) {
-		case spinner.TickMsg, cursor.BlinkMsg:
-			// Don't pass framework noise to viewport
+		case spinner.TickMsg:
+			if m.agentBusy {
+				return m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
+			}
+			return m, spinnerCmd
+		case cursor.BlinkMsg:
 			return m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
 		}
 	}
-
-	// Update viewport with current message handling
-	m.viewport, vpCmd = m.viewport.Update(msg)
+	// Do NOT pass tea.KeyMsg to viewport.Update. The bubbles viewport has its own
+	// built-in space/arrow key bindings that scroll independently of our layout —
+	// forwarding key events here causes the viewport to scroll on Space/arrow presses
+	// even while the user is typing. All viewport navigation is handled explicitly
+	// in handleScrollKey. Only non-key messages (mouse, spinner ticks, etc.) need
+	// to be forwarded to the viewport component.
+	switch msg.(type) {
+	case tea.KeyMsg, tea.WindowSizeMsg:
+		// Do not forward KeyMsg or WindowSizeMsg to viewport
+		// WindowSizeMsg makes the viewport internally set its viewport.Height
+		// to the entire terminal window height (destroying our layout logic)
+	default:
+		m.viewport, vpCmd = m.viewport.Update(msg)
+	}
 
 	return m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
 }
 
-// handleViewResult processes result selection from the result list
-func (m *model) handleViewResult(msg tuitypes.ViewResultMsg) {
-	if result, ok := m.resultCache.get(msg.ResultID); ok {
-		// Close the result list
-		m.resultList.Deactivate()
-		// Open the result in an overlay
-		overlay := overlay.NewToolResultOverlay(result.ToolName, result.Result, m.width, m.height)
-		m.overlay.activate(tuitypes.OverlayModeToolResult, overlay)
-		return
-	}
-	// If result not found, just close the list
-	m.resultList.Deactivate()
-}
-
-// handleViewNote processes note selection from the notes list
-func (m *model) handleViewNote(msg tuitypes.ViewNoteMsg) {
-	if msg.Note != nil {
-		// Build note detail content
-		content := fmt.Sprintf("Note ID: %s\n", msg.Note.ID)
-		content += fmt.Sprintf("Tags: [%s]\n", strings.Join(msg.Note.Tags, ", "))
-		content += fmt.Sprintf("Created: %s\n", msg.Note.CreatedAt)
-		content += fmt.Sprintf("Updated: %s\n\n", msg.Note.UpdatedAt)
-		content += msg.Note.Content
-
-		// Push note detail overlay on top of notes list (allows back navigation)
-		overlay := overlay.NewToolResultOverlay("Note Detail", content, m.width, m.height)
-		m.overlay.pushOverlay(tuitypes.OverlayModeToolResult, overlay)
-	}
-}
-
-// handleWindowResize processes window size change events
-// calculateViewportHeight computes the appropriate viewport height based on current model state
+// calculateViewportHeight computes the appropriate viewport height based on current model state.
 func (m *model) calculateViewportHeight() int {
-	headerHeight := 10                     // ASCII art (6) + tips (1) + status bar (1) + blank line (1) + spacing (1)
-	inputHeight := m.textarea.Height() + 2 // textarea height + border
+	// inputZoneHeight accounts for:
+	//   - 1 line for the horizontal rule (──────)
+	//   - 1 line for the prompt + textarea first line (❯ <input>)
+	//   - additional lines if textarea wraps (m.textarea.Height() - 1)
+	// So: rule(1) + prompt+first_line(1) + additional_textarea_lines = 2 + (m.textarea.Height() - 1)
+	inputZoneHeight := 1 + m.textarea.Height()
 	statusBarHeight := 1
+
 	loadingHeight := 0
 	if m.agentBusy {
-		loadingHeight = 1 // Loading indicator is a separate line when visible
+		loadingHeight = 1
 	}
-	// ADR-0048: reserve one line for the scroll-lock "new content" indicator
+
 	scrollIndicatorHeight := 0
 	if !m.followScroll && m.hasNewContent {
 		scrollIndicatorHeight = 1
 	}
 
-	viewportHeight := m.height - headerHeight - inputHeight - statusBarHeight - loadingHeight - scrollIndicatorHeight
-	if viewportHeight < 5 {
-		viewportHeight = 5
-	}
+	// Visual spacer line between header and viewport (assembleBaseView line 231 adds "")
+	const spacerHeight = 1
+	viewportHeight := max(m.height-headerHeight-spacerHeight-inputZoneHeight-statusBarHeight-loadingHeight-scrollIndicatorHeight, 1)
 	return viewportHeight
 }
 
+// handleWindowResize processes window size change events.
 func (m *model) handleWindowResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
-	// Update viewport on window resize
-	m.viewport, _ = m.viewport.Update(msg)
+	var cmd tea.Cmd
 
-	// Also update result list if active
+	// Do NOT call m.viewport.Update(msg) here. The bubbles viewport component
+	// sets its internal Height to msg.Height (full terminal size) and adjusts
+	// scroll offsets for that full height. We then set a smaller correct height,
+	// leaving the offsets calibrated for the wrong dimensions — which causes the
+	// viewport to snap/jump on the next recalculateLayout call (e.g. when space
+	// causes word-wrap after a height resize). We own the viewport dimensions
+	// directly; no need to delegate WindowSizeMsg to the component itself.
+
+	m.width = msg.Width
+	m.height = msg.Height
+
+	maxInputLines := m.height / 3
+	if maxInputLines < 1 {
+		maxInputLines = 1
+	}
+	m.textarea.MaxHeight = maxInputLines
+
+	m.textarea.SetWidth(m.width - textareaHorizontalPadding - promptWidth)
+	m.viewport.Width = m.width - viewportHorizontalPadding
+	m.ready = true
+
+	// Do NOT call GotoBottom() here - let recalculateLayout handle scroll positioning
+	// via scrollToBottomOrMark(). Calling GotoBottom() before recalculateLayout shrinks
+	// viewport.Height causes a double-GotoBottom: once here (with stale height), once
+	// inside scrollToBottomOrMark (with new height), leaving YOffset corrupted.
+
+	m.updateTextAreaHeight()
+	m.recalculateLayout()
+
+	// Also update result list if active.
 	if m.resultList.IsActive() {
 		updated, listCmd := m.resultList.Update(msg, m, m)
 		if rl, ok := updated.(*overlay.ResultListModel); ok {
 			m.resultList = *rl
 		}
-		return m, listCmd
+		cmd = listCmd
 	}
 
-	m.width = msg.Width
-	m.height = msg.Height
-
-	// Calculate and set viewport dimensions
-	m.viewport.Width = m.width - 4
-	m.viewport.Height = m.calculateViewportHeight()
-	m.textarea.SetWidth(m.width - 8)
-	m.ready = true
-	m.recalculateLayout()
-	return m, nil
+	return m, cmd
 }
 
-// handleSlashCommandComplete processes slash command completion
-func (m *model) handleSlashCommandComplete() (tea.Model, tea.Cmd) {
-	m.agentBusy = false
-	m.recalculateLayout()
-	return m, nil
-}
-
-// handleOperationStart processes operation start events
-func (m *model) handleOperationStart(msg operationStartMsg) (tea.Model, tea.Cmd) {
-	m.agentBusy = true
-	m.currentLoadingMessage = msg.message
-	m.recalculateLayout()
-	return m, nil
-}
-
-// handleOperationComplete processes operation completion events
-func (m *model) handleOperationComplete(msg operationCompleteMsg) (tea.Model, tea.Cmd) {
-	m.agentBusy = false
-	m.recalculateLayout()
-
-	if msg.err != nil {
-		m.showToast(msg.errorTitle, fmt.Sprintf("%v", msg.err), msg.errorIcon, true)
-	} else {
-		m.showToast(msg.successTitle, msg.result, msg.successIcon, false)
-	}
-
-	// Close any active overlay after operation completes
-	if m.overlay.isActive() {
-		m.overlay.deactivate()
-		m.viewport.SetContent(m.content.String())
-		m.scrollToBottomOrMark() // ADR-0048
-	}
-
-	return m, nil
-}
-
-// handleToast processes toast notification messages
-func (m *model) handleToast(msg toastMsg) (tea.Model, tea.Cmd) {
-	m.showToast(msg.message, msg.details, msg.icon, msg.isError)
-	m.agentBusy = false
-	m.recalculateLayout()
-
-	// Close any active overlay after showing toast
-	// This handles rejection cases where overlay should close
-	if m.overlay.isActive() {
-		m.overlay.deactivate()
-		m.viewport.SetContent(m.content.String())
-		m.scrollToBottomOrMark() // ADR-0048
-	}
-
-	return m, nil
-}
-
-// handleAgentError processes agent error messages
-func (m *model) handleAgentError(msg agentErrMsg) (tea.Model, tea.Cmd) {
-	m.content.WriteString(errorStyle.Render(fmt.Sprintf("  ❌ Error: %v", msg.err)))
-	m.content.WriteString("\n\n")
-	m.viewport.SetContent(m.content.String())
-	m.scrollToBottomOrMark() // ADR-0048
-	m.agentBusy = false
-	m.recalculateLayout()
-	return m, nil
-}
-
-// handleBashCommandResult processes bash command execution results
-func (m *model) handleBashCommandResult(msg bashCommandResultMsg) (tea.Model, tea.Cmd) {
-	// Display the result in the viewport
-	fmt.Fprintf(m.content, "[%s] Command completed:\n", msg.timestamp)
-	m.content.WriteString(msg.result)
-	m.content.WriteString("\n\n")
-
-	m.viewport.SetContent(m.content.String())
-	m.scrollToBottomOrMark() // ADR-0048
-
-	return m, nil
-}
-
-// handleApprovalRequest processes generic approval requests (for slash commands, etc.)
-func (m *model) handleApprovalRequest(msg approvalRequestMsg) (tea.Model, tea.Cmd) {
-	// Create and activate generic approval overlay
-	overlay := overlay.NewGenericApprovalOverlay(msg.request, m.width, m.height)
-	// We use pushOverlay to handle concurrent approval requests (stacking them)
-	m.overlay.pushOverlay(tuitypes.OverlayModeApproval, overlay)
-	return m, nil
-}
-
-// handleKeyPress processes keyboard input
-func (m *model) handleKeyPress(msg tea.KeyMsg, vpCmd, tiCmd, spinnerCmd tea.Cmd) (tea.Model, tea.Cmd) {
-	// If result list is active, pass keys to the result list
-	if m.resultList.IsActive() {
-		updated, cmd := m.resultList.Update(msg, m, m)
-		if rl, ok := updated.(*overlay.ResultListModel); ok {
-			m.resultList = *rl
-		}
-		return m, tea.Batch(cmd, spinnerCmd)
-	}
-
-	// ADR-0048: scroll-lock keys are handled in a dedicated helper
-	if handled, mdl, cmd := m.handleScrollKey(msg, vpCmd, tiCmd, spinnerCmd); handled {
-		return mdl, cmd
-	}
-
-	switch msg.Type {
-	case tea.KeyEsc:
-		if m.bashMode {
-			m.bashMode = false
-			m.textarea.Reset()
-			m.updatePrompt()
-			m.recalculateLayout()
-			return m, nil
-		}
-
-	case tea.KeyCtrlC:
-		return m.handleCtrlC()
-
-	case tea.KeyCtrlV:
-		return m.handleCtrlV()
-
-	case tea.KeyCtrlL:
-		return m.handleCtrlL()
-
-	case tea.KeyCtrlK:
-		return m.handleCtrlK()
-
-	case tea.KeyCtrlP:
-		return m.handleCtrlP()
-
-	case tea.KeyCtrlY:
-		return m.handleCopyToClipboard()
-
-	case tea.KeyEnter:
-		if msg.Alt {
-			m.textarea.InsertString("\n")
-			m.updateTextAreaHeight()
-			return m, nil
-		}
-		return m.handleEnter(tiCmd, vpCmd, spinnerCmd)
-	}
-
-	return m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
-}
-
-// handleScrollKey handles ADR-0048 scroll-lock key events (PgUp, PgDn, g).
-// Returns (handled, model, cmd) — if handled is false the caller should
-// continue with normal key dispatch.
-func (m *model) handleScrollKey(msg tea.KeyMsg, vpCmd, tiCmd, spinnerCmd tea.Cmd) (bool, tea.Model, tea.Cmd) {
-	switch msg.Type {
-	case tea.KeyPgUp, tea.KeyCtrlB:
-		m.followScroll = false
-		m.viewport.HalfPageUp()
-		return true, m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
-
-	case tea.KeyPgDown:
-		m.viewport.HalfPageDown()
-		if m.viewport.AtBottom() {
-			m.followScroll = true
-			m.hasNewContent = false
-		}
-		return true, m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
-	}
-
-	// Lowercase "g": jump to bottom and resume auto-follow (mirrors vim / less)
-	if msg.String() == "g" && !m.followScroll {
-		m.followScroll = true
-		m.hasNewContent = false
-		m.viewport.GotoBottom()
-		return true, m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
-	}
-
-	return false, m, nil
-}
-
-// handleCtrlC handles Ctrl+C key press (exit or exit bash mode)
-func (m *model) handleCtrlC() (tea.Model, tea.Cmd) {
-	if m.bashMode {
-		m.bashMode = false
-		m.textarea.Reset()
-		m.updatePrompt()
-		m.recalculateLayout()
-		return m, nil
-	}
-	return m, tea.Quit
-}
-
-// handleCtrlV handles Ctrl+V key press (view last tool result)
-func (m *model) handleCtrlV() (tea.Model, tea.Cmd) {
-	if m.lastToolCallID != "" {
-		if result, ok := m.resultCache.get(m.lastToolCallID); ok {
-			overlay := overlay.NewToolResultOverlay(result.ToolName, result.Result, m.width, m.height)
-			m.overlay.activate(tuitypes.OverlayModeToolResult, overlay)
-		}
-	}
-	return m, nil
-}
-
-// handleCtrlL handles Ctrl+L key press (show result history)
-func (m *model) handleCtrlL() (tea.Model, tea.Cmd) {
-	results := m.resultCache.getAll()
-	m.resultList.Activate(results, m.width, m.height)
-	return m, nil
-}
-
-// handleCtrlK handles Ctrl+K key press (toggle command palette)
-func (m *model) handleCtrlK() (tea.Model, tea.Cmd) {
-	if m.commandPalette.IsActive() {
-		m.commandPalette.Deactivate()
-	} else {
-		m.commandPalette.Activate()
-	}
-	return m, nil
-}
-
-// handleCtrlP handles Ctrl+P key press (toggle command palette - alternate)
-func (m *model) handleCtrlP() (tea.Model, tea.Cmd) {
-	if m.commandPalette.IsActive() {
-		m.commandPalette.Deactivate()
-	} else {
-		m.commandPalette.Activate()
-	}
-	return m, nil
-}
-
-// handleEnter handles Enter key press (send message or execute bash command)
-func (m *model) handleEnter(tiCmd, vpCmd, spinnerCmd tea.Cmd) (tea.Model, tea.Cmd) {
-	input := strings.TrimSpace(m.textarea.Value())
-
-	if input == "" {
-		return m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
-	}
-
-	// Handle bash mode
-	if m.bashMode {
-		return m.handleBashModeInput(input, tiCmd, vpCmd, spinnerCmd)
-	}
-
-	// Handle slash commands
-	if strings.HasPrefix(input, "/") {
-		return m.handleSlashCommand(input, tiCmd, vpCmd, spinnerCmd)
-	}
-
-	// Handle single-shot bash commands
-	if strings.HasPrefix(input, "!") {
-		return m.handleSingleShotBash(input, tiCmd, vpCmd, spinnerCmd)
-	}
-
-	// Handle regular agent message
-	return m.handleAgentMessage(input, tiCmd, vpCmd, spinnerCmd)
-}
-
-// handleBashModeInput processes bash mode input
-func (m *model) handleBashModeInput(input string, tiCmd, vpCmd, spinnerCmd tea.Cmd) (tea.Model, tea.Cmd) {
-	// Check for exit command
-	if input == "exit" {
-		m.bashMode = false
-		m.textarea.Reset()
-		m.recalculateLayout()
-		return m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
-	}
-
-	// Execute the bash command
-	m.content.WriteString(bashPromptStyle.Render(fmt.Sprintf("$ %s", input)))
-	m.content.WriteString("\n")
-
-	// Clear the input area
-	m.textarea.Reset()
-	m.viewport.SetContent(m.content.String())
-	m.scrollToBottomOrMark() // ADR-0048
-
-	// Execute command and return to event loop
-	return m, tea.Batch(tiCmd, vpCmd, spinnerCmd, m.executeBashCommand(input))
-}
-
-// handleSlashCommand processes slash commands
-func (m *model) handleSlashCommand(input string, tiCmd, vpCmd, spinnerCmd tea.Cmd) (tea.Model, tea.Cmd) {
-	// Do NOT display slash commands in chat history - they are executed silently
-
-	// Clear the input area
-	m.textarea.Reset()
-
-	// Parse slash command
-	commandName, args, ok := parseSlashCommand(input)
-	if !ok {
-		m.showToast("Invalid command", "Could not parse slash command", "❌", true)
-		return m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
-	}
-
-	// Execute slash command
-	updatedModel, cmd := executeSlashCommand(m, commandName, args)
-	return updatedModel, tea.Batch(tiCmd, vpCmd, spinnerCmd, cmd)
-}
-
-// handleSingleShotBash processes single-shot bash commands
-func (m *model) handleSingleShotBash(input string, tiCmd, vpCmd, spinnerCmd tea.Cmd) (tea.Model, tea.Cmd) {
-	// Remove the leading '!' and get the command
-	bashCmd := strings.TrimSpace(input[1:])
-	if bashCmd == "" {
-		return m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
-	}
-
-	// Display the command
-	m.content.WriteString(bashPromptStyle.Render(fmt.Sprintf("$ %s", bashCmd)))
-	m.content.WriteString("\n")
-
-	// Clear the input area
-	m.textarea.Reset()
-	m.viewport.SetContent(m.content.String())
-	m.scrollToBottomOrMark() // ADR-0048
-
-	// Execute command
-	return m, tea.Batch(tiCmd, vpCmd, spinnerCmd, m.executeBashCommand(bashCmd))
-}
-
-// handleAgentMessage processes regular agent messages
-func (m *model) handleAgentMessage(input string, tiCmd, vpCmd, spinnerCmd tea.Cmd) (tea.Model, tea.Cmd) {
-	// Display user message
-	formatted := formatEntry("You: ", input, userStyle, m.width, true)
-	// Strip any trailing newlines before adding our spacing
-	formatted = strings.TrimRight(formatted, "\n")
-	m.content.WriteString(formatted + "\n\n")
-
-	// Clear input
-	m.textarea.Reset()
-
-	// ADR-0048: sending a message always resumes auto-follow
-	m.followScroll = true
-	m.hasNewContent = false
-	m.viewport.SetContent(m.content.String())
-	m.viewport.GotoBottom()
-
-	// Set agent busy
-	m.agentBusy = true
-	m.currentLoadingMessage = getRandomLoadingMessage()
-	m.recalculateLayout()
-
-	// Send message to agent
-	userInput := types.NewUserInput(input)
-	m.channels.Input <- userInput
-
-	return m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
-}
-
-// recalculateLayout updates viewport content and scrolls to bottom
+// recalculateLayout updates the viewport height and re-renders content.
+// It re-renders all messages at the current viewport width so window resize causes
+// correct reflow rather than clipping pre-wrapped ANSI strings.
 func (m *model) recalculateLayout() {
-	// Update viewport height based on current state (including loading indicator)
-	m.viewport.Height = m.calculateViewportHeight()
-	m.viewport.SetContent(m.content.String())
-	m.scrollToBottomOrMark() // ADR-0048: respect scroll-lock during layout recalculation
-}
+	newVpHeight := m.calculateViewportHeight()
 
-// handleCopyToClipboard copies the full conversation buffer to the OS clipboard
-// and shows a brief toast confirmation (ADR-0050).
-// It uses m.content (the raw conversation string builder) rather than
-// m.viewport.View() so the user always gets the complete history, not just the
-// visible window. ANSI escape codes are stripped so the clipboard contains
-// plain text.
-func (m *model) handleCopyToClipboard() (tea.Model, tea.Cmd) {
-	content := stripANSI(m.content.String())
-	if err := clipboard.WriteAll(content); err != nil {
-		m.showToast("Clipboard unavailable", "No clipboard manager detected", "⚠", true)
-		return m, nil
-	}
-	m.showToast("Copied to clipboard", "", "✓", false)
-	return m, nil
+	m.viewport.Height = newVpHeight
+
+	renderedContent := m.renderMessages(m.viewport.Width)
+
+	m.viewport.SetContent(renderedContent)
+	// ADR-0048: scrollToBottomOrMark updates viewport.Height itself on the
+	// first false→true transition of hasNewContent, so no second call needed.
+	m.scrollToBottomOrMark()
 }

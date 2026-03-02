@@ -97,9 +97,9 @@ func (c *CommitRequest) OnApprove() tea.Cmd {
 				Result:       result,
 				Err:          err,
 				SuccessTitle: "Success",
-				SuccessIcon:  "✅",
+				SuccessIcon:  "✓",
 				ErrorTitle:   "Commit Failed",
-				ErrorIcon:    "❌",
+				ErrorIcon:    "✗",
 			}
 		},
 	)
@@ -111,7 +111,7 @@ func (c *CommitRequest) OnReject() tea.Cmd {
 		return types.ToastMsg{
 			Message: "Canceled",
 			Details: "/commit command canceled",
-			Icon:    "ℹ️",
+			Icon:    "i",
 			IsError: false,
 		}
 	}

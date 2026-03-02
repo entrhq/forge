@@ -1,7 +1,10 @@
 package overlay
 
 import (
+	"strings"
+
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/entrhq/forge/pkg/executor/tui/types"
 )
 
@@ -12,13 +15,12 @@ type HelpOverlay struct {
 }
 
 // NewHelpOverlay creates a new help overlay
-func NewHelpOverlay(title, content string) *HelpOverlay {
-	const (
-		viewportWidth  = 76
-		viewportHeight = 20
-		overlayWidth   = 80
-		overlayHeight  = 25
-	)
+func NewHelpOverlay(title, content string, termWidth, termHeight int) *HelpOverlay {
+	overlayWidth := types.ComputeOverlayWidth(termWidth, 0.80, 56, 100)
+
+	// chromeRows = title+sep (2) + blank (1) + footer (1) + blank (1) = 5
+	viewportHeight := types.ComputeViewportHeight(termHeight, 5)
+	overlayHeight := viewportHeight + 5
 
 	overlay := &HelpOverlay{
 		title: title,
@@ -28,7 +30,7 @@ func NewHelpOverlay(title, content string) *HelpOverlay {
 	baseConfig := BaseOverlayConfig{
 		Width:          overlayWidth,
 		Height:         overlayHeight,
-		ViewportWidth:  viewportWidth,
+		ViewportWidth:  overlayWidth - 4,
 		ViewportHeight: viewportHeight,
 		Content:        content,
 		OnClose: func(actions types.ActionHandler) tea.Cmd {
@@ -39,7 +41,10 @@ func NewHelpOverlay(title, content string) *HelpOverlay {
 			// Allow Enter to close help overlay
 			if msg.Type == tea.KeyEnter {
 				if overlay.BaseOverlay != nil {
-					return true, overlay.close(actions)
+					// We can just return an unhandled message and let it fall out naturally,
+					// but since this is OnCustomKey, we want it to close it.
+					// We'll let Update handle this.
+					return false, nil
 				}
 			}
 			return false, nil
@@ -68,20 +73,62 @@ func (h *HelpOverlay) Update(msg tea.Msg, state types.StateProvider, actions typ
 		return h, cmd
 	}
 
+	// Handle additional keys/events
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		if msg.String() == "esc" || msg.String() == "ctrl+c" || msg.Type == tea.KeyEnter {
+			return nil, nil // signal close
+		}
+	case tea.WindowSizeMsg:
+		newOverlayWidth := types.ComputeOverlayWidth(msg.Width, 0.80, 56, 100)
+		vpHeight := types.ComputeViewportHeight(msg.Height, 5)
+
+		h.SetDimensions(newOverlayWidth, vpHeight+5)
+
+		vp := h.Viewport()
+		vp.Width = newOverlayWidth - 4
+		vp.Height = vpHeight
+		// Viewport will re-wrap content automatically when dimensions change
+	}
+
 	return h, nil
 }
 
 // renderHeader renders the help overlay header
 func (h *HelpOverlay) renderHeader() string {
-	return types.OverlayTitleStyle.Render(h.title)
+	contentWidth := h.BaseOverlay.Viewport().Width
+
+	// Title
+	titleLen := len(h.title)
+	titlePadding := max(0, (contentWidth-titleLen)/2)
+	titleStr := ""
+	for i := 0; i < titlePadding; i++ {
+		titleStr += " "
+	}
+	titleStr += types.OverlayTitleStyle.Render(h.title)
+
+	// Separator
+	separator := lipgloss.NewStyle().Foreground(types.MutedGray).Render(strings.Repeat(sepChar, contentWidth))
+
+	return titleStr + "\n" + separator + "\n"
 }
 
 // renderFooter renders the help overlay footer
 func (h *HelpOverlay) renderFooter() string {
-	return types.OverlayHelpStyle.Render("Press ESC or Enter to close")
+	contentWidth := h.BaseOverlay.Viewport().Width
+	hint := "ESC or Enter to close • ↑/↓ to scroll"
+
+	hintLen := lipgloss.Width(hint)
+	hintPadding := max(0, (contentWidth-hintLen)/2)
+	padStr := ""
+	for i := 0; i < hintPadding; i++ {
+		padStr += " "
+	}
+
+	return "\n" + padStr + types.OverlayHelpStyle.Render(hint)
 }
 
 // View renders the help overlay
 func (h *HelpOverlay) View() string {
-	return h.BaseOverlay.View(h.BaseOverlay.Viewport().Width)
+	return h.BaseOverlay.View(h.Width())
 }

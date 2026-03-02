@@ -299,7 +299,7 @@ func (t *SearchFilesTool) formatMatches(matches []searchMatch) string {
 			if currentFile != "" {
 				builder.WriteString("\n")
 			}
-			builder.WriteString(fmt.Sprintf("📄 %s\n", relPath))
+			builder.WriteString(fmt.Sprintf("▸ %s\n", relPath))
 			builder.WriteString(strings.Repeat("-", 60) + "\n")
 			currentFile = match.FilePath
 		}

@@ -49,7 +49,6 @@ func (m *model) handleAgentEvent(event *pkgtypes.AgentEvent) {
 		m.handleMessageEnd()
 
 	case pkgtypes.EventTypeError:
-		debugLog.Printf("Processing EventTypeError: %v", event.Error)
 		m.handleError(event)
 
 	case pkgtypes.EventTypeTurnEnd:
@@ -59,15 +58,12 @@ func (m *model) handleAgentEvent(event *pkgtypes.AgentEvent) {
 		m.handleUpdateBusy(event)
 
 	case pkgtypes.EventTypeToolApprovalRequest:
-		debugLog.Printf("Processing EventTypeToolApprovalRequest")
 		m.handleToolApprovalRequest(event)
 
 	case pkgtypes.EventTypeToolApprovalGranted:
-		debugLog.Printf("Processing EventTypeToolApprovalGranted")
 		m.handleToolApprovalGranted()
 
 	case pkgtypes.EventTypeToolApprovalRejected:
-		debugLog.Printf("Processing EventTypeToolApprovalRejected")
 		m.handleToolApprovalRejected()
 
 	case pkgtypes.EventTypeToolApprovalTimeout:
@@ -101,19 +97,41 @@ func (m *model) handleAgentEvent(event *pkgtypes.AgentEvent) {
 		m.handleNotesData(event)
 	}
 
-	// Update viewport with current content
-	m.viewport.SetContent(m.content.String())
-	m.scrollToBottomOrMark() // ADR-0048: respect scroll-lock
+	m.recalculateLayout()
 }
 
 // scrollToBottomOrMark advances the viewport to the bottom when followScroll is
 // true, or marks hasNewContent when the user has scrolled up (ADR-0048).
 func (m *model) scrollToBottomOrMark() {
 	if m.followScroll {
-		m.viewport.GotoBottom()
-	} else {
+		// Only scroll to bottom if there's actual content that exceeds viewport height.
+		// Calling GotoBottom() when content fits entirely in viewport causes rendering
+		// corruption where the terminal scrolls the entire TUI frame upward.
+		// Use YPosition + Height to check if we need to scroll without re-rendering.
+		if len(m.messages) > 0 {
+			totalHeight := m.viewport.TotalLineCount()
+			needsScroll := totalHeight > m.viewport.Height
+
+			if needsScroll {
+				m.viewport.GotoBottom()
+			}
+		}
+	} else if !m.hasNewContent {
+		// First transition false→true: shrink the viewport immediately so the
+		// scroll-lock indicator line is reserved before the next render.
 		m.hasNewContent = true
+		m.viewport.Height = m.calculateViewportHeight()
 	}
+}
+
+// resumeFollowScroll is the symmetric inverse of the hasNewContent true→false
+// transition inside scrollToBottomOrMark. It clears the scroll-lock state and
+// immediately expands the viewport height back by the line that was reserved
+// for the indicator, preventing a blank gap at the bottom of the view.
+func (m *model) resumeFollowScroll() {
+	m.followScroll = true
+	m.hasNewContent = false
+	m.viewport.Height = m.calculateViewportHeight()
 }
 
 // Thinking event handlers
@@ -121,28 +139,54 @@ func (m *model) scrollToBottomOrMark() {
 func (m *model) handleThinkingStart() {
 	m.isThinking = true
 	m.thinkingBuffer.Reset()
+	m.thinkingStartTime = time.Now()
 }
 
 func (m *model) handleThinkingContent(event *pkgtypes.AgentEvent) {
 	if event.Content == "" {
 		return
 	}
-	// Buffer the thinking content
-	m.thinkingBuffer.WriteString(event.Content)
-	// Stream with "Thinking" label, content follows immediately
-	header := "💭 Thinking "
-	formatted := formatEntry("", m.thinkingBuffer.String(), thinkingStyle, m.width, false)
-	m.viewport.SetContent(m.content.String() + header + formatted)
+	m.thinkingBuffer.WriteString(sanitizeOutput(event.Content))
+
+	// Ephemeral streaming preview — committed messages stay correct at viewport width;
+	// the in-progress thinking fragment is appended temporarily.
+	base := m.renderMessages(m.viewport.Width)
+	if m.showThinking {
+		header := "⸫ "
+		formatted := formatEntry("", m.thinkingBuffer.String(), thinkingStyle, m.width)
+		block := header + formatted
+		indented := " " + strings.ReplaceAll(block, "\n", "\n ")
+		m.viewport.SetContent(base + indented)
+	} else {
+		elapsed := int(time.Since(m.thinkingStartTime).Seconds())
+		collapsed := thinkingStyle.Render(fmt.Sprintf(" ⸫ Thinking (%ds)", elapsed))
+		m.viewport.SetContent(base + collapsed)
+	}
 	m.scrollToBottomOrMark() // ADR-0048
 }
 
 func (m *model) handleThinkingEnd() {
 	if m.thinkingBuffer.Len() > 0 {
-		header := "💭 Thinking "
-		formatted := formatEntry("", m.thinkingBuffer.String(), thinkingStyle, m.width, false)
-		m.content.WriteString(header + formatted)
+		// Capture raw text so the closure can reflow at any future width.
+		thinkingText := m.thinkingBuffer.String()
+		elapsed := int(time.Since(m.thinkingStartTime).Seconds())
+
+		if m.showThinking {
+			m.appendMsg(DisplayMessage{
+				RenderFn: func(width int) string {
+					header := "⸫ "
+					formatted := formatEntry("", thinkingText, thinkingStyle, width)
+					block := header + formatted
+					return " " + strings.ReplaceAll(block, "\n", "\n ")
+				},
+				Trailing: "\n\n",
+			})
+		} else {
+			// Fixed historical record: "Thought for Xs" — no reflow needed.
+			summary := thinkingStyle.Render(fmt.Sprintf(" ⸫ Thought for %ds", elapsed))
+			m.appendMsg(newRawMsg(summary, "\n\n"))
+		}
 	}
-	m.content.WriteString("\n\n")
 	m.isThinking = false
 	m.thinkingBuffer.Reset()
 }
@@ -150,68 +194,56 @@ func (m *model) handleThinkingEnd() {
 // Tool event handlers
 
 func (m *model) handleToolCallStart(event *pkgtypes.AgentEvent) {
-	// Check if we have early tool name detection in metadata
+	// Early detection: if tool name is available in metadata, show it immediately.
 	if toolName, ok := event.Metadata["tool_name"].(string); ok && toolName != "" && !m.toolNameDisplayed {
-		// Display the tool name immediately when detected early
-		formatted := formatEntry("🔧 ", toolName, toolStyle, m.width, false)
-		m.content.WriteString(formatted)
-		m.content.WriteString("\n")
-		m.viewport.SetContent(m.content.String())
-		m.scrollToBottomOrMark() // ADR-0048
+		toolName = sanitizeOutput(toolName)
+		m.appendMsg(newEntryMsg("✎ ", toolName, toolStyle, "\n"))
+		m.recalculateLayout()
 		m.toolNameDisplayed = true
 	}
-	// If no tool name yet, we'll wait for EventTypeToolCall
+	// If no tool name yet, wait for EventTypeToolCall which always has ToolName.
 }
 
 func (m *model) handleToolCall(event *pkgtypes.AgentEvent) {
-	// Only display if we haven't already shown it from early detection
+	// Only display if early detection in handleToolCallStart didn't fire.
 	if !m.toolNameDisplayed {
-		formatted := formatEntry("🔧 ", event.ToolName, toolStyle, m.width, false)
-		m.content.WriteString(formatted)
-		m.content.WriteString("\n")
+		toolName := sanitizeOutput(event.ToolName)
+		m.appendMsg(newEntryMsg("✎ ", toolName, toolStyle, "\n"))
 	}
-	// Track tool call for result display
+	// Track tool call for result display and caching.
 	m.lastToolName = event.ToolName
-	// Generate a simple cache key using timestamp + tool name
-	m.lastToolCallID = fmt.Sprintf("%d_%s", time.Now().UnixNano(), event.ToolName)
-	m.toolNameDisplayed = false // Reset for next tool call
+	if event.ToolCallID != "" {
+		m.lastToolCallID = event.ToolCallID
+	} else {
+		m.lastToolCallID = fmt.Sprintf("%d_%s", time.Now().UnixNano(), event.ToolName)
+	}
+	m.toolNameDisplayed = false // Reset for next tool call.
 }
 
 func (m *model) handleToolResult(event *pkgtypes.AgentEvent) {
-	resultStr := fmt.Sprintf("%v", event.ToolOutput)
+	resultStr := sanitizeOutput(fmt.Sprintf("%v", event.ToolOutput))
 
-	// Classify the tool result to determine display strategy
+	// Classify the tool result to determine display strategy.
 	tier := m.resultClassifier.ClassifyToolResult(m.lastToolName, resultStr)
 
 	switch tier {
 	case TierFullInline:
-		// Display full result inline (loop-breaking tools)
-		formatted := formatEntry("    ✓ ", resultStr, toolResultStyle, m.width, false)
-		m.content.WriteString(formatted)
+		m.appendMsg(newEntryMsg("    ✓ ", resultStr, toolResultStyle, "\n\n"))
 
 	case TierSummaryWithPreview:
-		// Display summary + preview lines
 		summary := m.resultSummarizer.GenerateSummary(m.lastToolName, resultStr)
 		preview := m.resultClassifier.GetPreviewLines(resultStr)
-		displayText := summary + "\n" + preview
-		formatted := formatEntry("    ✓ ", displayText, toolResultStyle, m.width, false)
-		m.content.WriteString(formatted)
-		// Cache the full result for viewing
+		m.appendMsg(newEntryMsg("    ✓ ", summary+"\n"+preview, toolResultStyle, "\n\n"))
 		m.resultCache.store(m.lastToolCallID, m.lastToolName, resultStr, summary)
 
 	case TierSummaryOnly:
-		// Display summary only
 		summary := m.resultSummarizer.GenerateSummary(m.lastToolName, resultStr)
-		formatted := formatEntry("    ✓ ", summary, toolResultStyle, m.width, false)
-		m.content.WriteString(formatted)
-		// Cache the full result for viewing
+		m.appendMsg(newEntryMsg("    ✓ ", summary, toolResultStyle, "\n\n"))
 		m.resultCache.store(m.lastToolCallID, m.lastToolName, resultStr, summary)
 
 	case TierOverlayOnly:
-		// Command execution already handled by overlay system
-		// Don't display anything inline
+		// Command execution already handled by overlay; nothing inline.
 	}
-	m.content.WriteString("\n\n")
 }
 
 // Message event handlers
@@ -221,27 +253,28 @@ func (m *model) handleMessageStart() {
 }
 
 func (m *model) handleMessageContent(content string) bool {
+	content = sanitizeOutput(content)
 	if strings.TrimSpace(content) != "" && !m.hasMessageContentStarted {
 		m.hasMessageContentStarted = true
 	}
 
-	// Buffer the message content
 	m.messageBuffer.WriteString(content)
 
-	// Stream message content as it arrives
-	formatted := formatEntry("", m.messageBuffer.String(), lipgloss.NewStyle(), m.width, false)
-	m.viewport.SetContent(m.content.String() + formatted)
+	// Ephemeral streaming preview — committed messages form the base; the
+	// in-progress message fragment is appended temporarily at the current width.
+	base := m.renderMessages(m.viewport.Width)
+	fragment := formatEntry("", m.messageBuffer.String(), lipgloss.NewStyle(), m.width)
+	m.viewport.SetContent(base + fragment)
 	m.scrollToBottomOrMark() // ADR-0048
 
 	return true
 }
 
 func (m *model) handleMessageEnd() {
-	// Finalize message content (like thinking does)
 	if m.messageBuffer.Len() > 0 && m.hasMessageContentStarted {
-		formatted := formatEntry("", m.messageBuffer.String(), lipgloss.NewStyle(), m.width, false)
-		m.content.WriteString(formatted)
-		m.content.WriteString("\n\n")
+		// Capture raw text for reflow-capable DisplayMessage.
+		msgText := m.messageBuffer.String()
+		m.appendMsg(newEntryMsg("", msgText, lipgloss.NewStyle(), "\n\n"))
 		m.hasMessageContentStarted = false
 	}
 	m.messageBuffer.Reset()
@@ -250,27 +283,23 @@ func (m *model) handleMessageEnd() {
 // Error and state handlers
 
 func (m *model) handleError(event *pkgtypes.AgentEvent) {
-	m.content.WriteString(errorStyle.Render(fmt.Sprintf("  ❌ Error: %v", event.Error)))
-	m.content.WriteString("\n\n")
+	errMsg := truncateLines(fmt.Sprintf("%v", event.Error), 2)
+	rendered := warningStyle.Render(fmt.Sprintf(" ⚠ Agent encountered: %s", sanitizeOutput(errMsg)))
+	m.appendMsg(newRawMsg(rendered, "\n\n"))
 }
 
 func (m *model) handleTurnEnd() {
-	// Turn end — clear busy state and resume scroll following (ADR-0048)
 	m.agentBusy = false
-	m.followScroll = true
-	m.hasNewContent = false
+	m.resumeFollowScroll()
 	m.recalculateLayout()
 }
 
 func (m *model) handleUpdateBusy(event *pkgtypes.AgentEvent) {
-	// Update busy state based on event
 	wasBusy := m.agentBusy
 	m.agentBusy = event.IsBusy
 	if m.agentBusy {
-		// Pick a random loading message when becoming busy
 		m.currentLoadingMessage = getRandomLoadingMessage()
 	}
-	// Recalculate layout if busy state changed
 	if wasBusy != m.agentBusy {
 		m.recalculateLayout()
 	}
@@ -279,31 +308,18 @@ func (m *model) handleUpdateBusy(event *pkgtypes.AgentEvent) {
 // Tool approval handlers
 
 func (m *model) handleToolApprovalRequest(event *pkgtypes.AgentEvent) {
-	// Show "Requesting approval" message before overlay
-	formatted := formatEntry("  ⏳ ", "Requesting tool approval...", toolStyle, m.width, false)
-	m.content.WriteString(formatted)
-	m.content.WriteString("\n")
-	m.viewport.SetContent(m.content.String())
-	m.scrollToBottomOrMark() // ADR-0048
+	m.appendMsg(newEntryMsg("  … ", "Requesting tool approval...", toolStyle, "\n"))
+	m.recalculateLayout()
 
-	// Handle tool approval request by showing overlay
 	if event.Preview != nil {
 		preview, ok := event.Preview.(*tools.ToolPreview)
 		if ok {
-			// Create response callback that will be called by the overlay
 			responseFunc := func(response *pkgtypes.ApprovalResponse) {
-				// Send approval response to agent
 				m.channels.Approval <- response
-
-				// Close overlay; the user interacted so resume auto-following (ADR-0048)
 				m.overlay.deactivate()
-				m.followScroll = true
-				m.hasNewContent = false
-				m.viewport.SetContent(m.content.String())
-				m.viewport.GotoBottom()
+				m.recalculateLayout()
 			}
 
-			// Create and activate diff viewer overlay
 			diffViewer := overlay.NewDiffViewer(
 				event.ApprovalID,
 				event.ToolName,
@@ -318,30 +334,20 @@ func (m *model) handleToolApprovalRequest(event *pkgtypes.AgentEvent) {
 }
 
 func (m *model) handleToolApprovalGranted() {
-	// Approval granted - show confirmation
-	formatted := formatEntry("  ✓ ", "Tool approved - executing...", toolStyle, m.width, false)
-	m.content.WriteString(formatted)
-	m.content.WriteString("\n")
+	m.appendMsg(newEntryMsg("  ✓ ", "Tool approved - executing...", toolStyle, "\n"))
 }
 
 func (m *model) handleToolApprovalRejected() {
-	// Approval rejected - log it
-	formatted := formatEntry("  ✗ ", "Tool rejected by user", errorStyle, m.width, false)
-	m.content.WriteString(formatted)
-	m.content.WriteString("\n")
+	m.appendMsg(newEntryMsg("  ✗ ", "Tool rejected by user", warningStyle, "\n"))
 }
 
 func (m *model) handleToolApprovalTimeout() {
-	// Approval timeout - log it
-	formatted := formatEntry("  ⏱ ", "Tool approval timed out", errorStyle, m.width, false)
-	m.content.WriteString(formatted)
-	m.content.WriteString("\n")
+	m.appendMsg(newEntryMsg("  ⏱ ", "Tool approval timed out", warningStyle, "\n"))
 }
 
 // API and token handlers
 
 func (m *model) handleApiCallStart(event *pkgtypes.AgentEvent) {
-	// Update context token information
 	if event.APICallInfo != nil {
 		m.currentContextTokens = event.APICallInfo.ContextTokens
 		m.maxContextTokens = event.APICallInfo.MaxContextTokens
@@ -349,7 +355,6 @@ func (m *model) handleApiCallStart(event *pkgtypes.AgentEvent) {
 }
 
 func (m *model) handleTokenUsage(event *pkgtypes.AgentEvent) {
-	// Update token usage counts
 	if event.TokenUsage != nil {
 		m.totalPromptTokens += event.TokenUsage.PromptTokens
 		m.totalCompletionTokens += event.TokenUsage.CompletionTokens
@@ -360,45 +365,28 @@ func (m *model) handleTokenUsage(event *pkgtypes.AgentEvent) {
 // Command execution handlers
 
 func (m *model) handleCommandExecutionStart(event *pkgtypes.AgentEvent) {
-	// Show command execution started message
 	if event.CommandExecution != nil {
-		formatted := formatEntry("  🚀 ", fmt.Sprintf("Executing: %s", event.CommandExecution.Command), toolStyle, m.width, false)
-		m.content.WriteString(formatted)
-		m.content.WriteString("\n")
-		m.viewport.SetContent(m.content.String())
-		m.scrollToBottomOrMark() // ADR-0048
+		command := sanitizeOutput(event.CommandExecution.Command)
+		m.appendMsg(newEntryMsg("  ❯ ", fmt.Sprintf("Executing: %s", command), toolStyle, "\n"))
+		m.recalculateLayout()
 
-		// Create and activate command execution overlay
-		overlay := overlay.NewCommandExecutionOverlay(
+		ol := overlay.NewCommandExecutionOverlay(
 			event.CommandExecution.Command,
 			event.CommandExecution.WorkingDir,
 			event.CommandExecution.ExecutionID,
 			m.channels.Cancel,
 		)
-		m.overlay.pushOverlay(types.OverlayModeCommandOutput, overlay)
+		m.overlay.pushOverlay(types.OverlayModeCommandOutput, ol)
 	}
 }
 
-func (m *model) handleCommandExecutionOutput(event *pkgtypes.AgentEvent) {
-	// Stream command output as it arrives
-	// Write output directly without styling to preserve formatting/indentation
-	if event.CommandExecution != nil && event.CommandExecution.Output != "" {
-		m.content.WriteString(event.CommandExecution.Output)
-	}
+func (m *model) handleCommandExecutionOutput(_ *pkgtypes.AgentEvent) {
+	// Let overlay handle streaming directly; do not stream bulk to the chat output.
 }
 
-func (m *model) handleCommandExecutionComplete(event *pkgtypes.AgentEvent) {
-	// Show command completion status
-	if event.CommandExecution != nil {
-		if event.CommandExecution.ExitCode == 0 {
-			formatted := formatEntry("  ✓ ", "Command completed successfully", toolStyle, m.width, false)
-			m.content.WriteString(formatted)
-		} else {
-			formatted := formatEntry("  ✗ ", fmt.Sprintf("Command failed with exit code %d", event.CommandExecution.ExitCode), errorStyle, m.width, false)
-			m.content.WriteString(formatted)
-		}
-		m.content.WriteString("\n")
-	}
+func (m *model) handleCommandExecutionComplete(_ *pkgtypes.AgentEvent) {
+	// handleToolResult will catch the EventTypeToolResult that follows and
+	// write a clean summary using tier logic (TierSummaryWithPreview).
 }
 
 // Context summarization handlers
@@ -410,18 +398,11 @@ func (m *model) handleContextSummarizationStart(event *pkgtypes.AgentEvent) {
 		m.summarization.strategy = event.ContextSummarization.Strategy
 		m.summarization.currentTokens = event.ContextSummarization.CurrentTokens
 		m.summarization.maxTokens = event.ContextSummarization.MaxTokens
-		m.summarization.totalItems = event.ContextSummarization.TotalItems
 	}
 }
 
-func (m *model) handleContextSummarizationProgress(event *pkgtypes.AgentEvent) {
-	if event.ContextSummarization != nil {
-		m.summarization.itemsProcessed = event.ContextSummarization.ItemsProcessed
-		// Calculate progress percentage from items processed
-		if event.ContextSummarization.TotalItems > 0 {
-			m.summarization.progressPercent = float64(event.ContextSummarization.ItemsProcessed) / float64(event.ContextSummarization.TotalItems) * 100
-		}
-	}
+func (m *model) handleContextSummarizationProgress(_ *pkgtypes.AgentEvent) {
+	// Progress details have been removed; wait for completion.
 }
 
 func (m *model) handleContextSummarizationComplete(event *pkgtypes.AgentEvent) {
@@ -438,32 +419,29 @@ func (m *model) handleContextSummarizationComplete(event *pkgtypes.AgentEvent) {
 				formatTokenCount(oldTokens),
 				formatTokenCount(newTokens),
 				duration),
-			"🧠",
+			"◆",
 			false,
 		)
 
-		// Update current context tokens
 		m.currentContextTokens = newTokens
 	}
 }
 
 // Notes data handler
+
 func (m *model) handleNotesData(event *pkgtypes.AgentEvent) {
 	if event.NotesData == nil {
 		return
 	}
 
-	// End loading state
 	m.agentBusy = false
 	m.currentLoadingMessage = ""
 
-	// Notes data should only come from explicit /notes command request
 	if !m.pendingNotesRequest {
 		return
 	}
 	m.pendingNotesRequest = false
 
-	// Create and activate notes overlay
 	notesOverlay := overlay.NewNotesOverlay(event.NotesData.Notes, m.width, m.height)
 	m.overlay.pushOverlay(types.OverlayModeNotes, notesOverlay)
 }

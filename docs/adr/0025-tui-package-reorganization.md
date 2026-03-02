@@ -1,6 +1,6 @@
 # 0025. TUI Package Reorganization (Interface-Driven Design)
 
-**Status:** Proposed
+**Status:** Implemented
 **Date:** 2024-06-17
 **Deciders:** Developer, Architect
 **Technical Story:** Refactoring the monolithic `pkg/executor/tui` package into maintainable subpackages.

@@ -28,17 +28,9 @@ type DiffViewer struct {
 }
 
 func NewDiffViewer(approvalID, toolName string, preview *tools.ToolPreview, width, height int, responseFunc func(*pkgtypes.ApprovalResponse)) *DiffViewer {
-	// Make overlay wide - 90% of screen width
-	overlayWidth := max(int(float64(width)*0.9), 80)
-
-	// Fixed viewport height: max 10 lines for diff content
-	const maxViewportHeight = 10
-	viewportHeight := maxViewportHeight
-
-	// Calculate total overlay height
-	// Title (2) + subtitle (1) + spacing (1) + border (2) + buttons (2) + hints (1) = 9 lines
-	// Plus viewport height
-	overlayHeight := viewportHeight + 9
+	overlayWidth := types.ComputeOverlayWidth(width, 0.90, 60, 140)
+	viewportHeight := types.ComputeViewportHeight(height, 8)
+	overlayHeight := viewportHeight + 8
 
 	viewer := &DiffViewer{
 		approvalID:   approvalID,
@@ -122,53 +114,66 @@ func (d *DiffViewer) handleReject() tea.Cmd {
 
 // renderHeader renders the diff viewer header
 func (d *DiffViewer) renderHeader() string {
-	contentWidth := d.Width() - 6
+	contentWidth := d.Viewport().Width
 
 	title := "Tool Approval Required"
 	subtitle := fmt.Sprintf("%s: %s", d.toolName, d.preview.Title)
 
-	// Manually center by calculating padding
-	titleLen := len(title)
-	subtitleLen := len(subtitle)
+	titleLen := lipgloss.Width(title)
+	subtitleLen := lipgloss.Width(subtitle)
 	titlePadding := max(0, (contentWidth-titleLen)/2)
 	subtitlePadding := max(0, (contentWidth-subtitleLen)/2)
 
 	var header strings.Builder
-	header.WriteString(strings.Repeat(" ", titlePadding) + types.OverlayTitleStyle.Render(title))
+
+	p1 := ""
+	for i := 0; i < titlePadding; i++ {
+		p1 += " "
+	}
+	header.WriteString(p1 + types.OverlayTitleStyle.Render(title))
 	header.WriteString("\n")
-	header.WriteString(strings.Repeat(" ", subtitlePadding) + types.OverlaySubtitleStyle.Render(subtitle))
+
+	p2 := ""
+	for i := 0; i < subtitlePadding; i++ {
+		p2 += " "
+	}
+	header.WriteString(p2 + types.OverlaySubtitleStyle.Render(subtitle))
 
 	return header.String()
 }
 
 // renderFooter renders the diff viewer footer with buttons and hints
 func (d *DiffViewer) renderFooter() string {
-	contentWidth := d.Width() - 6
+	contentWidth := d.Viewport().Width
 
 	var footer strings.Builder
 
-	// Diff box has its own border (2) + padding (2), so reduce width further
-	diffStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(types.SalmonPink).
-		Padding(0, 1).
-		Width(contentWidth - 4)
+	separator := lipgloss.NewStyle().Foreground(types.MutedGray).Render(strings.Repeat(sepChar, contentWidth))
 
-	footer.WriteString(diffStyle.Render(d.Viewport().View()))
-	footer.WriteString("\n\n")
+	// In the flat design, viewport is inline.
+	footer.WriteString(d.Viewport().View())
+	footer.WriteString("\n" + separator + "\n")
 
 	// Render buttons
 	buttonsRow := d.RenderButtons()
 	buttonsLen := lipgloss.Width(buttonsRow)
 	buttonsPadding := max(0, (contentWidth-buttonsLen)/2)
-	footer.WriteString(strings.Repeat(" ", buttonsPadding) + buttonsRow)
+	pad1 := ""
+	for i := 0; i < buttonsPadding; i++ {
+		pad1 += " "
+	}
+	footer.WriteString(pad1 + buttonsRow)
 	footer.WriteString("\n")
 
 	// Render hints
 	hints := d.RenderHints()
 	hintsLen := lipgloss.Width(hints)
 	hintsPadding := max(0, (contentWidth-hintsLen)/2)
-	footer.WriteString(strings.Repeat(" ", hintsPadding) + hints)
+	pad2 := ""
+	for i := 0; i < hintsPadding; i++ {
+		pad2 += " "
+	}
+	footer.WriteString(pad2 + hints)
 
 	return footer.String()
 }

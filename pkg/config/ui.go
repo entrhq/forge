@@ -16,6 +16,7 @@ const (
 	defaultAutoCloseDelay          = 1 * time.Second
 	defaultBrowserEnabled          = false
 	defaultBrowserHeadless         = true
+	defaultShowThinking            = true
 )
 
 // UISection manages user interface configuration settings.
@@ -25,6 +26,7 @@ type UISection struct {
 	AutoCloseDelay          time.Duration `json:"auto_close_delay"`
 	BrowserEnabled          bool          `json:"browser_enabled"`
 	BrowserHeadless         bool          `json:"browser_headless"`
+	ShowThinking            bool          `json:"show_thinking"`
 	mu                      sync.RWMutex
 }
 
@@ -36,6 +38,7 @@ func NewUISection() *UISection {
 		AutoCloseDelay:          defaultAutoCloseDelay,
 		BrowserEnabled:          defaultBrowserEnabled,
 		BrowserHeadless:         defaultBrowserHeadless,
+		ShowThinking:            defaultShowThinking,
 	}
 }
 
@@ -65,6 +68,7 @@ func (s *UISection) Data() map[string]any {
 		"auto_close_delay":           s.AutoCloseDelay.String(),
 		"browser_enabled":            s.BrowserEnabled,
 		"browser_headless":           s.BrowserHeadless,
+		"show_thinking":              s.ShowThinking,
 	}
 }
 
@@ -103,6 +107,9 @@ func (s *UISection) setField(key string, value any) error {
 
 	case "browser_headless":
 		return s.setBoolField(&s.BrowserHeadless, value, key)
+
+	case "show_thinking":
+		return s.setBoolField(&s.ShowThinking, value, key)
 
 	default:
 		// Ignore unknown keys for forward compatibility
@@ -164,6 +171,7 @@ func (s *UISection) Reset() {
 	s.AutoCloseDelay = defaultAutoCloseDelay
 	s.BrowserEnabled = defaultBrowserEnabled
 	s.BrowserHeadless = defaultBrowserHeadless
+	s.ShowThinking = defaultShowThinking
 }
 
 // GetAutoCloseSettings returns the current auto-close configuration.
@@ -229,6 +237,20 @@ func (s *UISection) SetBrowserEnabled(enabled bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.BrowserEnabled = enabled
+}
+
+// IsShowThinking returns whether thinking blocks are shown in the TUI.
+func (s *UISection) IsShowThinking() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.ShowThinking
+}
+
+// SetShowThinking sets whether thinking blocks are shown in the TUI.
+func (s *UISection) SetShowThinking(show bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ShowThinking = show
 }
 
 // IsBrowserHeadless returns whether browser runs in headless mode by default.

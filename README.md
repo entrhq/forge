@@ -73,12 +73,16 @@ func main() {
 
 ### 🖥️ Advanced Terminal UI
 
-- **Syntax Highlighting**: Full syntax highlighting for diffs and code blocks
-- **Diff Viewer**: Interactive unified diff viewer with color-coded changes
-- **Command Palette**: Quick access to settings, slash commands, and actions (Ctrl+P)
-- **Interactive Settings**: Live configuration of auto-approval, model parameters, and system behavior
-- **Slash Commands**: Built-in commands for common workflows (`/commit`, `/pr`, `/clear`, `/help`)
-- **Real-time Streaming**: See agent thinking, tool calls, and responses as they happen
+- **Real-time Streaming**: See agent thinking, tool calls, and responses stream in as they happen
+- **Compact Header Bar**: Workspace path and active model shown at a glance; context-aware hints update with TUI state
+- **Smart Scroll-Lock**: Scroll up to review history while the agent works; a banner appears when new content arrives, press `G` to jump back and resume auto-follow
+- **Command Palette**: Instant slash command launcher via `Ctrl+K` / `Ctrl+P` or typing `/`; `Enter` executes immediately
+- **Diff Viewer**: Interactive unified diff viewer with syntax highlighting for file changes
+- **Tool Result History**: Browse all tool results from the session with `Ctrl+L`; inspect the latest result with `Ctrl+V`
+- **Clipboard Copy**: Copy the full conversation as plain text with `Ctrl+Y`
+- **Agent Thinking Blocks**: Extended reasoning shown inline with elapsed time; toggle visibility in settings
+- **Interactive Settings**: Live configuration of LLM parameters, auto-approval rules, and UI preferences
+- **Slash Commands**: Built-in commands for common workflows (`/commit`, `/pr`, `/bash`, `/notes`, `/help`, `/snapshot`)
 
 ### 🛠️ Complete Coding Toolkit
 
@@ -130,6 +134,7 @@ func main() {
 - [Understanding the Agent Loop](docs/getting-started/understanding-agent-loop.md) - Core concepts
 
 ### How-To Guides
+- [Use TUI Interface](docs/how-to/use-tui-interface.md) - Full TUI guide (scroll-lock, clipboard, thinking blocks, overlays)
 - [Configure Provider](docs/how-to/configure-provider.md) - LLM provider setup
 - [Create Custom Tools](docs/how-to/create-custom-tool.md) - Extend agent capabilities
 - [Setup PR Documentation](docs/how-to/setup-pr-documentation.md) - Automated docs workflow
@@ -157,9 +162,11 @@ func main() {
 
 ### Architecture Decision Records
 See [ADRs](docs/adr/) for detailed design decisions including:
+- [TUI Visual Redesign](docs/adr/0051-tui-visual-redesign.md)
+- [TUI Clipboard Copy](docs/adr/0050-tui-clipboard-copy.md)
+- [TUI Bracketed Paste](docs/adr/0049-tui-bracketed-paste-support.md)
+- [TUI Smart Scroll-Lock](docs/adr/0048-tui-smart-scroll-lock.md)
 - [Automated PR Documentation](docs/adr/0030-automated-pr-documentation.md)
-- [Headless Git PR Creation](docs/adr/0031-headless-git-pr-creation.md)
-- [Headless Git Integration](docs/adr/0029-headless-git-integration.md)
 - [XML Tool Call Format](docs/adr/0019-xml-cdata-tool-call-format.md)
 - [Auto-Approval System](docs/adr/0017-auto-approval-and-settings-system.md)
 - [Context Management](docs/adr/0014-composable-context-management.md)

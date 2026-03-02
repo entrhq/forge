@@ -14,12 +14,26 @@ func newScrollTestModel() *model {
 	// Fill with enough content that the viewport is not trivially at the bottom.
 	vp.SetContent(strings.Repeat("line\n", 50))
 	vp.GotoBottom()
-	return &model{
+
+	// Create model with messages so scrollToBottomOrMark will actually scroll
+	m := &model{
 		viewport:      vp,
 		followScroll:  true,
 		hasNewContent: false,
-		content:       &strings.Builder{},
+		width:         80,
+		height:        20,
 	}
+
+	// Add messages that will trigger the scroll logic
+	// Generate enough content to exceed viewport height
+	for i := 0; i < 20; i++ {
+		m.messages = append(m.messages, DisplayMessage{
+			RenderFn: func(width int) string { return "test message line" },
+			Trailing: "\n",
+		})
+	}
+
+	return m
 }
 
 // ---------------------------------------------------------------------------
@@ -62,13 +76,13 @@ func TestScrollToBottomOrMark_WhenLocked(t *testing.T) {
 		t.Skip("viewport too small to scroll away from bottom")
 	}
 
-	offsetBefore := m.viewport.ScrollPercent()
+	yOffsetBefore := m.viewport.YOffset
 	m.scrollToBottomOrMark()
 
 	if m.viewport.AtBottom() {
 		t.Error("viewport should NOT jump to bottom when followScroll=false")
 	}
-	if m.viewport.ScrollPercent() != offsetBefore {
+	if m.viewport.YOffset != yOffsetBefore {
 		t.Error("viewport offset should be unchanged when followScroll=false")
 	}
 	if !m.hasNewContent {

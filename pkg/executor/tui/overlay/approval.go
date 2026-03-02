@@ -19,6 +19,8 @@ const (
 	keyLeft  = "left"
 	keyRight = "right"
 	keyEsc   = "esc"
+	// sepChar is the Unicode box-drawing horizontal line used for separators
+	sepChar = "─"
 )
 
 // GenericApprovalOverlay displays an approval request for any command.
@@ -30,17 +32,9 @@ type GenericApprovalOverlay struct {
 
 // NewGenericApprovalOverlay creates a new generic approval overlay
 func NewGenericApprovalOverlay(request approval.ApprovalRequest, width, height int) *GenericApprovalOverlay {
-	// Make overlay wide - 90% of screen width
-	overlayWidth := max(int(float64(width)*0.9), 80)
-
-	// Fixed viewport height for content
-	const maxViewportHeight = 15
-	viewportHeight := maxViewportHeight
-
-	// Calculate total overlay height
-	// Title (2) + subtitle (1) + spacing (1) + border (2) + buttons (2) + hints (1) = 9 lines
-	// Plus viewport height
-	overlayHeight := viewportHeight + 9
+	overlayWidth := types.ComputeOverlayWidth(width, 0.90, 60, 140)
+	viewportHeight := types.ComputeViewportHeight(height, 8)
+	overlayHeight := viewportHeight + 8
 
 	overlay := &GenericApprovalOverlay{
 		request: request,
@@ -71,6 +65,18 @@ func NewGenericApprovalOverlay(request approval.ApprovalRequest, width, height i
 
 // Update handles messages for the approval overlay
 func (a *GenericApprovalOverlay) Update(msg tea.Msg, state types.StateProvider, actions types.ActionHandler) (types.Overlay, tea.Cmd) {
+	if sizeMsg, ok := msg.(tea.WindowSizeMsg); ok {
+		newOverlayWidth := types.ComputeOverlayWidth(sizeMsg.Width, 0.90, 60, 140)
+		vpHeight := types.ComputeViewportHeight(sizeMsg.Height, 8)
+
+		a.SetDimensions(newOverlayWidth, vpHeight+8)
+
+		vp := a.Viewport()
+		vp.Width = newOverlayWidth - 4
+		vp.Height = vpHeight
+		// Viewport will re-wrap content automatically when dimensions change
+	}
+
 	// Check if this is an approval/rejection key before delegating to base
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
 		switch keyMsg.String() {
@@ -97,37 +103,54 @@ func (a *GenericApprovalOverlay) Update(msg tea.Msg, state types.StateProvider, 
 
 // renderHeader renders the approval overlay header
 func (a *GenericApprovalOverlay) renderHeader() string {
-	return types.OverlayTitleStyle.Render(a.request.Title())
+	contentWidth := a.Viewport().Width
+	title := a.request.Title()
+
+	titleLen := lipgloss.Width(title)
+	titlePadding := max(0, (contentWidth-titleLen)/2)
+
+	var header strings.Builder
+	p1 := ""
+	for i := 0; i < titlePadding; i++ {
+		p1 += " "
+	}
+	header.WriteString(p1 + types.OverlayTitleStyle.Render(title))
+
+	return header.String()
 }
 
 // renderFooter renders the approval overlay footer with buttons and hints
 func (a *GenericApprovalOverlay) renderFooter() string {
-	contentWidth := a.Width() - 6
+	contentWidth := a.Viewport().Width
 
 	var footer strings.Builder
 
-	// Wrap viewport content in a bordered box
-	contentStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(types.SalmonPink).
-		Padding(0, 1).
-		Width(contentWidth - 4)
+	separator := lipgloss.NewStyle().Foreground(types.MutedGray).Render(strings.Repeat(sepChar, contentWidth))
 
-	footer.WriteString(contentStyle.Render(a.Viewport().View()))
-	footer.WriteString("\n\n")
+	// Since we are nested inside the footer call, we prepend our own rendered diff
+	footer.WriteString(a.Viewport().View())
+	footer.WriteString("\n" + separator + "\n")
 
 	// Render buttons
 	buttonsRow := a.RenderButtons()
 	buttonsLen := lipgloss.Width(buttonsRow)
 	buttonsPadding := max(0, (contentWidth-buttonsLen)/2)
-	footer.WriteString(strings.Repeat(" ", buttonsPadding) + buttonsRow)
+	pad1 := ""
+	for i := 0; i < buttonsPadding; i++ {
+		pad1 += " "
+	}
+	footer.WriteString(pad1 + buttonsRow)
 	footer.WriteString("\n")
 
 	// Render hints
 	hints := types.OverlayHelpStyle.Render("Ctrl+A: Accept • Ctrl+R: Reject • Tab: Toggle • ↑/↓: Scroll")
 	hintsLen := lipgloss.Width(hints)
 	hintsPadding := max(0, (contentWidth-hintsLen)/2)
-	footer.WriteString(strings.Repeat(" ", hintsPadding) + hints)
+	pad2 := ""
+	for i := 0; i < hintsPadding; i++ {
+		pad2 += " "
+	}
+	footer.WriteString(pad2 + hints)
 
 	return footer.String()
 }

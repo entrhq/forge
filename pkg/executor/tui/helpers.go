@@ -9,6 +9,10 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+const (
+	promptWidth = 2 // "❯ " prompt glyph width
+)
+
 // getRandomLoadingMessage returns a random loading message to display while agent is thinking
 func getRandomLoadingMessage() string {
 	messages := []string{
@@ -78,25 +82,14 @@ func formatTokenCount(count int) string {
 }
 
 // formatEntry formats a content entry with an icon and optional styling
-func formatEntry(icon string, text string, style lipgloss.Style, width int, iconOnly bool) string {
+func formatEntry(icon string, text string, style lipgloss.Style, width int) string {
 	// Calculate wrap width (full width minus small padding)
 	wrapWidth := width - 4
 	if wrapWidth <= 0 {
 		wrapWidth = 80
 	}
 
-	if iconOnly {
-		// Style only the icon, keep text white
-		styledIcon := style.Render(icon)
-		fullText := icon + text // Use unstyled for wrapping calculation
-		wrapped := wordWrap(fullText, wrapWidth)
-
-		// Replace the unstyled icon with styled icon in first occurrence
-		wrapped = strings.Replace(wrapped, icon, styledIcon, 1)
-		return wrapped
-	}
-
-	// Style everything (default behavior)
+	// Style the full text (icon + content)
 	fullText := icon + text
 	wrapped := wordWrap(fullText, wrapWidth)
 	return style.Render(wrapped)
@@ -142,8 +135,9 @@ func wordWrap(text string, width int) string {
 		currentLine := leadingSpace // Start first line with leading space
 
 		for _, word := range words {
+			wordLen := lipgloss.Width(word)
 			// If a single word is longer than width, break it up
-			if len(word) > width {
+			if wordLen > width {
 				// First, flush current line if it has content
 				if currentLine != "" {
 					result.WriteString(currentLine)
@@ -151,24 +145,34 @@ func wordWrap(text string, width int) string {
 					currentLine = ""
 				}
 
-				// Break the long word into chunks
-				for len(word) > 0 {
-					chunkSize := width
-					if len(word) < chunkSize {
-						chunkSize = len(word)
+				// Break the long word into chunks safely using visual width
+				runes := []rune(word)
+				for len(runes) > 0 {
+					chunk := ""
+					chunkWidth := 0
+					chunkLen := 0
+					for _, r := range runes {
+						rw := lipgloss.Width(string(r))
+						if chunkWidth+rw > width && chunkWidth > 0 {
+							break
+						}
+						chunk += string(r)
+						chunkWidth += rw
+						chunkLen++
 					}
-					result.WriteString(word[:chunkSize])
+					result.WriteString(chunk)
 					result.WriteString("\n")
-					word = word[chunkSize:]
+					runes = runes[chunkLen:]
 				}
 				continue
 			}
 
 			// Check if adding this word would exceed width
+			currentLineLen := lipgloss.Width(currentLine)
 			switch {
 			case currentLine == "" || currentLine == leadingSpace:
 				currentLine = leadingSpace + word
-			case len(currentLine)+1+len(word) > width:
+			case currentLineLen+1+wordLen > width:
 				// Write current line and start new one
 				result.WriteString(currentLine)
 				result.WriteString("\n")
@@ -189,15 +193,40 @@ func wordWrap(text string, width int) string {
 }
 
 // ansiEscape matches common ANSI terminal escape sequences (color codes, cursor
-// movement commands, etc.). Used by stripANSI to clean up content before it is
-// written to the OS clipboard.
-var ansiEscape = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
+// movement commands, OSC sequences, etc.). Used by stripANSI to clean up content.
+var ansiEscape = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]|\x1b\][^[:cntrl:]]*\x07|\x1b\][^\x1b]*\x1b\\`)
 
 // stripANSI removes ANSI escape sequences from s and returns plain text.
 // The conversation buffer is rendered with lipgloss color codes, so we must
 // strip them before writing to the clipboard to avoid garbled pastes.
 func stripANSI(s string) string {
 	return ansiEscape.ReplaceAllString(s, "")
+}
+
+// sanitizeOutput strips ANSI codes and non-printable control characters
+// to prevent lipgloss text measurement and line wrapping from breaking.
+func sanitizeOutput(s string) string {
+	s = stripANSI(s)
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, ch := range s {
+		// Keep newlines, tabs, and printable characters (but filter \r)
+		if ch < 0x20 && ch != '\n' && ch != '\t' {
+			continue
+		}
+		b.WriteRune(ch)
+	}
+	return b.String()
+}
+
+// truncateLines truncates a string to a maximum number of lines,
+// appending a truncation indicator if lines were dropped.
+func truncateLines(s string, maxLines int) string {
+	lines := strings.Split(s, "\n")
+	if len(lines) <= maxLines {
+		return s
+	}
+	return strings.Join(lines[:maxLines], "\n") + "\n  ... [truncated for readability]"
 }
 
 // updateTextAreaHeight dynamically adjusts the textarea height based on content
@@ -218,8 +247,8 @@ func (m *model) updateTextAreaHeight() {
 		width = 80 // default width
 	}
 
-	// Account for prompt width ("> " = 2 chars)
-	effectiveWidth := width - 2
+	// Account for prompt glyph width ("❯ " = 2 chars, rendered externally in buildInputBox)
+	effectiveWidth := width - promptWidth
 	if effectiveWidth <= 0 {
 		effectiveWidth = 78
 	}
@@ -233,7 +262,7 @@ func (m *model) updateTextAreaHeight() {
 			visualLines++ // Empty line still counts as 1 visual line
 		} else {
 			// Calculate how many visual lines this logical line takes
-			lineLen := len(line)
+			lineLen := lipgloss.Width(line)
 			wrappedLines := (lineLen + effectiveWidth - 1) / effectiveWidth
 			if wrappedLines == 0 {
 				wrappedLines = 1
