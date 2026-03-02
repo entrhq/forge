@@ -28,7 +28,7 @@ var (
 			Foreground(mutedGray)
 
 	userIconStyle = lipgloss.NewStyle().
-			Foreground(salmonPink).
+			Foreground(coralPink).
 			Bold(true)
 
 	userTextStyle = lipgloss.NewStyle().
