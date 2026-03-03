@@ -141,6 +141,12 @@ func (f *fakeProvider) GetModelInfo() *types.ModelInfo { return &types.ModelInfo
 func (f *fakeProvider) GetModel() string               { return "fake" }
 func (f *fakeProvider) GetBaseURL() string             { return "" }
 func (f *fakeProvider) GetAPIKey() string              { return "" }
+func (f *fakeProvider) AnalyzeDocument(_ context.Context, _ []byte, _ string, _ string) (string, error) {
+	if f.err != nil {
+		return "", f.err
+	}
+	return f.response, nil
+}
 
 // ── sentinel errors ──────────────────────────────────────────────────────────
 

@@ -39,6 +39,10 @@ func (m *mockProvider) GetAPIKey() string {
 	return "mock-key"
 }
 
+func (m *mockProvider) AnalyzeDocument(ctx context.Context, fileData []byte, mediaType string, prompt string) (string, error) {
+	return "mock document analysis", nil
+}
+
 // TestMemoryAddAndRetrieve verifies that messages are properly added to memory
 // and can be retrieved for token counting
 func TestMemoryAddAndRetrieve(t *testing.T) {

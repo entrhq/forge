@@ -40,6 +40,10 @@ func (m *mockProvider) GetModelInfo() *types.ModelInfo {
 	return &types.ModelInfo{Name: m.model}
 }
 
+func (m *mockProvider) AnalyzeDocument(ctx context.Context, fileData []byte, mediaType string, prompt string) (string, error) {
+	return "mock analysis", nil
+}
+
 func TestNewSettingsOverlay(t *testing.T) {
 	tests := []struct {
 		name   string

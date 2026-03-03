@@ -46,6 +46,10 @@ func Initialize(configPath string) error {
 		return err
 	}
 
+	if err := manager.RegisterSection(NewMultimodalSection()); err != nil {
+		return err
+	}
+
 	// Load configuration
 	if err := manager.LoadAll(); err != nil {
 		return err
@@ -193,4 +197,24 @@ func GetMemory() *MemorySection {
 	}
 
 	return memory
+}
+
+// GetMultimodal returns the multimodal settings section from global config.
+// Returns nil if config is not initialized.
+func GetMultimodal() *MultimodalSection {
+	if !IsInitialized() {
+		return nil
+	}
+
+	section, ok := Global().GetSection(SectionIDMultimodal)
+	if !ok {
+		return nil
+	}
+
+	multimodal, ok := section.(*MultimodalSection)
+	if !ok {
+		return nil
+	}
+
+	return multimodal
 }
