@@ -113,6 +113,8 @@ Proposed → Accepted → [Deprecated or Superseded]
 | [0049](0049-tui-bracketed-paste-support.md) | TUI Bracketed Paste Support | Implemented |
 | [0050](0050-tui-clipboard-copy.md) | TUI Clipboard Copy | Implemented |
 | [0051](0051-tui-visual-redesign.md) | TUI Visual Redesign | Implemented |
+| [0052](0052-tui-viewport-spacer-height-fix.md) | TUI Viewport Spacer Height Fix | Implemented |
+| [0053](0053-multimodal-document-analysis.md) | Multimodal Document Analysis | Proposed |
 
 ## Resources
 
