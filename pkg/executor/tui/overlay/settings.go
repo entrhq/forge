@@ -775,6 +775,8 @@ func (s *SettingsOverlay) saveSettings() error {
 							data[item.key] = n
 							continue
 						}
+						// Invalid integer - skip this setting to avoid storing bad value
+						continue
 					}
 				}
 				data[item.key] = item.value

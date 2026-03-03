@@ -206,7 +206,7 @@ func GetMultimodal() *MultimodalSection {
 		return nil
 	}
 
-	section, ok := Global().GetSection("multimodal")
+	section, ok := Global().GetSection(SectionIDMultimodal)
 	if !ok {
 		return nil
 	}

@@ -447,9 +447,18 @@ func (p *Provider) AnalyzeDocument(ctx context.Context, fileData []byte, mediaTy
 		prompt = "Analyze this document and provide a detailed description of its contents."
 	}
 
-	// Base64 encode the file data with data URL prefix
+	// Base64 encode the file data
 	encodedData := base64.StdEncoding.EncodeToString(fileData)
+
+	// Build content part - use data URL format for all file types
+	// This works with OpenAI-compatible providers that may not support the "file" content type
 	dataURL := fmt.Sprintf("data:%s;base64,%s", mediaType, encodedData)
+	contentPart := map[string]interface{}{
+		"type": "image_url",
+		"image_url": map[string]interface{}{
+			"url": dataURL,
+		},
+	}
 
 	// Build the request body manually (matching existing pattern)
 	reqBody := map[string]interface{}{
@@ -462,12 +471,7 @@ func (p *Provider) AnalyzeDocument(ctx context.Context, fileData []byte, mediaTy
 						"type": "text",
 						"text": prompt,
 					},
-					{
-						"type": "image_url",
-						"image_url": map[string]interface{}{
-							"url": dataURL,
-						},
-					},
+					contentPart,
 				},
 			},
 		},

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"sync"
 )
 
@@ -79,8 +80,11 @@ func (s *MultimodalSection) Validate() error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	// pdf_page_limit can be 0 (all pages) or any positive integer
-	// No validation needed as all values are acceptable
+	// pdf_page_limit must be non-negative (0 = all pages, positive = limit)
+	if s.PDFPageLimit < 0 {
+		return fmt.Errorf("pdf_page_limit must be non-negative, got %d", s.PDFPageLimit)
+	}
+
 	return nil
 }
 

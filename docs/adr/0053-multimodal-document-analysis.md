@@ -214,11 +214,11 @@ func NewAnalyzeDocumentTool(provider llm.Provider, workspaceRoot, model string) 
 - `prompt`: Optional string, additional analysis instructions
 
 **Page Selection Logic (PDFs):**
-- Neither `page_start` nor `page_end` specified: Use first N pages (config: `multimodal.pdf_page_limit`)
-- Only `page_start` specified: Analyze just that single page
-- Both specified: Analyze range from page_start to page_end (inclusive)
-- Range must not exceed `pdf_page_limit` in total page count
+- Neither `page_start` nor `page_end` specified (both 0): Apply `pdf_page_limit` from page 1
+- Only `page_start` specified (page_end=0): Apply `pdf_page_limit` starting from `page_start`
+- Both specified: Honor user's explicit range from `page_start` to `page_end` (ignores `pdf_page_limit`)
 - `pdf_page_limit: 0` means all pages (displayed as "0 (all pages)" in UI/docs)
+- Implementation: Full-file path reads directly; partial ranges use `pdfcpu.TrimFile` to extract pages to temp file before sending to LLM
 
 **Supported Formats (MVP):**
 - Images: .png, .jpg, .jpeg

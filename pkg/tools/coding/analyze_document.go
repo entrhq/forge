@@ -2,7 +2,6 @@ package coding
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/xml"
 	"fmt"
 	"os"
@@ -132,9 +131,6 @@ func (t *AnalyzeDocumentTool) analyzeImage(ctx context.Context, absPath, relPath
 		return "", nil, fmt.Errorf("failed to read image: %w", err)
 	}
 
-	// Encode to base64
-	base64Image := base64.StdEncoding.EncodeToString(imageData)
-
 	// Determine media type
 	ext := strings.ToLower(filepath.Ext(absPath))
 	var mediaType string
@@ -148,17 +144,11 @@ func (t *AnalyzeDocumentTool) analyzeImage(ctx context.Context, absPath, relPath
 	// Build analysis prompt
 	prompt := buildImageAnalysisPrompt(relPath, userPrompt)
 
-	// Decode base64 image back to bytes for provider
-	imageBytes, err := base64.StdEncoding.DecodeString(base64Image)
-	if err != nil {
-		return "", nil, fmt.Errorf("failed to decode image: %w", err)
-	}
-
 	// Get provider for analysis
 	provider := t.providerForAnalysis()
 
 	// Call LLM with multimodal content
-	analysisResult, err := provider.AnalyzeDocument(ctx, imageBytes, mediaType, prompt)
+	analysisResult, err := provider.AnalyzeDocument(ctx, imageData, mediaType, prompt)
 	if err != nil {
 		return "", nil, fmt.Errorf("LLM analysis failed: %w", err)
 	}
@@ -206,6 +196,9 @@ func (t *AnalyzeDocumentTool) analyzePDF(ctx context.Context, absPath, relPath s
 	if actualStart < 1 || actualStart > pageCount {
 		return "", nil, fmt.Errorf("invalid page range: start page %d exceeds document length (%d pages)", actualStart, pageCount)
 	}
+	if actualEnd < actualStart {
+		return "", nil, fmt.Errorf("invalid page range: end page %d is before start page %d", actualEnd, actualStart)
+	}
 	if actualEnd > pageCount {
 		actualEnd = pageCount
 	}
@@ -215,10 +208,21 @@ func (t *AnalyzeDocumentTool) analyzePDF(ctx context.Context, absPath, relPath s
 	pagesRemaining := pageCount - actualEnd
 	prompt := buildPDFAnalysisPrompt(relPath, pageCount, actualStart, actualEnd, pagesAnalyzed, pagesRemaining, userPrompt)
 
-	// Read PDF file bytes
-	pdfBytes, err := os.ReadFile(absPath)
-	if err != nil {
-		return "", nil, fmt.Errorf("failed to read PDF file: %w", err)
+	// Read PDF file bytes (trim to selected pages if needed)
+	var pdfBytes []byte
+	if actualStart == 1 && actualEnd == pageCount {
+		// Analyze entire PDF - read directly
+		pdfBytes, err = os.ReadFile(absPath)
+		if err != nil {
+			return "", nil, fmt.Errorf("failed to read PDF file: %w", err)
+		}
+	} else {
+		// Extract selected page range to temporary file
+		var trimErr error
+		pdfBytes, trimErr = t.extractPDFPages(absPath, actualStart, actualEnd)
+		if trimErr != nil {
+			return "", nil, trimErr
+		}
 	}
 
 	// Get provider for analysis
@@ -253,19 +257,45 @@ Analyzed: Pages %d-%d (%d pages remaining)
 	return result, metadata, nil
 }
 
+// extractPDFPages extracts a page range from a PDF file and returns the bytes.
+func (t *AnalyzeDocumentTool) extractPDFPages(absPath string, startPage, endPage int) ([]byte, error) {
+	tmpFile, tmpErr := os.CreateTemp("", "forge-pdf-*.pdf")
+	if tmpErr != nil {
+		return nil, fmt.Errorf("failed to create temporary file: %w", tmpErr)
+	}
+	tmpPath := tmpFile.Name()
+	tmpFile.Close()
+	defer os.Remove(tmpPath)
+
+	// Build page range string for pdfcpu (e.g., "5-10")
+	pageRange := fmt.Sprintf("%d-%d", startPage, endPage)
+	if trimErr := api.TrimFile(absPath, tmpPath, []string{pageRange}, nil); trimErr != nil {
+		return nil, fmt.Errorf("failed to extract pages %d-%d: %w", startPage, endPage, trimErr)
+	}
+
+	// Read trimmed PDF bytes
+	pdfBytes, readErr := os.ReadFile(tmpPath)
+	if readErr != nil {
+		return nil, fmt.Errorf("failed to read trimmed PDF: %w", readErr)
+	}
+
+	return pdfBytes, nil
+}
+
 // calculatePageRange determines the actual page range to analyze based on inputs and limits.
 func (t *AnalyzeDocumentTool) calculatePageRange(pageStart, pageEnd, pageCount, pdfPageLimit int) (int, int) {
 	// If both are 0, use default limit from start
 	if pageStart == 0 && pageEnd == 0 {
 		start := 1
 		end := pdfPageLimit
-		if end > pageCount {
+		// If limit is 0, analyze all pages
+		if pdfPageLimit == 0 || end > pageCount {
 			end = pageCount
 		}
 		return start, end
 	}
 
-	// If only pageStart is specified
+	// If only pageStart is specified, apply limit from that start point
 	if pageStart > 0 && pageEnd == 0 {
 		start := pageStart
 		end := pageStart + pdfPageLimit - 1
@@ -275,13 +305,18 @@ func (t *AnalyzeDocumentTool) calculatePageRange(pageStart, pageEnd, pageCount, 
 		return start, end
 	}
 
-	// If both are specified, use as-is (will be validated later)
+	// If both are specified, honor user's explicit range (ignoring limit)
 	if pageStart > 0 && pageEnd > 0 {
-		return pageStart, pageEnd
+		// Clamp to page count
+		actualEnd := pageEnd
+		if actualEnd > pageCount {
+			actualEnd = pageCount
+		}
+		return pageStart, actualEnd
 	}
 
-	// Fallback
-	return 1, pdfPageLimit
+	// Fallback (shouldn't reach here)
+	return 1, pageCount
 }
 
 // buildImageAnalysisPrompt creates the analysis prompt for images.
@@ -289,11 +324,11 @@ func buildImageAnalysisPrompt(path, userPrompt string) string {
 	var prompt strings.Builder
 
 	prompt.WriteString("You are analyzing a visual document for an AI coding agent. Your analysis will be used by the agent to understand the document's content, structure, and purpose. Provide dense, structured information optimized for machine processing.\n\n")
-	prompt.WriteString(fmt.Sprintf("Document Path: %s\n", path))
+	fmt.Fprintf(&prompt, "Document Path: %s\n", path)
 	prompt.WriteString("Document Format: Image (PNG/JPG/JPEG)\n\n")
 
 	if userPrompt != "" {
-		prompt.WriteString(fmt.Sprintf("Agent Query: %s\n\n", userPrompt))
+		fmt.Fprintf(&prompt, "Agent Query: %s\n\n", userPrompt)
 		prompt.WriteString("Address the agent's query within the structured analysis below.\n\n")
 	}
 
@@ -334,7 +369,7 @@ func buildImageAnalysisPrompt(path, userPrompt string) string {
 
 	if userPrompt != "" {
 		prompt.WriteString("7. RESPONSE TO AGENT QUERY\n")
-		prompt.WriteString(fmt.Sprintf("   - Directly address: %s\n", userPrompt))
+		fmt.Fprintf(&prompt, "   - Directly address: %s\n", userPrompt)
 		prompt.WriteString("   - Reference specific elements from the analysis above\n\n")
 	}
 
@@ -412,7 +447,7 @@ func buildPDFAnalysisPrompt(path string, totalPages, startPage, endPage, analyze
 
 	if userPrompt != "" {
 		prompt.WriteString("8. RESPONSE TO AGENT QUERY\n")
-		prompt.WriteString(fmt.Sprintf("   - Directly address: %s\n", userPrompt))
+		fmt.Fprintf(&prompt, "   - Directly address: %s\n", userPrompt)
 		prompt.WriteString("   - Reference specific pages and elements from the analysis above\n")
 		prompt.WriteString("   - Highlight relevant sections that answer the query\n\n")
 	}
