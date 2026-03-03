@@ -447,6 +447,7 @@ func runTUI(ctx context.Context, config *Config) error {
 		coding.NewSearchFilesTool(guard),
 		coding.NewApplyDiffTool(guard),
 		coding.NewExecuteCommandTool(guard),
+		coding.NewAnalyzeDocumentTool(guard, provider),
 	}
 
 	for _, tool := range codingTools {

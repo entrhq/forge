@@ -109,6 +109,19 @@ type Provider interface {
 	// Returns the assistant's response message or an error.
 	Complete(ctx context.Context, messages []*types.Message) (*types.Message, error)
 
+	// AnalyzeDocument analyzes a document (image or PDF) using the LLM's vision capabilities.
+	//
+	// Parameters:
+	//   - ctx: Context for the request
+	//   - fileData: Raw bytes of the document
+	//   - mediaType: MIME type of the document (e.g., "image/png", "application/pdf")
+	//   - prompt: Optional analysis prompt (empty string for default analysis)
+	//
+	// Returns the LLM's analysis as a text string, formatted for agent consumption.
+	// The caller (typically a tool) is responsible for reading the file and determining
+	// the media type before calling this method.
+	AnalyzeDocument(ctx context.Context, fileData []byte, mediaType string, prompt string) (string, error)
+
 	// GetModelInfo returns information about the LLM model being used.
 	//
 	// This can be used to inspect model capabilities, pricing, token limits,

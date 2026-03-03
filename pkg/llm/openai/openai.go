@@ -43,6 +43,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -382,7 +383,7 @@ func (p *Provider) Complete(ctx context.Context, messages []*types.Message) (*ty
 		return nil, err
 	}
 
-	var content string
+	var content strings.Builder
 	var role string
 
 	for chunk := range stream {
@@ -394,7 +395,7 @@ func (p *Provider) Complete(ctx context.Context, messages []*types.Message) (*ty
 			role = chunk.Role
 		}
 
-		content += chunk.Content
+		content.WriteString(chunk.Content)
 	}
 
 	// Default to assistant role if not set
@@ -404,7 +405,7 @@ func (p *Provider) Complete(ctx context.Context, messages []*types.Message) (*ty
 
 	return &types.Message{
 		Role:    types.MessageRole(role),
-		Content: content,
+		Content: content.String(),
 	}, nil
 }
 
@@ -426,6 +427,98 @@ func (p *Provider) GetBaseURL() string {
 // GetAPIKey returns the API key being used.
 func (p *Provider) GetAPIKey() string {
 	return p.apiKey
+}
+
+// AnalyzeDocument analyzes a document using the OpenAI vision API.
+//
+// This method sends the document data (image or PDF) directly to the OpenAI API
+// as an inline file content part. The document is base64-encoded and embedded
+// in the API request along with the analysis prompt.
+//
+// Supported media types:
+//   - image/png
+//   - image/jpeg
+//   - application/pdf
+//
+// Returns the model's analysis as plain text formatted for agent consumption.
+func (p *Provider) AnalyzeDocument(ctx context.Context, fileData []byte, mediaType string, prompt string) (string, error) {
+	// Default prompt if none provided
+	if prompt == "" {
+		prompt = "Analyze this document and provide a detailed description of its contents."
+	}
+
+	// Base64 encode the file data with data URL prefix
+	encodedData := base64.StdEncoding.EncodeToString(fileData)
+	dataURL := fmt.Sprintf("data:%s;base64,%s", mediaType, encodedData)
+
+	// Build the request body manually (matching existing pattern)
+	reqBody := map[string]interface{}{
+		"model": p.model,
+		"messages": []map[string]interface{}{
+			{
+				"role": "user",
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": prompt,
+					},
+					{
+						"type": "image_url",
+						"image_url": map[string]interface{}{
+							"url": dataURL,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	bodyBytes, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	url := p.baseURL + "/chat/completions"
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+p.apiKey)
+
+	resp, err := p.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return "", fmt.Errorf("API request failed with status %d (failed to read error body: %w)", resp.StatusCode, readErr)
+		}
+		return "", fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Parse the response
+	var result struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if len(result.Choices) == 0 {
+		return "", fmt.Errorf("no response from API")
+	}
+
+	return result.Choices[0].Message.Content, nil
 }
 
 // convertToOpenAIMessages converts our Message format to OpenAI's ChatCompletionMessageParamUnion format.

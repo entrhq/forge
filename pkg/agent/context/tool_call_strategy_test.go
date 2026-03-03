@@ -55,6 +55,11 @@ func (m *MockLLMProvider) GetAPIKey() string {
 	return args.String(0)
 }
 
+func (m *MockLLMProvider) AnalyzeDocument(ctx context.Context, fileData []byte, mediaType string, prompt string) (string, error) {
+	args := m.Called(ctx, fileData, mediaType, prompt)
+	return args.String(0), args.Error(1)
+}
+
 // toolCallMsg returns an assistant message containing an XML tool call for the given tool name.
 func toolCallMsg(toolName string) *types.Message {
 	return types.NewAssistantMessage(

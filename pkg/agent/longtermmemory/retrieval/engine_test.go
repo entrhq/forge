@@ -473,3 +473,6 @@ func (c *countingProvider) GetModelInfo() *types.ModelInfo { return &types.Model
 func (c *countingProvider) GetModel() string               { return "counting" }
 func (c *countingProvider) GetBaseURL() string             { return "" }
 func (c *countingProvider) GetAPIKey() string              { return "" }
+func (c *countingProvider) AnalyzeDocument(ctx context.Context, fileData []byte, mediaType string, prompt string) (string, error) {
+	return c.inner.AnalyzeDocument(ctx, fileData, mediaType, prompt)
+}

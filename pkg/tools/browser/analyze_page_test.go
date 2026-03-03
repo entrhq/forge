@@ -60,6 +60,13 @@ func (m *mockAnalyzeProvider) GetAPIKey() string {
 	return "mock-key"
 }
 
+func (m *mockAnalyzeProvider) AnalyzeDocument(ctx context.Context, fileData []byte, mediaType string, prompt string) (string, error) {
+	if m.err != nil {
+		return "", m.err
+	}
+	return m.response, nil
+}
+
 func TestAnalyzePageTool_Metadata(t *testing.T) {
 	manager := NewSessionManager()
 	provider := &mockAnalyzeProvider{response: "test analysis"}

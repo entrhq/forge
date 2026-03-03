@@ -362,6 +362,33 @@ func (s *SettingsOverlay) loadSettings() {
 				}
 				section.items = append(section.items, item)
 			}
+
+		case "multimodal":
+			// Create text items for multimodal configuration
+			multimodalFields := []struct {
+				key         string
+				displayName string
+				itemType    itemType
+			}{
+				{"model", "Model", itemTypeText},
+				{"pdf_page_limit", "PDF Page Limit", itemTypeText},
+			}
+
+			for _, field := range multimodalFields {
+				value := data[field.key]
+				// Render numeric values as strings for text fields
+				if field.itemType == itemTypeText {
+					value = fmt.Sprintf("%v", value)
+				}
+				item := settingsItem{
+					key:         field.key,
+					displayName: field.displayName,
+					value:       value,
+					itemType:    field.itemType,
+					modified:    false,
+				}
+				section.items = append(section.items, item)
+			}
 		}
 
 		s.sections = append(s.sections, section)
@@ -729,6 +756,20 @@ func (s *SettingsOverlay) saveSettings() error {
 			}
 			for _, item := range section.items {
 				if numericMemoryKeys[item.key] {
+					if s, ok := item.value.(string); ok {
+						if n, err := strconv.Atoi(s); err == nil {
+							data[item.key] = n
+							continue
+						}
+					}
+				}
+				data[item.key] = item.value
+			}
+
+		case "multimodal":
+			// Save multimodal settings - pdf_page_limit must be stored as int
+			for _, item := range section.items {
+				if item.key == "pdf_page_limit" {
 					if s, ok := item.value.(string); ok {
 						if n, err := strconv.Atoi(s); err == nil {
 							data[item.key] = n
