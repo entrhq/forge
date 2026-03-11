@@ -31,18 +31,18 @@ func (t *FillTool) Description() string {
 }
 
 // Schema returns the tool's JSON schema.
-func (t *FillTool) Schema() map[string]interface{} {
+func (t *FillTool) Schema() map[string]any {
 	return tools.BaseToolSchema(
-		map[string]interface{}{
-			"session": map[string]interface{}{
+		map[string]any{
+			"session": map[string]any{
 				"type":        "string",
 				"description": "Name of the browser session to use",
 			},
-			"selector": map[string]interface{}{
+			"selector": map[string]any{
 				"type":        "string",
 				"description": "CSS selector for the input element to fill (e.g., 'input[name=\"email\"]', '#password', 'textarea.comment')",
 			},
-			"value": map[string]interface{}{
+			"value": map[string]any{
 				"type":        "string",
 				"description": "Text value to fill into the input field",
 			},
@@ -60,7 +60,7 @@ type FillInput struct {
 }
 
 // Execute fills a form input.
-func (t *FillTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
+func (t *FillTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]any, error) {
 	// Parse parameters
 	var input FillInput
 	if err := tools.UnmarshalXMLWithFallback(argsXML, &input); err != nil {

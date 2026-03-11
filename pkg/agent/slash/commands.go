@@ -147,9 +147,9 @@ func (h *Handler) handlePR(ctx context.Context, customTitle string) (string, err
 	}
 
 	var result strings.Builder
-	result.WriteString(fmt.Sprintf("✅ PR Created: %s -> %s\n\n", head, base))
-	result.WriteString(fmt.Sprintf("Title: %s\n\n", prContent.Title))
-	result.WriteString(fmt.Sprintf("URL: %s\n\n", prURL))
+	fmt.Fprintf(&result, "✅ PR Created: %s -> %s\n\n", head, base)
+	fmt.Fprintf(&result, "Title: %s\n\n", prContent.Title)
+	fmt.Fprintf(&result, "URL: %s\n\n", prURL)
 	result.WriteString(prContent.Description)
 
 	return result.String(), nil

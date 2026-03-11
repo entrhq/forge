@@ -173,10 +173,7 @@ func (e *Engine) retrieve(
 	hits := e.mergeTopK(vecs, topK)
 
 	// 5. Graph hop traversal.
-	hopDepth := e.cfg.HopDepth
-	if hopDepth < 0 {
-		hopDepth = 0
-	}
+	hopDepth := max(e.cfg.HopDepth, 0)
 	if hopDepth > 0 {
 		hits = e.expandHops(hits, hopDepth)
 	}
@@ -255,7 +252,7 @@ func (e *Engine) expandHops(initial []MemoryVector, depth int) []MemoryVector {
 		visited[mv.Memory.Meta.ID] = struct{}{}
 	}
 
-	for d := 0; d < depth; d++ {
+	for range depth {
 		var next []MemoryVector
 		for _, mv := range frontier {
 			for _, rel := range mv.Memory.Meta.Related {

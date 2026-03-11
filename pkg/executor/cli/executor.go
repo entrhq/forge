@@ -221,7 +221,7 @@ func (e *Executor) handleToolCall(toolName string) {
 	fmt.Fprintf(e.writer, "\n🔧 Tool: %s\n", toolName)
 }
 
-func (e *Executor) handleToolResult(toolOutput interface{}) {
+func (e *Executor) handleToolResult(toolOutput any) {
 	if result, ok := toolOutput.(string); ok {
 		fmt.Fprintf(e.writer, "✅ Result: %s\n", result)
 	} else {

@@ -40,7 +40,7 @@ func TestCommandWhitelistSection_Data(t *testing.T) {
 			t.Fatal("Data should contain 'patterns' key")
 		}
 
-		patterns, ok := patternsData.([]interface{})
+		patterns, ok := patternsData.([]any)
 		if !ok {
 			t.Fatal("Patterns should be a slice")
 		}
@@ -55,12 +55,12 @@ func TestCommandWhitelistSection_Data(t *testing.T) {
 		section.AddPattern("test command", "Test description")
 
 		data := section.Data()
-		patterns := data["patterns"].([]interface{})
+		patterns := data["patterns"].([]any)
 
 		// Find our test pattern
 		found := false
 		for _, p := range patterns {
-			patternMap := p.(map[string]interface{})
+			patternMap := p.(map[string]any)
 			if patternMap["pattern"] == "test command" {
 				found = true
 				if patternMap["description"] != "Test description" {
@@ -81,14 +81,14 @@ func TestCommandWhitelistSection_Data(t *testing.T) {
 func TestCommandWhitelistSection_SetData(t *testing.T) {
 	t.Run("sets patterns from data", func(t *testing.T) {
 		section := NewCommandWhitelistSection()
-		data := map[string]interface{}{
-			"patterns": []interface{}{
-				map[string]interface{}{
+		data := map[string]any{
+			"patterns": []any{
+				map[string]any{
 					"pattern":     "npm",
 					"description": "NPM commands",
 					"type":        "prefix",
 				},
-				map[string]interface{}{
+				map[string]any{
 					"pattern":     "git status",
 					"description": "Git status",
 					"type":        "exact",
@@ -118,7 +118,7 @@ func TestCommandWhitelistSection_SetData(t *testing.T) {
 
 	t.Run("handles missing patterns key", func(t *testing.T) {
 		section := NewCommandWhitelistSection()
-		data := map[string]interface{}{
+		data := map[string]any{
 			"other_key": "value",
 		}
 
@@ -130,7 +130,7 @@ func TestCommandWhitelistSection_SetData(t *testing.T) {
 
 	t.Run("rejects invalid patterns type", func(t *testing.T) {
 		section := NewCommandWhitelistSection()
-		data := map[string]interface{}{
+		data := map[string]any{
 			"patterns": "not a slice",
 		}
 
@@ -142,8 +142,8 @@ func TestCommandWhitelistSection_SetData(t *testing.T) {
 
 	t.Run("rejects invalid pattern item type", func(t *testing.T) {
 		section := NewCommandWhitelistSection()
-		data := map[string]interface{}{
-			"patterns": []interface{}{
+		data := map[string]any{
+			"patterns": []any{
 				"not a map",
 			},
 		}
@@ -156,9 +156,9 @@ func TestCommandWhitelistSection_SetData(t *testing.T) {
 
 	t.Run("rejects missing pattern field", func(t *testing.T) {
 		section := NewCommandWhitelistSection()
-		data := map[string]interface{}{
-			"patterns": []interface{}{
-				map[string]interface{}{
+		data := map[string]any{
+			"patterns": []any{
+				map[string]any{
 					"description": "Missing pattern",
 				},
 			},
@@ -172,9 +172,9 @@ func TestCommandWhitelistSection_SetData(t *testing.T) {
 
 	t.Run("defaults to prefix type", func(t *testing.T) {
 		section := NewCommandWhitelistSection()
-		data := map[string]interface{}{
-			"patterns": []interface{}{
-				map[string]interface{}{
+		data := map[string]any{
+			"patterns": []any{
+				map[string]any{
 					"pattern":     "npm",
 					"description": "NPM",
 				},
@@ -191,9 +191,9 @@ func TestCommandWhitelistSection_SetData(t *testing.T) {
 
 	t.Run("handles optional description", func(t *testing.T) {
 		section := NewCommandWhitelistSection()
-		data := map[string]interface{}{
-			"patterns": []interface{}{
-				map[string]interface{}{
+		data := map[string]any{
+			"patterns": []any{
+				map[string]any{
 					"pattern": "npm",
 				},
 			},

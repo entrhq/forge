@@ -13,7 +13,7 @@ const (
 // Input represents various types of input that can be sent to an agent.
 type Input struct {
 	// Metadata holds optional additional information about the input.
-	Metadata map[string]interface{}
+	Metadata map[string]any
 
 	// FormData holds structured key-value pairs for form-based input.
 	// Only populated when Type is InputTypeFormInput.
@@ -31,7 +31,7 @@ type Input struct {
 func NewCancelInput() *Input {
 	return &Input{
 		Type:     InputTypeCancel,
-		Metadata: make(map[string]interface{}),
+		Metadata: make(map[string]any),
 	}
 }
 
@@ -40,7 +40,7 @@ func NewUserInput(content string) *Input {
 	return &Input{
 		Type:     InputTypeUserInput,
 		Content:  content,
-		Metadata: make(map[string]interface{}),
+		Metadata: make(map[string]any),
 	}
 }
 
@@ -49,14 +49,14 @@ func NewFormInput(formData map[string]string) *Input {
 	return &Input{
 		Type:     InputTypeFormInput,
 		FormData: formData,
-		Metadata: make(map[string]interface{}),
+		Metadata: make(map[string]any),
 	}
 }
 
 // WithMetadata adds metadata to the input and returns the input for chaining.
-func (i *Input) WithMetadata(key string, value interface{}) *Input {
+func (i *Input) WithMetadata(key string, value any) *Input {
 	if i.Metadata == nil {
-		i.Metadata = make(map[string]interface{})
+		i.Metadata = make(map[string]any)
 	}
 	i.Metadata[key] = value
 	return i
@@ -98,6 +98,6 @@ func NewNotesRequestInput(params NotesRequestParams) *Input {
 
 	return &Input{
 		Type:     InputTypeNotesRequest,
-		Metadata: map[string]interface{}{"params": params},
+		Metadata: map[string]any{"params": params},
 	}
 }

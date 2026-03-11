@@ -223,7 +223,7 @@ func TestLLMSection_ThreadSafety(t *testing.T) {
 
 	// Test concurrent reads and writes
 	done := make(chan bool)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		go func(n int) {
 			section.SetModel("model")
 			_ = section.GetModel()
@@ -235,7 +235,7 @@ func TestLLMSection_ThreadSafety(t *testing.T) {
 		}(i)
 	}
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		<-done
 	}
 }

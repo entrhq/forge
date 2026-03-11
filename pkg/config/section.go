@@ -14,11 +14,11 @@ type Section interface {
 
 	// Data returns the current configuration data for this section
 	// The data should be JSON-serializable
-	Data() map[string]interface{}
+	Data() map[string]any
 
 	// SetData updates the section's configuration from the provided data
 	// Returns an error if the data is invalid
-	SetData(data map[string]interface{}) error
+	SetData(data map[string]any) error
 
 	// Validate validates the current configuration
 	// Returns an error if the configuration is invalid

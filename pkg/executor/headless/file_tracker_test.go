@@ -18,7 +18,7 @@ func TestFileModificationTracker_TrackToolCall(t *testing.T) {
 			event: &types.AgentEvent{
 				Type:     types.EventTypeToolCall,
 				ToolName: "write_file",
-				ToolInput: map[string]interface{}{
+				ToolInput: map[string]any{
 					"path":    "test.txt",
 					"content": "hello world",
 				},
@@ -31,10 +31,10 @@ func TestFileModificationTracker_TrackToolCall(t *testing.T) {
 			event: &types.AgentEvent{
 				Type:     types.EventTypeToolCall,
 				ToolName: "apply_diff",
-				ToolInput: map[string]interface{}{
+				ToolInput: map[string]any{
 					"path": "src/main.go",
-					"edits": []interface{}{
-						map[string]interface{}{
+					"edits": []any{
+						map[string]any{
 							"search":  "old",
 							"replace": "new",
 						},
@@ -49,7 +49,7 @@ func TestFileModificationTracker_TrackToolCall(t *testing.T) {
 			event: &types.AgentEvent{
 				Type:     types.EventTypeToolCall,
 				ToolName: "read_file",
-				ToolInput: map[string]interface{}{
+				ToolInput: map[string]any{
 					"path": "test.txt",
 				},
 			},
@@ -61,7 +61,7 @@ func TestFileModificationTracker_TrackToolCall(t *testing.T) {
 			event: &types.AgentEvent{
 				Type:     types.EventTypeToolCall,
 				ToolName: "write_file",
-				ToolInput: map[string]interface{}{
+				ToolInput: map[string]any{
 					"content": "hello world",
 				},
 			},
@@ -111,7 +111,7 @@ func TestFileModificationTracker_ConfirmModification(t *testing.T) {
 	event := &types.AgentEvent{
 		Type:     types.EventTypeToolCall,
 		ToolName: "write_file",
-		ToolInput: map[string]interface{}{
+		ToolInput: map[string]any{
 			"path":    "test.txt",
 			"content": "hello",
 		},
@@ -150,7 +150,7 @@ func TestFileModificationTracker_CancelModification(t *testing.T) {
 	event := &types.AgentEvent{
 		Type:     types.EventTypeToolCall,
 		ToolName: "write_file",
-		ToolInput: map[string]interface{}{
+		ToolInput: map[string]any{
 			"path":    "test.txt",
 			"content": "hello",
 		},
@@ -188,7 +188,7 @@ func TestFileModificationTracker_MultipleModifications(t *testing.T) {
 		event := &types.AgentEvent{
 			Type:     types.EventTypeToolCall,
 			ToolName: "write_file",
-			ToolInput: map[string]interface{}{
+			ToolInput: map[string]any{
 				"path":    file,
 				"content": "test",
 			},

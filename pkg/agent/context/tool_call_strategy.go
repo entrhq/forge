@@ -223,9 +223,9 @@ func (s *ToolCallSummarizationStrategy) summarizeBatch(ctx context.Context, grou
 	var rawMessages strings.Builder
 	totalOriginalChars := 0
 	for i, group := range groups {
-		rawMessages.WriteString(fmt.Sprintf("--- Operation %d ---\n", i+1))
+		fmt.Fprintf(&rawMessages, "--- Operation %d ---\n", i+1)
 		for _, msg := range group {
-			rawMessages.WriteString(fmt.Sprintf("[%s]: %s\n\n", msg.Role, msg.Content))
+			fmt.Fprintf(&rawMessages, "[%s]: %s\n\n", msg.Role, msg.Content)
 			totalOriginalChars += len(msg.Content)
 		}
 	}

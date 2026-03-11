@@ -148,7 +148,7 @@ func (s *Session) extractStructured(opts ExtractOptions) (string, error) {
 	headingLocator := s.Page.Locator("h1, h2, h3, h4, h5, h6")
 	count, err := headingLocator.Count()
 	if err == nil && count > 0 {
-		for i := 0; i < count; i++ {
+		for i := range count {
 			text, textErr := headingLocator.Nth(i).TextContent()
 			if textErr == nil && text != "" {
 				structured.Headings = append(structured.Headings, text)
@@ -160,7 +160,7 @@ func (s *Session) extractStructured(opts ExtractOptions) (string, error) {
 	linkLocator := s.Page.Locator("a[href]")
 	linkCount, err := linkLocator.Count()
 	if err == nil && linkCount > 0 {
-		for i := 0; i < linkCount; i++ {
+		for i := range linkCount {
 			linkElem := linkLocator.Nth(i)
 			text, _ := linkElem.TextContent()
 			href, _ := linkElem.GetAttribute("href")
@@ -231,10 +231,10 @@ func (s *Session) extractHTML(opts ExtractOptions) (string, error) {
 	var result strings.Builder
 
 	if cleaned.Title != "" {
-		result.WriteString(fmt.Sprintf("<!-- Title: %s -->\n", cleaned.Title))
+		fmt.Fprintf(&result, "<!-- Title: %s -->\n", cleaned.Title)
 	}
 	if cleaned.Description != "" {
-		result.WriteString(fmt.Sprintf("<!-- Description: %s -->\n", cleaned.Description))
+		fmt.Fprintf(&result, "<!-- Description: %s -->\n", cleaned.Description)
 	}
 	if cleaned.Truncated {
 		result.WriteString("<!-- Note: Content truncated to fit size limit -->\n")

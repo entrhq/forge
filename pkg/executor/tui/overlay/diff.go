@@ -126,18 +126,18 @@ func (d *DiffViewer) renderHeader() string {
 
 	var header strings.Builder
 
-	p1 := ""
-	for i := 0; i < titlePadding; i++ {
-		p1 += " "
+	var p1 strings.Builder
+	for range titlePadding {
+		p1.WriteString(" ")
 	}
-	header.WriteString(p1 + types.OverlayTitleStyle.Render(title))
+	header.WriteString(p1.String() + types.OverlayTitleStyle.Render(title))
 	header.WriteString("\n")
 
-	p2 := ""
-	for i := 0; i < subtitlePadding; i++ {
-		p2 += " "
+	var p2 strings.Builder
+	for range subtitlePadding {
+		p2.WriteString(" ")
 	}
-	header.WriteString(p2 + types.OverlaySubtitleStyle.Render(subtitle))
+	header.WriteString(p2.String() + types.OverlaySubtitleStyle.Render(subtitle))
 
 	return header.String()
 }
@@ -158,22 +158,22 @@ func (d *DiffViewer) renderFooter() string {
 	buttonsRow := d.RenderButtons()
 	buttonsLen := lipgloss.Width(buttonsRow)
 	buttonsPadding := max(0, (contentWidth-buttonsLen)/2)
-	pad1 := ""
-	for i := 0; i < buttonsPadding; i++ {
-		pad1 += " "
+	var pad1 strings.Builder
+	for range buttonsPadding {
+		pad1.WriteString(" ")
 	}
-	footer.WriteString(pad1 + buttonsRow)
+	footer.WriteString(pad1.String() + buttonsRow)
 	footer.WriteString("\n")
 
 	// Render hints
 	hints := d.RenderHints()
 	hintsLen := lipgloss.Width(hints)
 	hintsPadding := max(0, (contentWidth-hintsLen)/2)
-	pad2 := ""
-	for i := 0; i < hintsPadding; i++ {
-		pad2 += " "
+	var pad2 strings.Builder
+	for range hintsPadding {
+		pad2.WriteString(" ")
 	}
-	footer.WriteString(pad2 + hints)
+	footer.WriteString(pad2.String() + hints)
 
 	return footer.String()
 }

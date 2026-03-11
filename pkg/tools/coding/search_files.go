@@ -37,22 +37,22 @@ func (t *SearchFilesTool) Description() string {
 }
 
 // Schema returns the JSON schema for the tool's input parameters.
-func (t *SearchFilesTool) Schema() map[string]interface{} {
+func (t *SearchFilesTool) Schema() map[string]any {
 	return tools.BaseToolSchema(
-		map[string]interface{}{
-			"path": map[string]interface{}{
+		map[string]any{
+			"path": map[string]any{
 				"type":        "string",
 				"description": "Directory path to search in (relative to workspace, defaults to workspace root)",
 			},
-			"pattern": map[string]interface{}{
+			"pattern": map[string]any{
 				"type":        "string",
 				"description": "Regular expression pattern to search for",
 			},
-			"file_pattern": map[string]interface{}{
+			"file_pattern": map[string]any{
 				"type":        "string",
 				"description": "Optional glob pattern to filter files (e.g., '*.go', '*.py')",
 			},
-			"context_lines": map[string]interface{}{
+			"context_lines": map[string]any{
 				"type":        "integer",
 				"description": "Number of context lines to show before and after match (default: 2)",
 			},
@@ -62,7 +62,7 @@ func (t *SearchFilesTool) Schema() map[string]interface{} {
 }
 
 // Execute searches for the pattern in files.
-func (t *SearchFilesTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
+func (t *SearchFilesTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]any, error) {
 	// Parse arguments
 	var input struct {
 		XMLName      xml.Name `xml:"arguments"`
@@ -117,7 +117,7 @@ func (t *SearchFilesTool) Execute(ctx context.Context, argsXML []byte) (string, 
 	result := t.formatMatches(matches)
 
 	// Build metadata
-	metadata := map[string]interface{}{
+	metadata := map[string]any{
 		"path":          input.Path,
 		"pattern":       input.Pattern,
 		"match_count":   len(matches),
@@ -299,7 +299,7 @@ func (t *SearchFilesTool) formatMatches(matches []searchMatch) string {
 			if currentFile != "" {
 				builder.WriteString("\n")
 			}
-			builder.WriteString(fmt.Sprintf("▸ %s\n", relPath))
+			fmt.Fprintf(&builder, "▸ %s\n", relPath)
 			builder.WriteString(strings.Repeat("-", 60) + "\n")
 			currentFile = match.FilePath
 		}
@@ -308,7 +308,7 @@ func (t *SearchFilesTool) formatMatches(matches []searchMatch) string {
 		contextLineNum := match.ContextFrom
 		for _, line := range match.Context {
 			if contextLineNum < match.LineNumber {
-				builder.WriteString(fmt.Sprintf("  %d | %s\n", contextLineNum, line))
+				fmt.Fprintf(&builder, "  %d | %s\n", contextLineNum, line)
 				contextLineNum++
 			} else {
 				// This is context after the match
@@ -317,11 +317,11 @@ func (t *SearchFilesTool) formatMatches(matches []searchMatch) string {
 		}
 
 		// Print the matching line (highlighted)
-		builder.WriteString(fmt.Sprintf("▶ %d | %s\n", match.LineNumber, match.Line))
+		fmt.Fprintf(&builder, "▶ %d | %s\n", match.LineNumber, match.Line)
 
 		// Print context after match
 		for i := match.LineNumber - match.ContextFrom; i < len(match.Context); i++ {
-			builder.WriteString(fmt.Sprintf("  %d | %s\n", contextLineNum, match.Context[i]))
+			fmt.Fprintf(&builder, "  %d | %s\n", contextLineNum, match.Context[i])
 			contextLineNum++
 		}
 
@@ -329,7 +329,7 @@ func (t *SearchFilesTool) formatMatches(matches []searchMatch) string {
 	}
 
 	// Add summary
-	builder.WriteString(fmt.Sprintf("Found %d matches", len(matches)))
+	fmt.Fprintf(&builder, "Found %d matches", len(matches))
 
 	return builder.String()
 }
@@ -365,7 +365,7 @@ func isBinaryFile(path string) bool {
 	}
 
 	// Check for null bytes (common in binary files)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		if buf[i] == 0 {
 			return true
 		}

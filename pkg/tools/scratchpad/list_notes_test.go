@@ -41,7 +41,7 @@ func TestListNotesTool_Schema(t *testing.T) {
 		t.Fatal("Schema() returned nil")
 	}
 
-	props, ok := schema["properties"].(map[string]interface{})
+	props, ok := schema["properties"].(map[string]any)
 	if !ok {
 		t.Fatal("Schema missing properties")
 	}
@@ -96,7 +96,7 @@ func TestListNotesTool_Execute_DefaultLimit(t *testing.T) {
 	tool := NewListNotesTool(manager)
 
 	// Add 15 notes with small delay to ensure unique IDs
-	for i := 0; i < 15; i++ {
+	for i := range 15 {
 		_, err := manager.Add(fmt.Sprintf("Note %d", i), []string{"test"})
 		if err != nil {
 			t.Fatalf("Failed to add note: %v", err)
@@ -128,7 +128,7 @@ func TestListNotesTool_Execute_CustomLimit(t *testing.T) {
 	tool := NewListNotesTool(manager)
 
 	// Add 10 notes
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		manager.Add(fmt.Sprintf("Note %d", i), []string{"test"})
 		time.Sleep(time.Microsecond) // Ensure unique timestamps
 	}
@@ -381,7 +381,7 @@ func TestListNotesTool_Execute_LimitLessThanTotal(t *testing.T) {
 	tool := NewListNotesTool(manager)
 
 	// Add 5 notes
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		manager.Add(fmt.Sprintf("Note %d", i), []string{"test"})
 		time.Sleep(time.Microsecond) // Ensure unique timestamps
 	}

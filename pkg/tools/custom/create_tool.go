@@ -37,14 +37,14 @@ func (t *CreateCustomToolTool) Description() string {
 }
 
 // Schema returns the JSON schema for the tool's input parameters.
-func (t *CreateCustomToolTool) Schema() map[string]interface{} {
+func (t *CreateCustomToolTool) Schema() map[string]any {
 	return tools.BaseToolSchema(
-		map[string]interface{}{
-			"name": map[string]interface{}{
+		map[string]any{
+			"name": map[string]any{
 				"type":        "string",
 				"description": "Tool name (will be the directory and binary name)",
 			},
-			"description": map[string]interface{}{
+			"description": map[string]any{
 				"type":        "string",
 				"description": "Tool description (what the tool does)",
 			},
@@ -54,7 +54,7 @@ func (t *CreateCustomToolTool) Schema() map[string]interface{} {
 }
 
 // Execute creates a new custom tool scaffold.
-func (t *CreateCustomToolTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
+func (t *CreateCustomToolTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]any, error) {
 	var input struct {
 		XMLName     xml.Name `xml:"arguments"`
 		Name        string   `xml:"name"`
@@ -101,7 +101,7 @@ func (t *CreateCustomToolTool) Execute(ctx context.Context, argsXML []byte) (str
 
 	message := buildToolCreationGuide(input.Name, toolDir)
 
-	metadata := map[string]interface{}{
+	metadata := map[string]any{
 		"tool_name":   input.Name,
 		"tool_dir":    toolDir,
 		"version":     "1.0.0",
@@ -149,7 +149,7 @@ func (t *CreateCustomToolTool) GeneratePreview(ctx context.Context, argsXML []by
 		Title:       fmt.Sprintf("Create custom tool: %s", input.Name),
 		Description: input.Description,
 		Content:     content,
-		Metadata: map[string]interface{}{
+		Metadata: map[string]any{
 			"tool_name":   input.Name,
 			"tool_dir":    filepath.Join(toolDir, input.Name),
 			"version":     "1.0.0",

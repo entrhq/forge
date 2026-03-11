@@ -67,10 +67,7 @@ func (m *model) buildHeader() string {
 	right := tipsStyle.Render(modelName + "  v" + version.Version)
 
 	totalUsed := lipgloss.Width(left) + lipgloss.Width(mid) + lipgloss.Width(right)
-	gap := (m.width - totalUsed) / 2
-	if gap < 1 {
-		gap = 1
-	}
+	gap := max((m.width-totalUsed)/2, 1)
 	pad := strings.Repeat(" ", gap)
 
 	bar := left + pad + mid + pad + right
@@ -168,10 +165,7 @@ func (m *model) buildBottomBar() string {
 	}
 
 	// Subtract 2 for the Padding(0, 1) on statusBarStyle (1 char each side)
-	gap := m.width - 2 - lipgloss.Width(left) - lipgloss.Width(right)
-	if gap < 1 {
-		gap = 1
-	}
+	gap := max(m.width-2-lipgloss.Width(left)-lipgloss.Width(right), 1)
 
 	return statusBarStyle.Width(m.width).Render(
 		left + strings.Repeat(" ", gap) + right,
@@ -287,12 +281,12 @@ func (m *model) renderSummarizationStatus() string {
 	content.WriteString(headerStyle.Render(title))
 	content.WriteString("\n")
 
-	sepStr := ""
+	var sepStr strings.Builder
 	innerWidth := boxWidth - 4 // Account for borders (2) and padding (2)
-	for i := 0; i < innerWidth; i++ {
-		sepStr += "─"
+	for range innerWidth {
+		sepStr.WriteString("─")
 	}
-	content.WriteString(lipgloss.NewStyle().Foreground(mutedGray).Render(sepStr))
+	content.WriteString(lipgloss.NewStyle().Foreground(mutedGray).Render(sepStr.String()))
 	content.WriteString("\n")
 
 	// Render the spinner alongside the loading text
@@ -306,7 +300,7 @@ func (m *model) renderSummarizationStatus() string {
 			formatTokenCount(m.summarization.maxTokens))
 	}
 
-	content.WriteString(fmt.Sprintf("%s %s", spinnerStr, textStyle.Render(statusText)))
+	fmt.Fprintf(&content, "%s %s", spinnerStr, textStyle.Render(statusText))
 
 	// Create styled box
 	boxStyle := lipgloss.NewStyle().

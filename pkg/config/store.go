@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"sync"
@@ -17,22 +18,22 @@ type Store interface {
 	Save() error
 
 	// GetSection retrieves configuration data for a specific section
-	GetSection(sectionID string) (map[string]interface{}, error)
+	GetSection(sectionID string) (map[string]any, error)
 
 	// SetSection stores configuration data for a specific section
-	SetSection(sectionID string, data map[string]interface{}) error
+	SetSection(sectionID string, data map[string]any) error
 
 	// GetAll retrieves all configuration data
-	GetAll() (map[string]map[string]interface{}, error)
+	GetAll() (map[string]map[string]any, error)
 
 	// SetAll stores all configuration data
-	SetAll(data map[string]map[string]interface{}) error
+	SetAll(data map[string]map[string]any) error
 }
 
 // FileStore implements Store using a JSON file.
 type FileStore struct {
 	path     string
-	data     map[string]map[string]interface{}
+	data     map[string]map[string]any
 	mu       sync.RWMutex
 	version  string
 	modified bool
@@ -51,7 +52,7 @@ func NewFileStore(path string) (*FileStore, error) {
 
 	store := &FileStore{
 		path:    path,
-		data:    make(map[string]map[string]interface{}),
+		data:    make(map[string]map[string]any),
 		version: "1.0",
 	}
 
@@ -72,7 +73,7 @@ func (s *FileStore) Load() error {
 	if err != nil {
 		if os.IsNotExist(err) {
 			// File doesn't exist yet, use empty config
-			s.data = make(map[string]map[string]interface{})
+			s.data = make(map[string]map[string]any)
 			return nil
 		}
 		return fmt.Errorf("failed to open config file: %w", err)
@@ -80,8 +81,8 @@ func (s *FileStore) Load() error {
 	defer file.Close()
 
 	var config struct {
-		Version  string                            `json:"version"`
-		Sections map[string]map[string]interface{} `json:"sections"`
+		Version  string                    `json:"version"`
+		Sections map[string]map[string]any `json:"sections"`
 	}
 
 	decoder := json.NewDecoder(file)
@@ -93,7 +94,7 @@ func (s *FileStore) Load() error {
 	if config.Sections != nil {
 		s.data = config.Sections
 	} else {
-		s.data = make(map[string]map[string]interface{})
+		s.data = make(map[string]map[string]any)
 	}
 	s.modified = false
 
@@ -119,8 +120,8 @@ func (s *FileStore) Save() error {
 	}
 
 	config := struct {
-		Version  string                            `json:"version"`
-		Sections map[string]map[string]interface{} `json:"sections"`
+		Version  string                    `json:"version"`
+		Sections map[string]map[string]any `json:"sections"`
 	}{
 		Version:  s.version,
 		Sections: s.data,
@@ -150,33 +151,29 @@ func (s *FileStore) Save() error {
 }
 
 // GetSection retrieves configuration data for a specific section.
-func (s *FileStore) GetSection(sectionID string) (map[string]interface{}, error) {
+func (s *FileStore) GetSection(sectionID string) (map[string]any, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	if data, exists := s.data[sectionID]; exists {
 		// Return a copy to prevent external modification
-		dataCopy := make(map[string]interface{}, len(data))
-		for k, v := range data {
-			dataCopy[k] = v
-		}
+		dataCopy := make(map[string]any, len(data))
+		maps.Copy(dataCopy, data)
 		return dataCopy, nil
 	}
 
 	// Return empty map if section doesn't exist
-	return make(map[string]interface{}), nil
+	return make(map[string]any), nil
 }
 
 // SetSection stores configuration data for a specific section.
-func (s *FileStore) SetSection(sectionID string, data map[string]interface{}) error {
+func (s *FileStore) SetSection(sectionID string, data map[string]any) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	// Store a copy to prevent external modification
-	dataCopy := make(map[string]interface{}, len(data))
-	for k, v := range data {
-		dataCopy[k] = v
-	}
+	dataCopy := make(map[string]any, len(data))
+	maps.Copy(dataCopy, data)
 
 	s.data[sectionID] = dataCopy
 	s.modified = true
@@ -184,17 +181,15 @@ func (s *FileStore) SetSection(sectionID string, data map[string]interface{}) er
 }
 
 // GetAll retrieves all configuration data.
-func (s *FileStore) GetAll() (map[string]map[string]interface{}, error) {
+func (s *FileStore) GetAll() (map[string]map[string]any, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	// Return a deep copy
-	dataCopy := make(map[string]map[string]interface{}, len(s.data))
+	dataCopy := make(map[string]map[string]any, len(s.data))
 	for sectionID, sectionData := range s.data {
-		sectionCopy := make(map[string]interface{}, len(sectionData))
-		for k, v := range sectionData {
-			sectionCopy[k] = v
-		}
+		sectionCopy := make(map[string]any, len(sectionData))
+		maps.Copy(sectionCopy, sectionData)
 		dataCopy[sectionID] = sectionCopy
 	}
 
@@ -202,17 +197,15 @@ func (s *FileStore) GetAll() (map[string]map[string]interface{}, error) {
 }
 
 // SetAll stores all configuration data.
-func (s *FileStore) SetAll(data map[string]map[string]interface{}) error {
+func (s *FileStore) SetAll(data map[string]map[string]any) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	// Store a deep copy
-	dataCopy := make(map[string]map[string]interface{}, len(data))
+	dataCopy := make(map[string]map[string]any, len(data))
 	for sectionID, sectionData := range data {
-		sectionCopy := make(map[string]interface{}, len(sectionData))
-		for k, v := range sectionData {
-			sectionCopy[k] = v
-		}
+		sectionCopy := make(map[string]any, len(sectionData))
+		maps.Copy(sectionCopy, sectionData)
 		dataCopy[sectionID] = sectionCopy
 	}
 

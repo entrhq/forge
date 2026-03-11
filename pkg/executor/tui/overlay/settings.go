@@ -74,7 +74,7 @@ type settingsSection struct {
 type settingsItem struct {
 	key         string
 	displayName string
-	value       interface{}
+	value       any
 	itemType    itemType
 	modified    bool
 }
@@ -216,9 +216,9 @@ func (s *SettingsOverlay) loadSettings() {
 
 		case sectionCommandWhitelist:
 			// Show patterns as list items
-			if patterns, ok := data["patterns"].([]interface{}); ok {
+			if patterns, ok := data["patterns"].([]any); ok {
 				for i, p := range patterns {
-					if patternMap, ok := p.(map[string]interface{}); ok {
+					if patternMap, ok := p.(map[string]any); ok {
 						pattern := patternMap["pattern"]
 						desc := patternMap["description"]
 						displayName := fmt.Sprintf("%v", pattern)
@@ -713,7 +713,7 @@ func (s *SettingsOverlay) saveSettings() error {
 		}
 
 		// Build updated data map
-		data := make(map[string]interface{})
+		data := make(map[string]any)
 
 		switch section.id {
 		case "auto_approval":
@@ -723,7 +723,7 @@ func (s *SettingsOverlay) saveSettings() error {
 
 		case sectionCommandWhitelist:
 			// Reconstruct patterns array
-			patterns := make([]interface{}, 0)
+			patterns := make([]any, 0)
 			for _, item := range section.items {
 				if item.itemType == itemTypeList {
 					patterns = append(patterns, item.value)
@@ -874,7 +874,7 @@ func (s *SettingsOverlay) sliceBodyLines(bodyStr string, maxHeight int) []string
 	s.scrollOffset = startIdx
 
 	visible := make([]string, maxHeight)
-	for i := 0; i < maxHeight; i++ {
+	for i := range maxHeight {
 		if startIdx+i < len(lines) {
 			visible[i] = lines[startIdx+i]
 		}
@@ -894,10 +894,7 @@ func (s *SettingsOverlay) View() string {
 		return s.renderWithConfirmation()
 	}
 
-	innerWidth := s.width - 4
-	if innerWidth < 0 {
-		innerWidth = 0
-	}
+	innerWidth := max(s.width-4, 0)
 
 	var body strings.Builder
 	for i, section := range s.sections {
@@ -1031,9 +1028,9 @@ func (s *SettingsOverlay) renderItem(item settingsItem, isFocused bool) string {
 			check = "[x]"
 			check = lipgloss.NewStyle().Foreground(types.MintGreen).Render(check)
 		}
-		out.WriteString(fmt.Sprintf("%s %s", check, labelStyle.Render(item.displayName)))
+		fmt.Fprintf(&out, "%s %s", check, labelStyle.Render(item.displayName))
 	case itemTypeList:
-		out.WriteString(fmt.Sprintf("• %s", labelStyle.Render(item.displayName)))
+		fmt.Fprintf(&out, "• %s", labelStyle.Render(item.displayName))
 	case itemTypeText:
 		out.WriteString(s.renderTextItem(item, isFocused, labelStyle))
 	}
@@ -1126,7 +1123,7 @@ func (s *SettingsOverlay) showAddPatternDialog() tea.Cmd {
 func (s *SettingsOverlay) showEditPatternDialog() tea.Cmd {
 	section := s.sections[s.selectedSection]
 	item := section.items[s.selectedItem]
-	data, ok := item.value.(map[string]interface{})
+	data, ok := item.value.(map[string]any)
 	if !ok {
 		return nil
 	}
@@ -1275,7 +1272,7 @@ func (s *SettingsOverlay) addPattern(pattern, description, matchType string) {
 			newItem := settingsItem{
 				key:         fmt.Sprintf("pattern_new_%d", len(section.items)),
 				displayName: fmt.Sprintf("%s - %s", pattern, description),
-				value: map[string]interface{}{
+				value: map[string]any{
 					"pattern":     pattern,
 					"description": description,
 					"type":        matchType,
@@ -1294,7 +1291,7 @@ func (s *SettingsOverlay) updatePattern(index int, pattern, description, matchTy
 	for i, section := range s.sections {
 		if section.id == sectionCommandWhitelist {
 			if index < len(section.items) {
-				s.sections[i].items[index].value = map[string]interface{}{
+				s.sections[i].items[index].value = map[string]any{
 					"pattern":     pattern,
 					"description": description,
 					"type":        matchType,
@@ -1590,11 +1587,11 @@ func (s *SettingsOverlay) renderInputDialog() string {
 	titleText := titleStyle.Render(s.activeDialog.title)
 
 	// Create separator (fixed width dialog = 60 inner width, minus borders = 56)
-	sepStr := ""
-	for i := 0; i < 56; i++ {
-		sepStr += "─"
+	var sepStr strings.Builder
+	for range 56 {
+		sepStr.WriteString("─")
 	}
-	separator := lipgloss.NewStyle().Foreground(types.MutedGray).Render(sepStr)
+	separator := lipgloss.NewStyle().Foreground(types.MutedGray).Render(sepStr.String())
 
 	content.WriteString(titleText)
 	content.WriteString("\n")

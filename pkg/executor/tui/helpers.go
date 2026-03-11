@@ -148,7 +148,7 @@ func wordWrap(text string, width int) string {
 				// Break the long word into chunks safely using visual width
 				runes := []rune(word)
 				for len(runes) > 0 {
-					chunk := ""
+					var chunk strings.Builder
 					chunkWidth := 0
 					chunkLen := 0
 					for _, r := range runes {
@@ -156,11 +156,11 @@ func wordWrap(text string, width int) string {
 						if chunkWidth+rw > width && chunkWidth > 0 {
 							break
 						}
-						chunk += string(r)
+						chunk.WriteString(string(r))
 						chunkWidth += rw
 						chunkLen++
 					}
-					result.WriteString(chunk)
+					result.WriteString(chunk.String())
 					result.WriteString("\n")
 					runes = runes[chunkLen:]
 				}

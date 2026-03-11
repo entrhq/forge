@@ -41,18 +41,18 @@ func (t *ExecuteCommandTool) Description() string {
 }
 
 // Schema returns the tool's JSON schema
-func (t *ExecuteCommandTool) Schema() map[string]interface{} {
+func (t *ExecuteCommandTool) Schema() map[string]any {
 	return tools.BaseToolSchema(
-		map[string]interface{}{
-			"command": map[string]interface{}{
+		map[string]any{
+			"command": map[string]any{
 				"type":        "string",
 				"description": "The shell command to execute",
 			},
-			"timeout": map[string]interface{}{
+			"timeout": map[string]any{
 				"type":        "number",
 				"description": "Command timeout in seconds (default: 30)",
 			},
-			"working_dir": map[string]interface{}{
+			"working_dir": map[string]any{
 				"type":        "string",
 				"description": "Working directory relative to workspace (default: workspace root)",
 			},
@@ -64,7 +64,7 @@ func (t *ExecuteCommandTool) Schema() map[string]interface{} {
 // Execute runs the command with streaming output support
 //
 //nolint:gocyclo // Complexity is acceptable for command execution logic
-func (t *ExecuteCommandTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
+func (t *ExecuteCommandTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]any, error) {
 	var input struct {
 		XMLName    xml.Name `xml:"arguments"`
 		Command    string   `xml:"command"`
@@ -185,7 +185,7 @@ func (t *ExecuteCommandTool) Execute(ctx context.Context, argsXML []byte) (strin
 	result += fmt.Sprintf("\n\nExit code: %d", exitCode)
 
 	// Build metadata
-	metadata := map[string]interface{}{
+	metadata := map[string]any{
 		"command":     input.Command,
 		"exit_code":   exitCode,
 		"duration_ms": duration.Milliseconds(),
@@ -279,14 +279,14 @@ func (t *ExecuteCommandTool) GeneratePreview(ctx context.Context, argsXML []byte
 	preview.WriteString("Working Directory: ")
 	preview.WriteString(workDir)
 	preview.WriteString("\n\n")
-	preview.WriteString(fmt.Sprintf("Timeout: %s\n", timeout))
+	fmt.Fprintf(&preview, "Timeout: %s\n", timeout)
 
 	return &tools.ToolPreview{
 		Type:        tools.PreviewTypeCommand,
 		Title:       "Execute Command",
 		Description: fmt.Sprintf("This will execute the command: %s", input.Command),
 		Content:     preview.String(),
-		Metadata: map[string]interface{}{
+		Metadata: map[string]any{
 			"command":     input.Command,
 			"working_dir": workDir,
 			"timeout":     timeout.Seconds(),

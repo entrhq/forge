@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/entrhq/forge/pkg/llm"
@@ -45,14 +46,14 @@ func TestThinkingParser_StreamedThinking(t *testing.T) {
 		"Here's the answer", // Message content
 	}
 
-	var thinkingContent string
+	var thinkingContent strings.Builder
 	var messageContent string
 
 	for _, chunk := range chunks {
 		thinking, message := parser.Parse(chunk)
 
 		if thinking != nil {
-			thinkingContent += thinking.Content
+			thinkingContent.WriteString(thinking.Content)
 			if thinking.Type != llm.ContentTypeThinking {
 				t.Errorf("Expected thinking type, got %v", thinking.Type)
 			}
@@ -69,14 +70,14 @@ func TestThinkingParser_StreamedThinking(t *testing.T) {
 	// Flush to get any remaining buffered content
 	thinkingFlush, messageFlush := parser.Flush()
 	if thinkingFlush != nil {
-		thinkingContent += thinkingFlush.Content
+		thinkingContent.WriteString(thinkingFlush.Content)
 	}
 	if messageFlush != nil {
 		messageContent += messageFlush.Content
 	}
 
-	if thinkingContent != "Let me analyze this..." {
-		t.Errorf("Expected 'Let me analyze this...', got '%s'", thinkingContent)
+	if thinkingContent.String() != "Let me analyze this..." {
+		t.Errorf("Expected 'Let me analyze this...', got '%s'", thinkingContent.String())
 	}
 
 	if messageContent != "Here's the answer" {

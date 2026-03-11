@@ -186,7 +186,7 @@ func (s *ThresholdSummarizationStrategy) buildSummarizationPrompt(messages []*ty
 
 	b.WriteString("Messages to summarize:\n\n")
 	for i, msg := range messages {
-		b.WriteString(fmt.Sprintf("%d. [%s]: %s\n\n", i+1, msg.Role, msg.Content))
+		fmt.Fprintf(&b, "%d. [%s]: %s\n\n", i+1, msg.Role, msg.Content)
 	}
 
 	return b.String()

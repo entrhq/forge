@@ -32,22 +32,22 @@ func (t *SearchTool) Description() string {
 }
 
 // Schema returns the tool's JSON schema.
-func (t *SearchTool) Schema() map[string]interface{} {
+func (t *SearchTool) Schema() map[string]any {
 	return tools.BaseToolSchema(
-		map[string]interface{}{
-			"session": map[string]interface{}{
+		map[string]any{
+			"session": map[string]any{
 				"type":        "string",
 				"description": "Name of the browser session to search in",
 			},
-			"pattern": map[string]interface{}{
+			"pattern": map[string]any{
 				"type":        "string",
 				"description": "Text pattern to search for in the page content",
 			},
-			"case_sensitive": map[string]interface{}{
+			"case_sensitive": map[string]any{
 				"type":        "boolean",
 				"description": "Whether the search should be case-sensitive. Default: false",
 			},
-			"max_results": map[string]interface{}{
+			"max_results": map[string]any{
 				"type":        "integer",
 				"description": "Maximum number of results to return. Default: 10",
 			},
@@ -66,7 +66,7 @@ type SearchInput struct {
 }
 
 // Execute searches the page.
-func (t *SearchTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
+func (t *SearchTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]any, error) {
 	// Parse parameters
 	var input SearchInput
 	if err := tools.UnmarshalXMLWithFallback(argsXML, &input); err != nil {
@@ -113,35 +113,26 @@ func (t *SearchTool) Execute(ctx context.Context, argsXML []byte) (string, map[s
 
 	// Build result message
 	var resultText strings.Builder
-	resultText.WriteString(fmt.Sprintf(`Search completed successfully
-
-Search Details:
-- Session: %s
-- Pattern: "%s"
-- Case Sensitive: %v
-- Results Found: %d
-- Current URL: %s
-
-`,
+	fmt.Fprintf(&resultText, "Search completed successfully\n\nSearch Details:\n- Session: %s\n- Pattern: %q\n- Case Sensitive: %v\n- Results Found: %d\n- Current URL: %s\n\n",
 		input.Session,
 		input.Pattern,
 		opts.CaseSensitive,
 		len(results),
 		session.CurrentURL,
-	))
+	)
 
 	if len(results) == 0 {
 		resultText.WriteString("No matches found for the search pattern.")
 	} else {
 		resultText.WriteString("Matches:\n\n")
 		for i, result := range results {
-			resultText.WriteString(fmt.Sprintf("Match %d:\n", i+1))
-			resultText.WriteString(fmt.Sprintf("Text: %q\n", result.Text))
-			resultText.WriteString(fmt.Sprintf("Context: %s\n\n", result.Context))
+			fmt.Fprintf(&resultText, "Match %d:\n", i+1)
+			fmt.Fprintf(&resultText, "Text: %q\n", result.Text)
+			fmt.Fprintf(&resultText, "Context: %s\n\n", result.Context)
 		}
 
 		if len(results) == opts.MaxResults {
-			resultText.WriteString(fmt.Sprintf("\n[Limited to %d results. There may be more matches in the page.]", opts.MaxResults))
+			fmt.Fprintf(&resultText, "\n[Limited to %d results. There may be more matches in the page.]", opts.MaxResults)
 		}
 	}
 

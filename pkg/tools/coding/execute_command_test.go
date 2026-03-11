@@ -554,18 +554,3 @@ func TestExecuteCommandTool_CrossPlatformCommand(t *testing.T) {
 		t.Errorf("Expected exit_code=0, got %v", metadata["exit_code"])
 	}
 }
-
-// Helper functions
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}

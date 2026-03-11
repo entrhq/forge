@@ -36,7 +36,7 @@ func TestManager_CheckAutoApproval_ExecuteCommand_Whitelisted(t *testing.T) {
 		Arguments:  tools.ArgumentsBlock{InnerXML: []byte(`<command>echo test</command>`)},
 	}
 
-	argsMap := map[string]interface{}{
+	argsMap := map[string]any{
 		"command": testCommand,
 	}
 
@@ -78,7 +78,7 @@ func TestManager_CheckAutoApproval_ExecuteCommand_NotWhitelisted(t *testing.T) {
 		Arguments:  tools.ArgumentsBlock{InnerXML: []byte(`<command>rm -rf /</command>`)},
 	}
 
-	argsMap := map[string]interface{}{
+	argsMap := map[string]any{
 		"command": "rm -rf /",
 	}
 
@@ -123,7 +123,7 @@ func TestManager_CheckAutoApproval_RegularTool_AutoApproved(t *testing.T) {
 		Arguments:  tools.ArgumentsBlock{InnerXML: []byte(`<path>test.txt</path>`)},
 	}
 
-	argsMap := map[string]interface{}{
+	argsMap := map[string]any{
 		"path": "test.txt",
 	}
 
@@ -165,7 +165,7 @@ func TestManager_CheckAutoApproval_RegularTool_NotAutoApproved(t *testing.T) {
 		Arguments:  tools.ArgumentsBlock{InnerXML: []byte(`<path>test.txt</path><content>data</content>`)},
 	}
 
-	argsMap := map[string]interface{}{
+	argsMap := map[string]any{
 		"path":    "test.txt",
 		"content": "data",
 	}
@@ -201,7 +201,7 @@ func TestManager_IsCommandWhitelisted_ValidCommand(t *testing.T) {
 	emitter := &mockEventEmitter{}
 	manager := NewManager(0, emitter.emit)
 
-	argsMap := map[string]interface{}{
+	argsMap := map[string]any{
 		"command": testCommand,
 	}
 
@@ -226,7 +226,7 @@ func TestManager_IsCommandWhitelisted_MissingCommandKey(t *testing.T) {
 	emitter := &mockEventEmitter{}
 	manager := NewManager(0, emitter.emit)
 
-	argsMap := map[string]interface{}{
+	argsMap := map[string]any{
 		"other_key": "value",
 	}
 
@@ -247,7 +247,7 @@ func TestManager_IsCommandWhitelisted_InvalidCommandType(t *testing.T) {
 	emitter := &mockEventEmitter{}
 	manager := NewManager(0, emitter.emit)
 
-	argsMap := map[string]interface{}{
+	argsMap := map[string]any{
 		"command": 123, // Not a string
 	}
 
@@ -275,7 +275,7 @@ func TestManager_IsCommandWhitelisted_NotWhitelisted(t *testing.T) {
 	emitter := &mockEventEmitter{}
 	manager := NewManager(0, emitter.emit)
 
-	argsMap := map[string]interface{}{
+	argsMap := map[string]any{
 		"command": "dangerous_command",
 	}
 
@@ -302,7 +302,7 @@ func TestManager_CheckAutoApproval_ExecuteCommand_EmptyArgs(t *testing.T) {
 		Arguments:  tools.ArgumentsBlock{InnerXML: []byte(``)},
 	}
 
-	argsMap := map[string]interface{}{}
+	argsMap := map[string]any{}
 
 	approved, autoApproved := manager.checkAutoApproval("test-id", toolCall, argsMap)
 

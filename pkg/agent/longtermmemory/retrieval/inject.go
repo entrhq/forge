@@ -45,9 +45,9 @@ func FormatInjection(memories []*longtermmemory.MemoryFile, tokenBudget int) str
 
 func formatEntry(n int, m *longtermmemory.MemoryFile) string {
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("\n## Memory %d", n))
+	fmt.Fprintf(&sb, "\n## Memory %d", n)
 	if m.Meta.Category != "" {
-		sb.WriteString(fmt.Sprintf(" [%s]", m.Meta.Category))
+		fmt.Fprintf(&sb, " [%s]", m.Meta.Category)
 	}
 	sb.WriteString("\n")
 	sb.WriteString(strings.TrimSpace(m.Content))

@@ -32,18 +32,18 @@ func (t *EvaluateTool) Description() string {
 }
 
 // Schema returns the tool's JSON schema.
-func (t *EvaluateTool) Schema() map[string]interface{} {
+func (t *EvaluateTool) Schema() map[string]any {
 	return tools.BaseToolSchema(
-		map[string]interface{}{
-			"session": map[string]interface{}{
+		map[string]any{
+			"session": map[string]any{
 				"type":        "string",
 				"description": "Name of the browser session to use",
 			},
-			"code": map[string]interface{}{
+			"code": map[string]any{
 				"type":        "string",
 				"description": "JavaScript code to execute. Can be an expression or a function body. For complex operations, wrap in an IIFE: (function() { /* code */ })();",
 			},
-			"timeout": map[string]interface{}{
+			"timeout": map[string]any{
 				"type":        "number",
 				"description": "Execution timeout in milliseconds. Default: 30000 (30 seconds)",
 			},
@@ -61,7 +61,7 @@ type EvaluateInput struct {
 }
 
 // Execute executes JavaScript in the browser session.
-func (t *EvaluateTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
+func (t *EvaluateTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]any, error) {
 	// Parse and validate input
 	var input EvaluateInput
 	if err := xml.Unmarshal(argsXML, &input); err != nil {
@@ -161,7 +161,7 @@ func (t *EvaluateTool) GeneratePreview(ctx context.Context, argsXML []byte) (*to
 		Title:       "Execute JavaScript",
 		Description: description,
 		Content:     content,
-		Metadata: map[string]interface{}{
+		Metadata: map[string]any{
 			"session": input.Session,
 		},
 	}, nil

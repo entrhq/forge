@@ -524,8 +524,7 @@ func TestPipeline_WritesMemoriesToStore(t *testing.T) {
 
 	var mu sync.Mutex
 	var rebuilt bool
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	p := NewPipeline(&fakeProvider{response: string(raw)}, "", store, func() {
 		mu.Lock()
@@ -564,8 +563,7 @@ func TestPipeline_RebuildNotCalledForEmptyResult(t *testing.T) {
 	var mu sync.Mutex
 	var rebuilt bool
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	p := NewPipeline(&fakeProvider{response: "[]"}, "", store, func() {
 		mu.Lock()
@@ -596,7 +594,7 @@ func TestPipeline_EnqueueIsNonBlocking(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		for i := 0; i < triggerBufferSize*3; i++ {
+		for range triggerBufferSize * 3 {
 			p.Enqueue(TriggerEvent{
 				Kind:      TriggerKindTurn,
 				Messages:  []ConversationMessage{{Role: "user", Content: "hi"}},
@@ -631,8 +629,7 @@ func TestPipeline_StopsOnContextCancel(t *testing.T) {
 // ── Observer ─────────────────────────────────────────────────────────────────
 
 func TestObserver_OnTurnComplete(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	p := NewPipeline(&fakeProvider{response: "[]"}, "", newFakeStore(), nil, nil)
 	p.Start(ctx)
 	obs := NewObserver(p)
@@ -647,8 +644,7 @@ func TestObserver_OnTurnComplete(t *testing.T) {
 }
 
 func TestObserver_OnCompaction(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	p := NewPipeline(&fakeProvider{response: "[]"}, "", newFakeStore(), nil, nil)
 	p.Start(ctx)
 	obs := NewObserver(p)
@@ -663,8 +659,7 @@ func TestObserver_OnCompaction(t *testing.T) {
 
 func TestObserver_SkipsSystemAndToolMessages(t *testing.T) {
 	store := newFakeStore()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	p := NewPipeline(&fakeProvider{response: "[]"}, "", store, nil, nil)
 	p.Start(ctx)
 	obs := NewObserver(p)

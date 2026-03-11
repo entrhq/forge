@@ -13,12 +13,12 @@ import (
 
 // executeToolCall emits events, executes the tool, and handles execution errors
 // Returns (result, metadata, shouldContinue, errorContext)
-func (a *DefaultAgent) executeToolCall(ctx context.Context, tool tools.Tool, toolCall tools.ToolCall) (string, map[string]interface{}, bool, string) {
+func (a *DefaultAgent) executeToolCall(ctx context.Context, tool tools.Tool, toolCall tools.ToolCall) (string, map[string]any, bool, string) {
 	// Emit tool call event - parse arguments to map for event emission
 	argsMap, err := tools.XMLToMap(toolCall.GetArgumentsXML())
 	if err != nil {
 		// If parsing fails, emit empty map - the actual tool execution will handle the raw XML
-		argsMap = make(map[string]interface{})
+		argsMap = make(map[string]any)
 	}
 	a.emitEvent(types.NewToolCallEvent(toolCall.ID, toolCall.ToolName, argsMap))
 
@@ -52,7 +52,7 @@ func (a *DefaultAgent) executeToolCall(ctx context.Context, tool tools.Tool, too
 
 // processToolResult handles successful tool execution results
 // Returns (shouldContinue, errorContext)
-func (a *DefaultAgent) processToolResult(tool tools.Tool, toolCall tools.ToolCall, result string, metadata map[string]interface{}) (bool, string) {
+func (a *DefaultAgent) processToolResult(tool tools.Tool, toolCall tools.ToolCall, result string, metadata map[string]any) (bool, string) {
 	event := types.NewToolResultEvent(toolCall.ID, toolCall.ToolName, result)
 	// Add metadata to the event if present
 	if len(metadata) > 0 {

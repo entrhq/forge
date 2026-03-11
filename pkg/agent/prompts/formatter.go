@@ -14,14 +14,14 @@ func FormatToolSchema(tool tools.Tool) string {
 	var builder strings.Builder
 
 	// Tool name and description
-	builder.WriteString(fmt.Sprintf("## %s\n\n", tool.Name()))
-	builder.WriteString(fmt.Sprintf("%s\n\n", tool.Description()))
+	fmt.Fprintf(&builder, "## %s\n\n", tool.Name())
+	fmt.Fprintf(&builder, "%s\n\n", tool.Description())
 
 	// Schema details
 	schema := tool.Schema()
 
 	// Extract properties if they exist
-	properties, ok := schema["properties"].(map[string]interface{})
+	properties, ok := schema["properties"].(map[string]any)
 	if ok && len(properties) > 0 {
 		builder.WriteString("**Parameters:**\n\n")
 
@@ -35,7 +35,7 @@ func FormatToolSchema(tool tools.Tool) string {
 
 		// Format each property
 		for propName, propValue := range properties {
-			propMap, ok := propValue.(map[string]interface{})
+			propMap, ok := propValue.(map[string]any)
 			if !ok {
 				continue
 			}
@@ -57,8 +57,8 @@ func FormatToolSchema(tool tools.Tool) string {
 				propDesc = d
 			}
 
-			builder.WriteString(fmt.Sprintf("- `%s` (%s)%s: %s\n",
-				propName, propType, required, propDesc))
+			fmt.Fprintf(&builder, "- `%s` (%s)%s: %s\n",
+				propName, propType, required, propDesc)
 		}
 		builder.WriteString("\n")
 	}
@@ -106,8 +106,8 @@ func FormatToolSchemas(toolsList []tools.Tool) string {
 
 // FormatToolForLLM creates a JSON schema representation suitable for LLM providers
 // that support native tool calling (future enhancement)
-func FormatToolForLLM(tool tools.Tool) map[string]interface{} {
-	return map[string]interface{}{
+func FormatToolForLLM(tool tools.Tool) map[string]any {
+	return map[string]any{
 		"name":        tool.Name(),
 		"description": tool.Description(),
 		"parameters":  tool.Schema(),
@@ -115,7 +115,7 @@ func FormatToolForLLM(tool tools.Tool) map[string]interface{} {
 }
 
 // SchemaToJSON converts a schema map to a pretty-printed JSON string
-func SchemaToJSON(schema map[string]interface{}) (string, error) {
+func SchemaToJSON(schema map[string]any) (string, error) {
 	jsonBytes, err := json.MarshalIndent(schema, "", "  ")
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal schema: %w", err)

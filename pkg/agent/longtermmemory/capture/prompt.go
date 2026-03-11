@@ -91,7 +91,7 @@ func buildClassifierPrompt(event TriggerEvent, existing []*longtermmemory.Memory
 // firstLine returns the first non-empty line of s, trimmed of whitespace.
 // Used to produce compact one-line summaries of existing memory content for the prompt.
 func firstLine(s string) string {
-	for _, line := range strings.Split(s, "\n") {
+	for line := range strings.SplitSeq(s, "\n") {
 		line = strings.TrimSpace(line)
 		if line != "" {
 			return line

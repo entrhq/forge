@@ -31,18 +31,18 @@ func (t *NavigateTool) Description() string {
 }
 
 // Schema returns the tool's JSON schema.
-func (t *NavigateTool) Schema() map[string]interface{} {
+func (t *NavigateTool) Schema() map[string]any {
 	return tools.BaseToolSchema(
-		map[string]interface{}{
-			"session": map[string]interface{}{
+		map[string]any{
+			"session": map[string]any{
 				"type":        "string",
 				"description": "Name of the browser session to use",
 			},
-			"url": map[string]interface{}{
+			"url": map[string]any{
 				"type":        "string",
 				"description": "URL to navigate to (must include protocol, e.g., https://example.com)",
 			},
-			"wait_until": map[string]interface{}{
+			"wait_until": map[string]any{
 				"type":        "string",
 				"description": "When to consider navigation complete: 'load' (default), 'domcontentloaded', or 'networkidle'",
 			},
@@ -60,7 +60,7 @@ type NavigateInput struct {
 }
 
 // Execute navigates to a URL.
-func (t *NavigateTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
+func (t *NavigateTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]any, error) {
 	// Parse parameters
 	var input NavigateInput
 	if err := tools.UnmarshalXMLWithFallback(argsXML, &input); err != nil {

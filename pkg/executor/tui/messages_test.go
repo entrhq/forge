@@ -23,7 +23,7 @@ func TestAppendMsg_TrimAt500(t *testing.T) {
 	m := minimalModel()
 
 	// Fill to exactly the cap.
-	for i := 0; i < 500; i++ {
+	for range 500 {
 		m.appendMsg(newRawMsg("line", "\n"))
 	}
 	if len(m.messages) != 500 {
@@ -43,7 +43,7 @@ func TestAppendMsg_RetainsNewest(t *testing.T) {
 	m := minimalModel()
 
 	// Append 500 messages numbered 0–499.
-	for i := 0; i < 500; i++ {
+	for i := range 500 {
 		idx := i // capture for closure
 		m.appendMsg(DisplayMessage{
 			RenderFn: func(_ int) string { return strings.Repeat("x", idx+1) },

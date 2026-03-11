@@ -8,7 +8,7 @@ import (
 
 // checkAutoApproval checks if the tool or command should be auto-approved
 // Returns (approved, autoApproved) where autoApproved indicates if a decision was made
-func (m *Manager) checkAutoApproval(approvalID string, toolCall tools.ToolCall, argsMap map[string]interface{}) (bool, bool) {
+func (m *Manager) checkAutoApproval(approvalID string, toolCall tools.ToolCall, argsMap map[string]any) (bool, bool) {
 	// Special handling for execute_command: always check command whitelist first
 	// The execute_command tool uses a per-command whitelist, not tool-level auto-approval
 	if toolCall.ToolName == "execute_command" {
@@ -28,7 +28,7 @@ func (m *Manager) checkAutoApproval(approvalID string, toolCall tools.ToolCall, 
 }
 
 // isCommandWhitelisted checks if a command is whitelisted
-func (m *Manager) isCommandWhitelisted(approvalID string, argsMap map[string]interface{}) bool {
+func (m *Manager) isCommandWhitelisted(approvalID string, argsMap map[string]any) bool {
 	cmdInterface, ok := argsMap["command"]
 	if !ok {
 		return false

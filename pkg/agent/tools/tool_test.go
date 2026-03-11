@@ -138,8 +138,8 @@ func TestConverseTool(t *testing.T) {
 }
 
 func TestBaseToolSchema(t *testing.T) {
-	properties := map[string]interface{}{
-		"name": map[string]interface{}{
+	properties := map[string]any{
+		"name": map[string]any{
 			"type":        "string",
 			"description": "The name",
 		},

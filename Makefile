@@ -104,7 +104,7 @@ install-tools: ## Install development tools
 	@echo "Installing development tools..."
 	@if ! command -v golangci-lint > /dev/null; then \
 		echo "Installing golangci-lint..."; \
-		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell go env GOPATH)/bin v2.6.2; \
+		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell go env GOPATH)/bin v2.11.3; \
 	else \
 		echo "golangci-lint already installed"; \
 	fi

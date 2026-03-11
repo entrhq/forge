@@ -32,10 +32,10 @@ func (t *CloseSessionTool) Description() string {
 }
 
 // Schema returns the tool's JSON schema.
-func (t *CloseSessionTool) Schema() map[string]interface{} {
+func (t *CloseSessionTool) Schema() map[string]any {
 	return tools.BaseToolSchema(
-		map[string]interface{}{
-			"session": map[string]interface{}{
+		map[string]any{
+			"session": map[string]any{
 				"type":        "string",
 				"description": "Name of the browser session to close",
 			},
@@ -51,7 +51,7 @@ type CloseSessionInput struct {
 }
 
 // Execute closes a browser session.
-func (t *CloseSessionTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
+func (t *CloseSessionTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]any, error) {
 	// Parse parameters
 	var input CloseSessionInput
 	if err := tools.UnmarshalXMLWithFallback(argsXML, &input); err != nil {
@@ -118,7 +118,7 @@ func (t *CloseSessionTool) GeneratePreview(ctx context.Context, argsXML []byte) 
 		Title:       "Close Browser Session",
 		Description: fmt.Sprintf("This will close browser session '%s'", input.Session),
 		Content:     fmt.Sprintf("Session: %s\n\nThe browser window will be closed and all resources will be cleaned up.", input.Session),
-		Metadata: map[string]interface{}{
+		Metadata: map[string]any{
 			"session": input.Session,
 		},
 	}, nil

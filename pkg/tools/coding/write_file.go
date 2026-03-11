@@ -34,14 +34,14 @@ func (t *WriteFileTool) Description() string {
 }
 
 // Schema returns the JSON schema for the tool's input parameters.
-func (t *WriteFileTool) Schema() map[string]interface{} {
+func (t *WriteFileTool) Schema() map[string]any {
 	return tools.BaseToolSchema(
-		map[string]interface{}{
-			"path": map[string]interface{}{
+		map[string]any{
+			"path": map[string]any{
 				"type":        "string",
 				"description": "Path to the file to write (relative to workspace)",
 			},
-			"content": map[string]interface{}{
+			"content": map[string]any{
 				"type":        "string",
 				"description": "Content to write to the file",
 			},
@@ -51,7 +51,7 @@ func (t *WriteFileTool) Schema() map[string]interface{} {
 }
 
 // Execute writes content to the specified file.
-func (t *WriteFileTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
+func (t *WriteFileTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]any, error) {
 	var input struct {
 		XMLName xml.Name `xml:"arguments"`
 		Path    string   `xml:"path"`
@@ -129,7 +129,7 @@ func (t *WriteFileTool) Execute(ctx context.Context, argsXML []byte) (string, ma
 	}
 
 	// Build metadata
-	metadata := map[string]interface{}{
+	metadata := map[string]any{
 		"file_path":     input.Path,
 		"file_exists":   fileExists,
 		"lines_added":   lineChanges.LinesAdded,
@@ -218,7 +218,7 @@ func (t *WriteFileTool) GeneratePreview(ctx context.Context, argsXML []byte) (*t
 		Title:       title,
 		Description: description,
 		Content:     previewContent,
-		Metadata: map[string]interface{}{
+		Metadata: map[string]any{
 			"file_path": relPath,
 			"language":  language,
 			"size":      len(input.Content),

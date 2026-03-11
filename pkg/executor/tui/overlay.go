@@ -137,10 +137,7 @@ func renderToastOverlay(baseView string, toastContent string) string {
 
 	// Position toast starting from a few lines above the bottom
 	// This puts it directly above the input box (bottomBar + inputBox = 3 lines usually)
-	startLine := len(baseLines) - 3 - toastHeight
-	if startLine < 0 {
-		startLine = 0
-	}
+	startLine := max(len(baseLines)-3-toastHeight, 0)
 
 	// Build result with toast overlaid
 	var result strings.Builder

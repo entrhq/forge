@@ -101,16 +101,16 @@ func (h *HelpOverlay) renderHeader() string {
 	// Title
 	titleLen := len(h.title)
 	titlePadding := max(0, (contentWidth-titleLen)/2)
-	titleStr := ""
-	for i := 0; i < titlePadding; i++ {
-		titleStr += " "
+	var titleStr strings.Builder
+	for range titlePadding {
+		titleStr.WriteString(" ")
 	}
-	titleStr += types.OverlayTitleStyle.Render(h.title)
+	titleStr.WriteString(types.OverlayTitleStyle.Render(h.title))
 
 	// Separator
 	separator := lipgloss.NewStyle().Foreground(types.MutedGray).Render(strings.Repeat(sepChar, contentWidth))
 
-	return titleStr + "\n" + separator + "\n"
+	return titleStr.String() + "\n" + separator + "\n"
 }
 
 // renderFooter renders the help overlay footer
@@ -120,12 +120,12 @@ func (h *HelpOverlay) renderFooter() string {
 
 	hintLen := lipgloss.Width(hint)
 	hintPadding := max(0, (contentWidth-hintLen)/2)
-	padStr := ""
-	for i := 0; i < hintPadding; i++ {
-		padStr += " "
+	var padStr strings.Builder
+	for range hintPadding {
+		padStr.WriteString(" ")
 	}
 
-	return "\n" + padStr + types.OverlayHelpStyle.Render(hint)
+	return "\n" + padStr.String() + types.OverlayHelpStyle.Render(hint)
 }
 
 // View renders the help overlay

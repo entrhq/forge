@@ -3,6 +3,7 @@ package workspace
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
 )
 
 // AddWhitelist adds a directory to the whitelist, allowing file operations
@@ -28,10 +29,8 @@ func (g *Guard) AddWhitelist(dir string) error {
 	evalPath := resolveWhitelistPath(absPath)
 
 	// Check if already whitelisted
-	for _, existing := range g.whitelistedDirs {
-		if existing == evalPath {
-			return nil // Already whitelisted
-		}
+	if slices.Contains(g.whitelistedDirs, evalPath) {
+		return nil // Already whitelisted
 	}
 
 	g.whitelistedDirs = append(g.whitelistedDirs, evalPath)

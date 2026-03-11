@@ -174,9 +174,9 @@ func (c *CommandExecutionOverlay) renderHeader() string {
 	b.WriteString("\n\n")
 
 	// Command info
-	b.WriteString(fmt.Sprintf("Command: %s", c.command))
+	fmt.Fprintf(&b, "Command: %s", c.command)
 	if c.workingDir != "" {
-		b.WriteString(fmt.Sprintf("\nWorking Dir: %s", c.workingDir))
+		fmt.Fprintf(&b, "\nWorking Dir: %s", c.workingDir)
 	}
 	b.WriteString("\n")
 

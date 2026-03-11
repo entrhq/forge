@@ -33,18 +33,18 @@ func (t *ListNotesTool) Description() string {
 }
 
 // Schema returns the JSON schema for the tool's input parameters.
-func (t *ListNotesTool) Schema() map[string]interface{} {
+func (t *ListNotesTool) Schema() map[string]any {
 	return tools.BaseToolSchema(
-		map[string]interface{}{
-			"tag": map[string]interface{}{
+		map[string]any{
+			"tag": map[string]any{
 				"type":        "string",
 				"description": "Optional tag to filter notes by",
 			},
-			"include_scratched": map[string]interface{}{
+			"include_scratched": map[string]any{
 				"type":        "boolean",
 				"description": "Include scratched notes in the results (default: false)",
 			},
-			"limit": map[string]interface{}{
+			"limit": map[string]any{
 				"type":        "integer",
 				"description": "Maximum number of notes to return (default: 10)",
 			},
@@ -54,7 +54,7 @@ func (t *ListNotesTool) Schema() map[string]interface{} {
 }
 
 // Execute lists notes.
-func (t *ListNotesTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
+func (t *ListNotesTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]any, error) {
 	var input struct {
 		XMLName          xml.Name `xml:"arguments"`
 		Tag              string   `xml:"tag"`
@@ -83,11 +83,11 @@ func (t *ListNotesTool) Execute(ctx context.Context, argsXML []byte) (string, ma
 	if len(results) == 0 {
 		message.WriteString("No notes found.")
 	} else {
-		message.WriteString(fmt.Sprintf("Found %d note(s):\n\n", len(results)))
+		fmt.Fprintf(&message, "Found %d note(s):\n\n", len(results))
 		for i, note := range results {
-			message.WriteString(fmt.Sprintf("%d. [%s] (tags: %s)\n",
-				i+1, note.ID, strings.Join(note.Tags, ", ")))
-			message.WriteString(fmt.Sprintf("   %s\n", note.Content))
+			fmt.Fprintf(&message, "%d. [%s] (tags: %s)\n",
+				i+1, note.ID, strings.Join(note.Tags, ", "))
+			fmt.Fprintf(&message, "   %s\n", note.Content)
 			if note.Scratched {
 				message.WriteString("   [SCRATCHED]\n")
 			}
@@ -96,7 +96,7 @@ func (t *ListNotesTool) Execute(ctx context.Context, argsXML []byte) (string, ma
 	}
 
 	// Build metadata
-	metadata := map[string]interface{}{
+	metadata := map[string]any{
 		"note_count":        len(results),
 		"tag_filter":        input.Tag,
 		"include_scratched": input.IncludeScratched,

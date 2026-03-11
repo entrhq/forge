@@ -132,10 +132,7 @@ func CreateOverlayContainerStyle(width int) lipgloss.Style {
 // ComputeOverlayWidth returns a responsive overlay width clamped between minW and maxW.
 // factor is a fraction of the terminal width (e.g. 0.80 for 80%).
 func ComputeOverlayWidth(terminalWidth int, factor float64, minW, maxW int) int {
-	w := int(float64(terminalWidth) * factor)
-	if w < minW {
-		w = minW
-	}
+	w := max(int(float64(terminalWidth)*factor), minW)
 	if w > maxW {
 		w = maxW
 	}
@@ -146,10 +143,9 @@ func ComputeOverlayWidth(terminalWidth int, factor float64, minW, maxW int) int 
 // terminal height and the number of fixed "chrome" rows the overlay needs outside the viewport
 // (title row, separator, footer rows, border rows, top/bottom margin).
 func ComputeViewportHeight(terminalHeight, chromeRows int) int {
-	h := terminalHeight - chromeRows - 4 // 2-line top margin + 2-line bottom margin
-	if h < 3 {
-		h = 3
-	}
+	h := max(
+		// 2-line top margin + 2-line bottom margin
+		terminalHeight-chromeRows-4, 3)
 	return h
 }
 

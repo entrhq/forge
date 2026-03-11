@@ -36,18 +36,18 @@ func (t *ListFilesTool) Description() string {
 }
 
 // Schema returns the JSON schema for the tool's input parameters.
-func (t *ListFilesTool) Schema() map[string]interface{} {
+func (t *ListFilesTool) Schema() map[string]any {
 	return tools.BaseToolSchema(
-		map[string]interface{}{
-			"path": map[string]interface{}{
+		map[string]any{
+			"path": map[string]any{
 				"type":        "string",
 				"description": "Directory path to list (relative to workspace, defaults to workspace root)",
 			},
-			"recursive": map[string]interface{}{
+			"recursive": map[string]any{
 				"type":        "boolean",
 				"description": "Whether to list files recursively (default: false)",
 			},
-			"pattern": map[string]interface{}{
+			"pattern": map[string]any{
 				"type":        "string",
 				"description": "Optional glob pattern to filter files (e.g., '*.go', 'test_*.py')",
 			},
@@ -57,7 +57,7 @@ func (t *ListFilesTool) Schema() map[string]interface{} {
 }
 
 // Execute lists files in the specified directory.
-func (t *ListFilesTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
+func (t *ListFilesTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]any, error) {
 	// Parse arguments
 	var input struct {
 		XMLName   xml.Name `xml:"arguments"`
@@ -110,7 +110,7 @@ func (t *ListFilesTool) Execute(ctx context.Context, argsXML []byte) (string, ma
 	result := t.formatEntries(entries)
 
 	// Build metadata
-	metadata := map[string]interface{}{
+	metadata := map[string]any{
 		"path":       input.Path,
 		"recursive":  input.Recursive,
 		"file_count": len(entries),
@@ -251,18 +251,18 @@ func (t *ListFilesTool) formatEntries(entries []fileEntry) string {
 		}
 
 		if entry.IsDir {
-			builder.WriteString(fmt.Sprintf("▸ %s/\n", relPath))
+			fmt.Fprintf(&builder, "▸ %s/\n", relPath)
 			totalDirs++
 		} else {
 			// Format file size
 			sizeStr := formatFileSize(entry.Size)
-			builder.WriteString(fmt.Sprintf("· %s (%s)\n", relPath, sizeStr))
+			fmt.Fprintf(&builder, "· %s (%s)\n", relPath, sizeStr)
 			totalFiles++
 		}
 	}
 
 	// Add summary
-	builder.WriteString(fmt.Sprintf("\nTotal: %d files, %d directories", totalFiles, totalDirs))
+	fmt.Fprintf(&builder, "\nTotal: %d files, %d directories", totalFiles, totalDirs)
 
 	return builder.String()
 }

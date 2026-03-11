@@ -87,16 +87,16 @@ func (w *ArtifactWriter) WriteSummaryMarkdown(summary *ExecutionSummary) error {
 
 	// Header
 	md.WriteString("# Forge Headless Execution Summary\n\n")
-	md.WriteString(fmt.Sprintf("**Task:** %s\n\n", summary.Task))
-	md.WriteString(fmt.Sprintf("**Status:** %s\n\n", summary.Status))
-	md.WriteString(fmt.Sprintf("**Started:** %s\n\n", summary.StartTime.Format(time.RFC3339)))
-	md.WriteString(fmt.Sprintf("**Completed:** %s\n\n", summary.EndTime.Format(time.RFC3339)))
-	md.WriteString(fmt.Sprintf("**Duration:** %s\n\n", summary.Duration))
+	fmt.Fprintf(&md, "**Task:** %s\n\n", summary.Task)
+	fmt.Fprintf(&md, "**Status:** %s\n\n", summary.Status)
+	fmt.Fprintf(&md, "**Started:** %s\n\n", summary.StartTime.Format(time.RFC3339))
+	fmt.Fprintf(&md, "**Completed:** %s\n\n", summary.EndTime.Format(time.RFC3339))
+	fmt.Fprintf(&md, "**Duration:** %s\n\n", summary.Duration)
 
 	// Result
 	md.WriteString("## Result\n\n")
 	if summary.Error != "" {
-		md.WriteString(fmt.Sprintf("❌ **Error:** %s\n\n", summary.Error))
+		fmt.Fprintf(&md, "❌ **Error:** %s\n\n", summary.Error)
 	} else {
 		md.WriteString("✅ **Success**\n\n")
 	}
@@ -105,8 +105,7 @@ func (w *ArtifactWriter) WriteSummaryMarkdown(summary *ExecutionSummary) error {
 	if len(summary.FilesModified) > 0 {
 		md.WriteString("## Files Modified\n\n")
 		for _, file := range summary.FilesModified {
-			md.WriteString(fmt.Sprintf("- `%s` (+%d/-%d lines)\n",
-				file.Path, file.LinesAdded, file.LinesRemoved))
+			fmt.Fprintf(&md, "- `%s` (+%d/-%d lines)\n", file.Path, file.LinesAdded, file.LinesRemoved)
 		}
 		md.WriteString("\n")
 	}
@@ -127,16 +126,16 @@ func (w *ArtifactWriter) WriteSummaryMarkdown(summary *ExecutionSummary) error {
 	// Pull Request
 	if summary.PRURL != "" {
 		md.WriteString("## Pull Request\n\n")
-		md.WriteString(fmt.Sprintf("✅ **Created:** %s\n\n", summary.PRURL))
+		fmt.Fprintf(&md, "✅ **Created:** %s\n\n", summary.PRURL)
 	}
 
 	// Metrics
 	md.WriteString("## Metrics\n\n")
-	md.WriteString(fmt.Sprintf("- **Files Modified:** %d\n", summary.Metrics.FilesModified))
-	md.WriteString(fmt.Sprintf("- **Total Lines Added:** %d\n", summary.Metrics.TotalLinesAdded))
-	md.WriteString(fmt.Sprintf("- **Total Lines Removed:** %d\n", summary.Metrics.TotalLinesRemoved))
-	md.WriteString(fmt.Sprintf("- **Tokens Used:** %d\n", summary.Metrics.TokensUsed))
-	md.WriteString(fmt.Sprintf("- **Iterations:** %d\n", summary.Metrics.Iterations))
+	fmt.Fprintf(&md, "- **Files Modified:** %d\n", summary.Metrics.FilesModified)
+	fmt.Fprintf(&md, "- **Total Lines Added:** %d\n", summary.Metrics.TotalLinesAdded)
+	fmt.Fprintf(&md, "- **Total Lines Removed:** %d\n", summary.Metrics.TotalLinesRemoved)
+	fmt.Fprintf(&md, "- **Tokens Used:** %d\n", summary.Metrics.TokensUsed)
+	fmt.Fprintf(&md, "- **Iterations:** %d\n", summary.Metrics.Iterations)
 
 	// Write file
 	if writeErr := os.WriteFile(path, []byte(md.String()), 0600); writeErr != nil {

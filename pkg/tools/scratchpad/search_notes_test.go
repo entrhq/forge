@@ -40,7 +40,7 @@ func TestSearchNotesTool_Schema(t *testing.T) {
 		t.Fatal("Schema() returned nil")
 	}
 
-	props, ok := schema["properties"].(map[string]interface{})
+	props, ok := schema["properties"].(map[string]any)
 	if !ok {
 		t.Fatal("Schema missing properties")
 	}
@@ -53,7 +53,7 @@ func TestSearchNotesTool_Schema(t *testing.T) {
 	}
 
 	// Both query and tags are optional - required field might not exist or be empty
-	if required, ok := schema["required"].([]interface{}); ok {
+	if required, ok := schema["required"].([]any); ok {
 		if len(required) != 0 {
 			t.Errorf("Expected 0 required fields, got %d", len(required))
 		}

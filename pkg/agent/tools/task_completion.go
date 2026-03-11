@@ -31,10 +31,10 @@ func (t *TaskCompletionTool) Description() string {
 }
 
 // Schema returns the JSON schema for the tool's arguments
-func (t *TaskCompletionTool) Schema() map[string]interface{} {
+func (t *TaskCompletionTool) Schema() map[string]any {
 	return BaseToolSchema(
-		map[string]interface{}{
-			"result": map[string]interface{}{
+		map[string]any{
+			"result": map[string]any{
 				"type":        "string",
 				"description": "The final result of the task. Should be clear, complete, and not end with questions or offers for further assistance.",
 			},
@@ -44,7 +44,7 @@ func (t *TaskCompletionTool) Schema() map[string]interface{} {
 }
 
 // Execute runs the tool and returns the result
-func (t *TaskCompletionTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
+func (t *TaskCompletionTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]any, error) {
 	var args struct {
 		XMLName xml.Name `xml:"arguments"`
 		Result  string   `xml:"result"`

@@ -136,7 +136,7 @@ func ValidateToolCall(tc *ToolCall) error {
 // UnmarshalXMLWithFallback attempts to unmarshal XML, with fallback to
 // escape unescaped ampersands if the initial parse fails.
 // This improves robustness when LLMs generate unescaped & characters.
-func UnmarshalXMLWithFallback(data []byte, v interface{}) error {
+func UnmarshalXMLWithFallback(data []byte, v any) error {
 	// Try normal unmarshaling first
 	err := xml.Unmarshal(data, v)
 	if err == nil {
@@ -180,9 +180,9 @@ func escapeUnescapedAmpersands(data []byte) []byte {
 
 // XMLToMap converts XML bytes to a map[string]interface{} by parsing the XML structure.
 // This is useful for extracting arguments from tool calls in a generic way.
-func XMLToMap(data []byte) (map[string]interface{}, error) {
+func XMLToMap(data []byte) (map[string]any, error) {
 	decoder := xml.NewDecoder(strings.NewReader(string(data)))
-	result := make(map[string]interface{})
+	result := make(map[string]any)
 
 	var currentPath []string
 	var currentText strings.Builder

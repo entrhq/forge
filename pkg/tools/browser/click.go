@@ -31,22 +31,22 @@ func (t *ClickTool) Description() string {
 }
 
 // Schema returns the tool's JSON schema.
-func (t *ClickTool) Schema() map[string]interface{} {
+func (t *ClickTool) Schema() map[string]any {
 	return tools.BaseToolSchema(
-		map[string]interface{}{
-			"session": map[string]interface{}{
+		map[string]any{
+			"session": map[string]any{
 				"type":        "string",
 				"description": "Name of the browser session to use",
 			},
-			"selector": map[string]interface{}{
+			"selector": map[string]any{
 				"type":        "string",
 				"description": "CSS selector for the element to click (e.g., 'button.submit', '#login-btn', 'a[href=\"/about\"]')",
 			},
-			"button": map[string]interface{}{
+			"button": map[string]any{
 				"type":        "string",
 				"description": "Mouse button to use: 'left' (default), 'right', or 'middle'",
 			},
-			"click_count": map[string]interface{}{
+			"click_count": map[string]any{
 				"type":        "integer",
 				"description": "Number of clicks: 1 (default) for single click, 2 for double click",
 			},
@@ -65,7 +65,7 @@ type ClickInput struct {
 }
 
 // Execute clicks an element.
-func (t *ClickTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
+func (t *ClickTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]any, error) {
 	// Parse parameters
 	var input ClickInput
 	if err := tools.UnmarshalXMLWithFallback(argsXML, &input); err != nil {

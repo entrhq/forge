@@ -143,7 +143,7 @@ func TestNewMessageEvents(t *testing.T) {
 }
 
 func TestNewToolEvents(t *testing.T) {
-	toolInput := map[string]interface{}{
+	toolInput := map[string]any{
 		"query": "weather in San Francisco",
 	}
 

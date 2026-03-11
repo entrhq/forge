@@ -123,7 +123,7 @@ func (l *Logger) formatLogEntry(level, message string) string {
 }
 
 // Printf logs a formatted message
-func (l *Logger) Printf(format string, v ...interface{}) {
+func (l *Logger) Printf(format string, v ...any) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -133,7 +133,7 @@ func (l *Logger) Printf(format string, v ...interface{}) {
 }
 
 // Debugf logs a debug-level message
-func (l *Logger) Debugf(format string, v ...interface{}) {
+func (l *Logger) Debugf(format string, v ...any) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -143,7 +143,7 @@ func (l *Logger) Debugf(format string, v ...interface{}) {
 }
 
 // Infof logs an info-level message
-func (l *Logger) Infof(format string, v ...interface{}) {
+func (l *Logger) Infof(format string, v ...any) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -153,7 +153,7 @@ func (l *Logger) Infof(format string, v ...interface{}) {
 }
 
 // Warnf logs a warning-level message
-func (l *Logger) Warnf(format string, v ...interface{}) {
+func (l *Logger) Warnf(format string, v ...any) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -163,7 +163,7 @@ func (l *Logger) Warnf(format string, v ...interface{}) {
 }
 
 // Errorf logs an error-level message
-func (l *Logger) Errorf(format string, v ...interface{}) {
+func (l *Logger) Errorf(format string, v ...any) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 

@@ -45,6 +45,12 @@ func NewToolResultClassifier() *ToolResultClassifier {
 	}
 }
 
+// IsLoopBreakingTool returns true if the tool always renders its result inline
+// and is eligible for markdown rendering.
+func (c *ToolResultClassifier) IsLoopBreakingTool(toolName string) bool {
+	return c.loopBreakingTools[toolName]
+}
+
 // ClassifyToolResult determines the display tier for a tool result
 func (c *ToolResultClassifier) ClassifyToolResult(toolName string, result string) DisplayTier {
 	// Check if this is a loop-breaking tool (always full inline)
@@ -161,8 +167,8 @@ func (s *ToolResultSummarizer) extractExitCode(result string) (int, bool) {
 	if strings.Contains(result, "Exit code: ") {
 		var code int
 		// Let's grab the last line usually
-		lines := strings.Split(result, "\n")
-		for _, line := range lines {
+		lines := strings.SplitSeq(result, "\n")
+		for line := range lines {
 			if _, err := fmt.Sscanf(line, "Exit code: %d", &code); err == nil {
 				return code, true
 			}
@@ -302,9 +308,9 @@ func (s *ToolResultSummarizer) parseSearchResults(result string) (matchCount, fi
 
 // parseListResults extracts file and directory counts from list results
 func (s *ToolResultSummarizer) parseListResults(result string) (fileCount, dirCount int) {
-	lines := strings.Split(result, "\n")
+	lines := strings.SplitSeq(result, "\n")
 
-	for _, line := range lines {
+	for line := range lines {
 		line = strings.TrimSpace(line)
 		if strings.HasPrefix(line, "▸") && strings.HasSuffix(line, "/") {
 			dirCount++
@@ -332,11 +338,4 @@ func (s *ToolResultSummarizer) parseApplyDiffResults(result string) int {
 		}
 	}
 	return count
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }

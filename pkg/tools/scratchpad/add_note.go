@@ -32,16 +32,16 @@ func (t *AddNoteTool) Description() string {
 }
 
 // Schema returns the JSON schema for the tool's input parameters.
-func (t *AddNoteTool) Schema() map[string]interface{} {
+func (t *AddNoteTool) Schema() map[string]any {
 	return tools.BaseToolSchema(
-		map[string]interface{}{
-			"content": map[string]interface{}{
+		map[string]any{
+			"content": map[string]any{
 				"type":        "string",
 				"description": "Note content (max 800 characters)",
 			},
-			"tags": map[string]interface{}{
+			"tags": map[string]any{
 				"type": "array",
-				"items": map[string]interface{}{
+				"items": map[string]any{
 					"type": "string",
 				},
 				"description": "List of 1-5 tags for organizing the note",
@@ -54,7 +54,7 @@ func (t *AddNoteTool) Schema() map[string]interface{} {
 }
 
 // Execute creates a new note.
-func (t *AddNoteTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
+func (t *AddNoteTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]any, error) {
 	var input struct {
 		XMLName xml.Name `xml:"arguments"`
 		Content string   `xml:"content"`
@@ -83,7 +83,7 @@ func (t *AddNoteTool) Execute(ctx context.Context, argsXML []byte) (string, map[
 	message := fmt.Sprintf("Note created successfully with ID: %s", note.ID)
 
 	// Build metadata
-	metadata := map[string]interface{}{
+	metadata := map[string]any{
 		"note_id":     note.ID,
 		"total_notes": t.manager.Count(),
 		"tags":        note.Tags,

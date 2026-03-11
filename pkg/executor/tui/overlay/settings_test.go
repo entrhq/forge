@@ -77,18 +77,14 @@ func TestNewSettingsOverlay(t *testing.T) {
 
 			// In redesign, settings overlay width uses ComputeOverlayWidth(width, 0.90, 60, 140)
 			// and height uses ComputeViewportHeight(height, 4)
-			expectedWidth := tt.width * 90 / 100
-			if expectedWidth < 60 {
-				expectedWidth = 60
-			}
+			expectedWidth := max(tt.width*90/100, 60)
 			if expectedWidth > 140 {
 				expectedWidth = 140
 			}
 
-			expectedHeight := tt.height - 4 - 4 // terminal height - chrome - safe margin
-			if expectedHeight < 10 {
-				expectedHeight = 10
-			}
+			expectedHeight := max(
+				// terminal height - chrome - safe margin
+				tt.height-4-4, 10)
 
 			if overlay.width != expectedWidth {
 				t.Errorf("width = %d, want %d", overlay.width, expectedWidth)
@@ -364,7 +360,7 @@ func TestInputDialog_Backspace(t *testing.T) {
 	}
 
 	// Backspace until empty
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		result, _ = overlay.Update(tea.KeyMsg{Type: tea.KeyBackspace}, nil, nil)
 		overlay = result.(*SettingsOverlay)
 	}

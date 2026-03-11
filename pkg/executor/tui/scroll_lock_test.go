@@ -26,7 +26,7 @@ func newScrollTestModel() *model {
 
 	// Add messages that will trigger the scroll logic
 	// Generate enough content to exceed viewport height
-	for i := 0; i < 20; i++ {
+	for range 20 {
 		m.messages = append(m.messages, DisplayMessage{
 			RenderFn: func(width int) string { return "test message line" },
 			Trailing: "\n",

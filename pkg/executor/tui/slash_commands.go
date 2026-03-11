@@ -34,7 +34,7 @@ const (
 // - ApprovalRequest for commands requiring user approval
 // - nil for commands with no side effects
 // The model is passed as a pointer and can be modified directly.
-type CommandHandler func(m *model, args []string) interface{}
+type CommandHandler func(m *model, args []string) any
 
 // SlashCommand represents a registered command
 type SlashCommand struct {
@@ -259,7 +259,7 @@ func executeSlashCommand(m *model, commandName string, args []string) (*model, t
 }
 
 // handleHelpCommand shows help information
-func handleHelpCommand(m *model, args []string) interface{} {
+func handleHelpCommand(m *model, args []string) any {
 	content := buildHelpContent()
 	helpOverlay := overlay.NewHelpOverlay("Help", content, m.width, m.height)
 	m.overlay.activate(tuitypes.OverlayModeHelp, helpOverlay)
@@ -340,7 +340,7 @@ func buildHelpContent() string {
 }
 
 // handleStopCommand stops the current agent operation
-func handleStopCommand(m *model, args []string) interface{} {
+func handleStopCommand(m *model, args []string) any {
 	if m.channels != nil {
 		// Send cancel input to agent
 		m.channels.Input <- types.NewCancelInput()
@@ -350,7 +350,7 @@ func handleStopCommand(m *model, args []string) interface{} {
 }
 
 // handleCommitCommand creates a git commit with preview
-func handleCommitCommand(m *model, args []string) interface{} {
+func handleCommitCommand(m *model, args []string) any {
 	if m.slashHandler == nil {
 		m.showToast("Error", "Git operations not available", "✗", true)
 		return nil
@@ -447,7 +447,7 @@ func getDiffForFiles(workingDir string, files []string) string {
 }
 
 // handlePRCommand creates a pull request with preview
-func handlePRCommand(m *model, args []string) interface{} {
+func handlePRCommand(m *model, args []string) any {
 	if m.slashHandler == nil {
 		m.showToast("Error", "Git operations not available", "✗", true)
 		return nil
@@ -524,9 +524,9 @@ func handlePRCommand(m *model, args []string) interface{} {
 
 		// Build commits and changes preview
 		var changesContent strings.Builder
-		changesContent.WriteString(fmt.Sprintf("Commits (%d):\n", len(commits)))
+		fmt.Fprintf(&changesContent, "Commits (%d):\n", len(commits))
 		for _, commit := range commits {
-			changesContent.WriteString(fmt.Sprintf("  • %s\n", commit.Message))
+			fmt.Fprintf(&changesContent, "  • %s\n", commit.Message)
 		}
 		changesContent.WriteString("\n")
 		changesContent.WriteString(diffSummary)
@@ -553,7 +553,7 @@ func getCurrentBranch(workingDir string) (string, error) {
 }
 
 // handleSettingsCommand shows the settings configuration
-func handleSettingsCommand(m *model, args []string) interface{} {
+func handleSettingsCommand(m *model, args []string) any {
 	// Create settings overlay with callback for LLM settings changes
 	onLLMSettingsChange := func() error {
 		return m.reloadLLMProvider()
@@ -575,7 +575,7 @@ func handleSettingsCommand(m *model, args []string) interface{} {
 }
 
 // handleContextCommand shows detailed context information
-func handleContextCommand(m *model, args []string) interface{} {
+func handleContextCommand(m *model, args []string) any {
 	// Get context info from agent
 	if m.agent == nil {
 		m.showToast("Error", "Agent not available", "✗", true)
@@ -626,7 +626,7 @@ func handleContextCommand(m *model, args []string) interface{} {
 }
 
 // handleBashCommand enters bash mode for running shell commands
-func handleBashCommand(m *model, args []string) interface{} {
+func handleBashCommand(m *model, args []string) any {
 	m.bashMode = true
 	m.updatePrompt()
 	m.showToast("Bash Mode", "Entered bash mode. Commands will be executed directly. Type 'exit' or press Ctrl+C to return.", "❯", false)
@@ -636,7 +636,7 @@ func handleBashCommand(m *model, args []string) interface{} {
 // handleThinkingCommand toggles the display of extended thinking blocks.
 // When disabled, only a collapsed "… Thinking" indicator is shown during
 // streaming; the full content is discarded after the thinking block ends.
-func handleThinkingCommand(m *model, args []string) interface{} {
+func handleThinkingCommand(m *model, args []string) any {
 	m.showThinking = !m.showThinking
 
 	// Persist to config so the preference survives restarts
@@ -657,7 +657,7 @@ func handleThinkingCommand(m *model, args []string) interface{} {
 }
 
 // handleNotesCommand requests notes data from the agent and shows notes viewer
-func handleNotesCommand(m *model, args []string) interface{} {
+func handleNotesCommand(m *model, args []string) any {
 	// Send notes request to agent
 	return m.requestNotes()
 }
@@ -696,7 +696,7 @@ type contextSnapshot struct {
 
 // handleSnapshotCommand exports the full conversation payload to a timestamped
 // JSON file in <workspace>/.forge/context/ and shows a toast with the output path.
-func handleSnapshotCommand(m *model, args []string) interface{} {
+func handleSnapshotCommand(m *model, args []string) any {
 	if m.agent == nil {
 		m.showToast("Error", "Agent not available", "✗", true)
 		return nil

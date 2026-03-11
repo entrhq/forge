@@ -111,7 +111,7 @@ func TestManager_CleanupPendingApproval_MultipleCallsSafe(t *testing.T) {
 
 	// Call cleanup multiple times - should not panic
 	var wg sync.WaitGroup
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()

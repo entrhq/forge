@@ -102,50 +102,50 @@ func buildContextContent(info *ContextInfo) string {
 	// System section
 	b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(types.SalmonPink).Render("System"))
 	b.WriteString("\n")
-	b.WriteString(fmt.Sprintf("  System Prompt:      %s tokens\n", formatTokenCount(info.SystemPromptTokens)))
+	fmt.Fprintf(&b, "  System Prompt:      %s tokens\n", formatTokenCount(info.SystemPromptTokens))
 	if info.CustomInstructions {
 		b.WriteString("  Custom Instructions: Yes\n")
 	} else {
 		b.WriteString("  Custom Instructions: No\n")
 	}
 	if info.RepositoryContextTokens > 0 {
-		b.WriteString(fmt.Sprintf("  Repository Context (AGENTS.md): %s tokens\n", formatTokenCount(info.RepositoryContextTokens)))
+		fmt.Fprintf(&b, "  Repository Context (AGENTS.md): %s tokens\n", formatTokenCount(info.RepositoryContextTokens))
 	}
 	b.WriteString("\n")
 
 	// Tool System section
 	b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(types.SalmonPink).Render("Tool System"))
 	b.WriteString("\n")
-	b.WriteString(fmt.Sprintf("  Available Tools:    %d (%s tokens)\n", info.ToolCount, formatTokenCount(info.ToolTokens)))
+	fmt.Fprintf(&b, "  Available Tools:    %d (%s tokens)\n", info.ToolCount, formatTokenCount(info.ToolTokens))
 	if info.HasPendingToolCall {
-		b.WriteString(fmt.Sprintf("  Current Tool Call:  %s\n", info.CurrentToolCall))
+		fmt.Fprintf(&b, "  Current Tool Call:  %s\n", info.CurrentToolCall)
 	}
 	b.WriteString("\n")
 
 	// History section
 	b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(types.SalmonPink).Render("Message History"))
 	b.WriteString("\n")
-	b.WriteString(fmt.Sprintf("  Messages:           %d\n", info.MessageCount))
-	b.WriteString(fmt.Sprintf("  Conversation Turns: %d\n", info.ConversationTurns))
-	b.WriteString(fmt.Sprintf("  Conversation:       %s tokens\n", formatTokenCount(info.ConversationTokens)))
+	fmt.Fprintf(&b, "  Messages:           %d\n", info.MessageCount)
+	fmt.Fprintf(&b, "  Conversation Turns: %d\n", info.ConversationTurns)
+	fmt.Fprintf(&b, "  Conversation:       %s tokens\n", formatTokenCount(info.ConversationTokens))
 	b.WriteString("\n")
 
 	// History composition section
 	b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(types.SalmonPink).Render("History Composition"))
 	b.WriteString("\n")
-	b.WriteString(fmt.Sprintf("  Raw Messages:       %d (%s tokens)\n",
-		info.RawMessageCount, formatTokenCount(info.RawMessageTokens)))
-	b.WriteString(fmt.Sprintf("  Summarized Blocks:  %d (%s tokens)\n",
-		info.SummaryBlockCount, formatTokenCount(info.SummaryBlockTokens)))
-	b.WriteString(fmt.Sprintf("  Goal Batch Blocks:  %d (%s tokens)\n",
-		info.GoalBatchBlockCount, formatTokenCount(info.GoalBatchBlockTokens)))
+	fmt.Fprintf(&b, "  Raw Messages:       %d (%s tokens)\n",
+		info.RawMessageCount, formatTokenCount(info.RawMessageTokens))
+	fmt.Fprintf(&b, "  Summarized Blocks:  %d (%s tokens)\n",
+		info.SummaryBlockCount, formatTokenCount(info.SummaryBlockTokens))
+	fmt.Fprintf(&b, "  Goal Batch Blocks:  %d (%s tokens)\n",
+		info.GoalBatchBlockCount, formatTokenCount(info.GoalBatchBlockTokens))
 	// Show compression ratio if any summarization has occurred
 	if info.SummaryBlockCount > 0 || info.GoalBatchBlockCount > 0 {
 		totalCompressed := info.SummaryBlockTokens + info.GoalBatchBlockTokens
 		totalConv := info.ConversationTokens
 		if totalConv > 0 {
 			compressedPct := float64(totalCompressed) / float64(totalConv) * 100.0
-			b.WriteString(fmt.Sprintf("  Compressed Content: %.1f%% of conversation\n", compressedPct))
+			fmt.Fprintf(&b, "  Compressed Content: %.1f%% of conversation\n", compressedPct)
 		}
 	}
 	b.WriteString("\n")
@@ -153,11 +153,11 @@ func buildContextContent(info *ContextInfo) string {
 	// Current Context section
 	b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(types.SalmonPink).Render("Current Context"))
 	b.WriteString("\n")
-	b.WriteString(fmt.Sprintf("  Used:               %s / %s tokens (%.1f%%)\n",
+	fmt.Fprintf(&b, "  Used:               %s / %s tokens (%.1f%%)\n",
 		formatTokenCount(info.CurrentContextTokens),
 		formatTokenCount(info.MaxContextTokens),
-		info.UsagePercent))
-	b.WriteString(fmt.Sprintf("  Free Space:         %s tokens\n", formatTokenCount(info.FreeTokens)))
+		info.UsagePercent)
+	fmt.Fprintf(&b, "  Free Space:         %s tokens\n", formatTokenCount(info.FreeTokens))
 
 	// Add a progress bar
 	barWidth := 40
@@ -176,15 +176,15 @@ func buildContextContent(info *ContextInfo) string {
 
 	filled := lipgloss.NewStyle().Foreground(barColor).Render(strings.Repeat("█", filledWidth))
 	empty := lipgloss.NewStyle().Foreground(types.ProgressEmpty).Render(strings.Repeat("░", emptyWidth))
-	b.WriteString(fmt.Sprintf("  [%s%s]\n", filled, empty))
+	fmt.Fprintf(&b, "  [%s%s]\n", filled, empty)
 	b.WriteString("\n")
 
 	// Cumulative Token Usage section
 	b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(types.SalmonPink).Render("Cumulative Usage (All API Calls)"))
 	b.WriteString("\n")
-	b.WriteString(fmt.Sprintf("  Input Tokens:       %s\n", formatTokenCount(info.TotalPromptTokens)))
-	b.WriteString(fmt.Sprintf("  Output Tokens:      %s\n", formatTokenCount(info.TotalCompletionTokens)))
-	b.WriteString(fmt.Sprintf("  Total:              %s\n", formatTokenCount(info.TotalTokens)))
+	fmt.Fprintf(&b, "  Input Tokens:       %s\n", formatTokenCount(info.TotalPromptTokens))
+	fmt.Fprintf(&b, "  Output Tokens:      %s\n", formatTokenCount(info.TotalCompletionTokens))
+	fmt.Fprintf(&b, "  Total:              %s\n", formatTokenCount(info.TotalTokens))
 
 	return b.String()
 }
@@ -239,15 +239,15 @@ func (c *ContextOverlay) renderHeader() string {
 	titleLen := len(c.title)
 	titlePadding := max(0, (contentWidth-titleLen)/2)
 
-	titleStr := ""
-	for i := 0; i < titlePadding; i++ {
-		titleStr += " "
+	var titleStr strings.Builder
+	for range titlePadding {
+		titleStr.WriteString(" ")
 	}
-	titleStr += types.OverlayTitleStyle.Render(c.title)
+	titleStr.WriteString(types.OverlayTitleStyle.Render(c.title))
 
 	separator := lipgloss.NewStyle().Foreground(types.MutedGray).Render(strings.Repeat(sepChar, contentWidth))
 
-	return titleStr + "\n" + separator + "\n"
+	return titleStr.String() + "\n" + separator + "\n"
 }
 
 // renderFooter renders the context overlay footer
@@ -257,12 +257,12 @@ func (c *ContextOverlay) renderFooter() string {
 	hint := "ESC or Enter to close • ↑/↓ to scroll"
 	hintLen := lipgloss.Width(hint)
 	hintPadding := max(0, (contentWidth-hintLen)/2)
-	padStr := ""
-	for i := 0; i < hintPadding; i++ {
-		padStr += " "
+	var padStr strings.Builder
+	for range hintPadding {
+		padStr.WriteString(" ")
 	}
 
-	return "\n" + padStr + types.OverlayHelpStyle.Render(hint)
+	return "\n" + padStr.String() + types.OverlayHelpStyle.Render(hint)
 }
 
 // View renders the overlay

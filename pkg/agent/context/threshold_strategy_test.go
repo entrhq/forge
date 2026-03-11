@@ -2,6 +2,7 @@ package context
 
 import (
 	"context"
+	"slices"
 	"testing"
 
 	"github.com/entrhq/forge/pkg/agent/memory"
@@ -52,7 +53,7 @@ func TestThresholdStrategy_Name(t *testing.T) {
 func TestThresholdStrategy_ShouldRun(t *testing.T) {
 	makeConv := func(nonSystemMsgCount int) *memory.ConversationMemory {
 		conv := memory.NewConversationMemory()
-		for i := 0; i < nonSystemMsgCount; i++ {
+		for i := range nonSystemMsgCount {
 			if i%2 == 0 {
 				conv.Add(types.NewUserMessage("user message"))
 			} else {
@@ -96,7 +97,7 @@ func TestThresholdStrategy_ShouldRun_SystemMessagesExcluded(t *testing.T) {
 	conv := memory.NewConversationMemory()
 
 	// Add many system messages but only 3 non-system messages (below minMessages=4).
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		conv.Add(types.NewSystemMessage("system"))
 	}
 	conv.Add(types.NewUserMessage("user"))
@@ -221,13 +222,7 @@ func TestThresholdStrategy_Summarize_RecentHalfKeptVerbatim(t *testing.T) {
 	mockLLM.AssertNumberOfCalls(t, "Complete", 1)
 
 	// The existing summary in the recent half must be preserved verbatim.
-	found := false
-	for _, msg := range result {
-		if msg == existingSummary {
-			found = true
-			break
-		}
-	}
+	found := slices.Contains(result, existingSummary)
 	assert.True(t, found, "existing summary in the recent half must be kept verbatim")
 }
 

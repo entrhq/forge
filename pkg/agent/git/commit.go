@@ -96,7 +96,7 @@ func buildCommitPrompt(diff string, files []string) string {
 
 	sb.WriteString("Files changed:\\n")
 	for _, file := range files {
-		sb.WriteString(fmt.Sprintf("- %s\\n", file))
+		fmt.Fprintf(&sb, "- %s\\n", file)
 	}
 
 	sb.WriteString("\\nDiff:\\n")
@@ -129,8 +129,8 @@ func GetModifiedFiles(workingDir string) ([]string, error) {
 	}
 
 	var files []string
-	lines := strings.Split(strings.TrimSpace(stdout.String()), "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(strings.TrimSpace(stdout.String()), "\n")
+	for line := range lines {
 		if line == "" {
 			continue
 		}

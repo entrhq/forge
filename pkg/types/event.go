@@ -43,13 +43,13 @@ const (
 // AgentEvent represents an event emitted by the agent during execution.
 type AgentEvent struct {
 	// Metadata holds optional additional information about the event.
-	Metadata map[string]interface{}
+	Metadata map[string]any
 
 	// ToolInput is the input being sent to the tool (for tool call events).
-	ToolInput map[string]interface{}
+	ToolInput map[string]any
 
 	// ToolOutput is the result from the tool (for tool result events).
-	ToolOutput interface{}
+	ToolOutput any
 
 	// Error contains error information for error events.
 	Error error
@@ -73,7 +73,7 @@ type AgentEvent struct {
 	ApprovalID string
 
 	// Preview holds preview data for approval requests.
-	Preview interface{}
+	Preview any
 
 	// TokenUsage contains token usage information (for token usage events).
 	// Fields: PromptTokens, CompletionTokens, TotalTokens
@@ -171,7 +171,7 @@ type APICallInfo struct {
 func NewThinkingStartEvent() *AgentEvent {
 	return &AgentEvent{
 		Type:     EventTypeThinkingStart,
-		Metadata: make(map[string]interface{}),
+		Metadata: make(map[string]any),
 	}
 }
 
@@ -180,7 +180,7 @@ func NewThinkingContentEvent(content string) *AgentEvent {
 	return &AgentEvent{
 		Type:     EventTypeThinkingContent,
 		Content:  content,
-		Metadata: make(map[string]interface{}),
+		Metadata: make(map[string]any),
 	}
 }
 
@@ -188,7 +188,7 @@ func NewThinkingContentEvent(content string) *AgentEvent {
 func NewThinkingEndEvent() *AgentEvent {
 	return &AgentEvent{
 		Type:     EventTypeThinkingEnd,
-		Metadata: make(map[string]interface{}),
+		Metadata: make(map[string]any),
 	}
 }
 
@@ -196,7 +196,7 @@ func NewThinkingEndEvent() *AgentEvent {
 func NewToolCallStartEvent() *AgentEvent {
 	return &AgentEvent{
 		Type:     EventTypeToolCallStart,
-		Metadata: make(map[string]interface{}),
+		Metadata: make(map[string]any),
 	}
 }
 
@@ -205,7 +205,7 @@ func NewToolCallContentEvent(content string) *AgentEvent {
 	return &AgentEvent{
 		Type:     EventTypeToolCallContent,
 		Content:  content,
-		Metadata: make(map[string]interface{}),
+		Metadata: make(map[string]any),
 	}
 }
 
@@ -213,7 +213,7 @@ func NewToolCallContentEvent(content string) *AgentEvent {
 func NewToolCallEndEvent() *AgentEvent {
 	return &AgentEvent{
 		Type:     EventTypeToolCallEnd,
-		Metadata: make(map[string]interface{}),
+		Metadata: make(map[string]any),
 	}
 }
 
@@ -221,7 +221,7 @@ func NewToolCallEndEvent() *AgentEvent {
 func NewMessageStartEvent() *AgentEvent {
 	return &AgentEvent{
 		Type:     EventTypeMessageStart,
-		Metadata: make(map[string]interface{}),
+		Metadata: make(map[string]any),
 	}
 }
 
@@ -230,7 +230,7 @@ func NewMessageContentEvent(content string) *AgentEvent {
 	return &AgentEvent{
 		Type:     EventTypeMessageContent,
 		Content:  content,
-		Metadata: make(map[string]interface{}),
+		Metadata: make(map[string]any),
 	}
 }
 
@@ -238,29 +238,29 @@ func NewMessageContentEvent(content string) *AgentEvent {
 func NewMessageEndEvent() *AgentEvent {
 	return &AgentEvent{
 		Type:     EventTypeMessageEnd,
-		Metadata: make(map[string]interface{}),
+		Metadata: make(map[string]any),
 	}
 }
 
 // NewToolCallEvent creates a tool call event.
-func NewToolCallEvent(toolCallID string, toolName string, toolInput map[string]interface{}) *AgentEvent {
+func NewToolCallEvent(toolCallID string, toolName string, toolInput map[string]any) *AgentEvent {
 	return &AgentEvent{
 		Type:       EventTypeToolCall,
 		ToolCallID: toolCallID,
 		ToolName:   toolName,
 		ToolInput:  toolInput,
-		Metadata:   make(map[string]interface{}),
+		Metadata:   make(map[string]any),
 	}
 }
 
 // NewToolResultEvent creates a tool result event.
-func NewToolResultEvent(toolCallID string, toolName string, output interface{}) *AgentEvent {
+func NewToolResultEvent(toolCallID string, toolName string, output any) *AgentEvent {
 	return &AgentEvent{
 		Type:       EventTypeToolResult,
 		ToolCallID: toolCallID,
 		ToolName:   toolName,
 		ToolOutput: output,
-		Metadata:   make(map[string]interface{}),
+		Metadata:   make(map[string]any),
 	}
 }
 
@@ -271,7 +271,7 @@ func NewToolResultErrorEvent(toolCallID string, toolName string, err error) *Age
 		ToolCallID: toolCallID,
 		ToolName:   toolName,
 		Error:      err,
-		Metadata:   make(map[string]interface{}),
+		Metadata:   make(map[string]any),
 	}
 }
 
@@ -279,7 +279,7 @@ func NewToolResultErrorEvent(toolCallID string, toolName string, err error) *Age
 func NewNoToolCallEvent() *AgentEvent {
 	return &AgentEvent{
 		Type:     EventTypeNoToolCall,
-		Metadata: make(map[string]interface{}),
+		Metadata: make(map[string]any),
 	}
 }
 
@@ -287,7 +287,7 @@ func NewNoToolCallEvent() *AgentEvent {
 func NewAPICallStartEvent(apiName string, contextTokens, maxContextTokens int) *AgentEvent {
 	return &AgentEvent{
 		Type:     EventTypeAPICallStart,
-		Metadata: map[string]interface{}{"api_name": apiName},
+		Metadata: map[string]any{"api_name": apiName},
 		APICallInfo: &APICallInfo{
 			ContextTokens:    contextTokens,
 			MaxContextTokens: maxContextTokens,
@@ -299,7 +299,7 @@ func NewAPICallStartEvent(apiName string, contextTokens, maxContextTokens int) *
 func NewAPICallEndEvent(apiName string) *AgentEvent {
 	return &AgentEvent{
 		Type:     EventTypeAPICallEnd,
-		Metadata: map[string]interface{}{"api_name": apiName},
+		Metadata: map[string]any{"api_name": apiName},
 	}
 }
 
@@ -307,7 +307,7 @@ func NewAPICallEndEvent(apiName string) *AgentEvent {
 func NewToolsUpdateEvent(tools []string) *AgentEvent {
 	return &AgentEvent{
 		Type:     EventTypeToolsUpdate,
-		Metadata: map[string]interface{}{"tools": tools},
+		Metadata: map[string]any{"tools": tools},
 	}
 }
 
@@ -316,7 +316,7 @@ func NewUpdateBusyEvent(isBusy bool) *AgentEvent {
 	return &AgentEvent{
 		Type:     EventTypeUpdateBusy,
 		IsBusy:   isBusy,
-		Metadata: make(map[string]interface{}),
+		Metadata: make(map[string]any),
 	}
 }
 
@@ -324,7 +324,7 @@ func NewUpdateBusyEvent(isBusy bool) *AgentEvent {
 func NewTurnEndEvent() *AgentEvent {
 	return &AgentEvent{
 		Type:     EventTypeTurnEnd,
-		Metadata: make(map[string]interface{}),
+		Metadata: make(map[string]any),
 	}
 }
 
@@ -333,19 +333,19 @@ func NewErrorEvent(err error) *AgentEvent {
 	return &AgentEvent{
 		Type:     EventTypeError,
 		Error:    err,
-		Metadata: make(map[string]interface{}),
+		Metadata: make(map[string]any),
 	}
 }
 
 // NewToolApprovalRequestEvent creates a tool approval request event.
-func NewToolApprovalRequestEvent(approvalID, toolName string, toolInput map[string]interface{}, preview interface{}) *AgentEvent {
+func NewToolApprovalRequestEvent(approvalID, toolName string, toolInput map[string]any, preview any) *AgentEvent {
 	return &AgentEvent{
 		Type:       EventTypeToolApprovalRequest,
 		ApprovalID: approvalID,
 		ToolName:   toolName,
 		ToolInput:  toolInput,
 		Preview:    preview,
-		Metadata:   make(map[string]interface{}),
+		Metadata:   make(map[string]any),
 	}
 }
 
@@ -355,7 +355,7 @@ func NewToolApprovalTimeoutEvent(approvalID, toolName string) *AgentEvent {
 		Type:       EventTypeToolApprovalTimeout,
 		ApprovalID: approvalID,
 		ToolName:   toolName,
-		Metadata:   make(map[string]interface{}),
+		Metadata:   make(map[string]any),
 	}
 }
 
@@ -365,7 +365,7 @@ func NewToolApprovalGrantedEvent(approvalID, toolName string) *AgentEvent {
 		Type:       EventTypeToolApprovalGranted,
 		ApprovalID: approvalID,
 		ToolName:   toolName,
-		Metadata:   make(map[string]interface{}),
+		Metadata:   make(map[string]any),
 	}
 }
 
@@ -375,7 +375,7 @@ func NewToolApprovalRejectedEvent(approvalID, toolName string) *AgentEvent {
 		Type:       EventTypeToolApprovalRejected,
 		ApprovalID: approvalID,
 		ToolName:   toolName,
-		Metadata:   make(map[string]interface{}),
+		Metadata:   make(map[string]any),
 	}
 }
 
@@ -388,7 +388,7 @@ func NewTokenUsageEvent(promptTokens, completionTokens, totalTokens int) *AgentE
 			CompletionTokens: completionTokens,
 			TotalTokens:      totalTokens,
 		},
-		Metadata: make(map[string]interface{}),
+		Metadata: make(map[string]any),
 	}
 }
 
@@ -401,7 +401,7 @@ func NewCommandExecutionStartEvent(executionID, command, workingDir string) *Age
 			Command:     command,
 			WorkingDir:  workingDir,
 		},
-		Metadata: make(map[string]interface{}),
+		Metadata: make(map[string]any),
 	}
 }
 
@@ -414,7 +414,7 @@ func NewCommandOutputEvent(executionID, output, streamType string) *AgentEvent {
 			Output:      output,
 			StreamType:  streamType,
 		},
-		Metadata: make(map[string]interface{}),
+		Metadata: make(map[string]any),
 	}
 }
 
@@ -427,7 +427,7 @@ func NewCommandExecutionCompleteEvent(executionID string, exitCode int, duration
 			ExitCode:    exitCode,
 			Duration:    duration,
 		},
-		Metadata: make(map[string]interface{}),
+		Metadata: make(map[string]any),
 	}
 }
 
@@ -441,7 +441,7 @@ func NewCommandExecutionFailedEvent(executionID string, exitCode int, duration s
 			ExitCode:    exitCode,
 			Duration:    duration,
 		},
-		Metadata: make(map[string]interface{}),
+		Metadata: make(map[string]any),
 	}
 }
 
@@ -454,14 +454,14 @@ func NewCommandExecutionCanceledEvent(executionID string, duration string) *Agen
 			Duration:    duration,
 			ExitCode:    -1, // Indicate cancellation
 		},
-		Metadata: make(map[string]interface{}),
+		Metadata: make(map[string]any),
 	}
 }
 
 // WithMetadata adds metadata to the event and returns the event for chaining.
-func (e *AgentEvent) WithMetadata(key string, value interface{}) *AgentEvent {
+func (e *AgentEvent) WithMetadata(key string, value any) *AgentEvent {
 	if e.Metadata == nil {
-		e.Metadata = make(map[string]interface{})
+		e.Metadata = make(map[string]any)
 	}
 	e.Metadata[key] = value
 	return e
@@ -532,7 +532,7 @@ func NewContextSummarizationStartEvent(strategy string, currentTokens, maxTokens
 			CurrentTokens: currentTokens,
 			MaxTokens:     maxTokens,
 		},
-		Metadata: make(map[string]interface{}),
+		Metadata: make(map[string]any),
 	}
 }
 
@@ -546,7 +546,7 @@ func NewContextSummarizationProgressEvent(strategy string, itemsProcessed, total
 			TotalItems:     totalItems,
 			TokensSaved:    tokensSaved,
 		},
-		Metadata: make(map[string]interface{}),
+		Metadata: make(map[string]any),
 	}
 }
 
@@ -561,7 +561,7 @@ func NewContextSummarizationCompleteEvent(strategy string, tokensSaved, newToken
 			ItemsProcessed: itemsProcessed,
 			Duration:       duration,
 		},
-		Metadata: make(map[string]interface{}),
+		Metadata: make(map[string]any),
 	}
 }
 
@@ -574,7 +574,7 @@ func NewContextSummarizationErrorEvent(strategy string, err error) *AgentEvent {
 			Strategy:     strategy,
 			ErrorMessage: err.Error(),
 		},
-		Metadata: make(map[string]interface{}),
+		Metadata: make(map[string]any),
 	}
 }
 

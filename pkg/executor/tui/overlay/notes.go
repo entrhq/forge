@@ -177,20 +177,17 @@ func (o *NotesOverlay) View() string {
 
 	// Title pad logic matches help/context
 	headerStr := types.OverlayTitleStyle.Render(title)
-	innerWidth := o.width - 4
-	if innerWidth < 0 {
-		innerWidth = 0
-	}
+	innerWidth := max(o.width-4, 0)
 
 	headerLen := lipgloss.Width(headerStr)
-	titlePad := ""
+	var titlePad strings.Builder
 	for i := 0; i < max(0, (innerWidth-headerLen)/2); i++ {
-		titlePad += " "
+		titlePad.WriteString(" ")
 	}
 
 	separator := lipgloss.NewStyle().Foreground(types.MutedGray).Render(strings.Repeat(sepChar, innerWidth))
 
-	content := titlePad + headerStr + "\n" + separator + "\n" + listContent
+	content := titlePad.String() + headerStr + "\n" + separator + "\n" + listContent
 
 	return types.CreateOverlayContainerStyle(o.width).Height(o.height).Render(content)
 }

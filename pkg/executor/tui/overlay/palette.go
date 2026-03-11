@@ -148,10 +148,7 @@ func (cp *CommandPalette) clampScrollOffset(maxVisible int) {
 
 // renderCommandItems builds the list of rendered command row strings.
 func (cp *CommandPalette) renderCommandItems(maxVisible int) []string {
-	itemsToDraw := maxVisible
-	if len(cp.filteredCommands) < itemsToDraw {
-		itemsToDraw = len(cp.filteredCommands)
-	}
+	itemsToDraw := min(len(cp.filteredCommands), maxVisible)
 
 	var lines []string
 	for i := 0; i < itemsToDraw; i++ {
@@ -195,16 +192,10 @@ func (cp *CommandPalette) Render(width, height int) string {
 	paletteWidth := types.ComputeOverlayWidth(width, 0.70, 40, 90)
 
 	// innerWidth accounts for border (2) and padding (2)
-	innerWidth := paletteWidth - 4
-	if innerWidth < 0 {
-		innerWidth = 0
-	}
+	innerWidth := max(paletteWidth-4, 0)
 
 	// Calculate maxVisible visually based on available height (up to approx 40% of screen)
-	maxVisible := height * 40 / 100
-	if maxVisible < 5 {
-		maxVisible = 5
-	}
+	maxVisible := max(height*40/100, 5)
 	if maxVisible > 12 {
 		maxVisible = 12
 	}

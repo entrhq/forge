@@ -51,11 +51,11 @@ type Agent interface {
 
 	// GetTool retrieves a specific tool by name from the agent's tool registry.
 	// Returns nil if the tool is not found.
-	GetTool(name string) interface{}
+	GetTool(name string) any
 
 	// GetTools returns a list of all available tools registered with the agent.
 	// This includes both built-in tools and any custom tools that have been registered.
-	GetTools() []interface{}
+	GetTools() []any
 
 	// GetContextInfo returns detailed context information for debugging and display.
 	// This includes system prompt length, tool count, message history, and token usage.

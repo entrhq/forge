@@ -32,10 +32,10 @@ func (t *ScratchNoteTool) Description() string {
 }
 
 // Schema returns the JSON schema for the tool's input parameters.
-func (t *ScratchNoteTool) Schema() map[string]interface{} {
+func (t *ScratchNoteTool) Schema() map[string]any {
 	return tools.BaseToolSchema(
-		map[string]interface{}{
-			"id": map[string]interface{}{
+		map[string]any{
+			"id": map[string]any{
 				"type":        "string",
 				"description": "ID of the note to mark as scratched",
 			},
@@ -45,7 +45,7 @@ func (t *ScratchNoteTool) Schema() map[string]interface{} {
 }
 
 // Execute marks a note as scratched.
-func (t *ScratchNoteTool) Execute(_ context.Context, argsXML []byte) (string, map[string]interface{}, error) {
+func (t *ScratchNoteTool) Execute(_ context.Context, argsXML []byte) (string, map[string]any, error) {
 	var input struct {
 		XMLName xml.Name `xml:"arguments"`
 		ID      string   `xml:"id"`
@@ -69,7 +69,7 @@ func (t *ScratchNoteTool) Execute(_ context.Context, argsXML []byte) (string, ma
 	message := fmt.Sprintf("Note %s marked as scratched", input.ID)
 
 	// Build metadata
-	metadata := map[string]interface{}{
+	metadata := map[string]any{
 		"note_id":     input.ID,
 		"total_notes": t.manager.Count(),
 	}

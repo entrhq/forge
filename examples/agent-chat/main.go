@@ -24,20 +24,20 @@ func (t *CalculatorTool) Description() string {
 	return "Performs basic arithmetic operations (add, subtract, multiply, divide)"
 }
 
-func (t *CalculatorTool) Schema() map[string]interface{} {
-	return map[string]interface{}{
+func (t *CalculatorTool) Schema() map[string]any {
+	return map[string]any{
 		"type": "object",
-		"properties": map[string]interface{}{
-			"operation": map[string]interface{}{
+		"properties": map[string]any{
+			"operation": map[string]any{
 				"type":        "string",
 				"description": "The operation to perform: add, subtract, multiply, or divide",
 				"enum":        []string{"add", "subtract", "multiply", "divide"},
 			},
-			"a": map[string]interface{}{
+			"a": map[string]any{
 				"type":        "number",
 				"description": "First number",
 			},
-			"b": map[string]interface{}{
+			"b": map[string]any{
 				"type":        "number",
 				"description": "Second number",
 			},
@@ -46,7 +46,7 @@ func (t *CalculatorTool) Schema() map[string]interface{} {
 	}
 }
 
-func (t *CalculatorTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
+func (t *CalculatorTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]any, error) {
 	var args struct {
 		XMLName   xml.Name `xml:"arguments"`
 		Operation string   `xml:"operation"`

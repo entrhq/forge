@@ -127,10 +127,10 @@ func (m *Manager) cleanupPendingApproval(approvalID string) {
 }
 
 // parseToolArguments safely parses tool call arguments into a map
-func parseToolArguments(toolCall tools.ToolCall) map[string]interface{} {
+func parseToolArguments(toolCall tools.ToolCall) map[string]any {
 	argsMap, err := tools.XMLToMap(toolCall.GetArgumentsXML())
 	if err != nil {
-		return make(map[string]interface{})
+		return make(map[string]any)
 	}
 	return argsMap
 }

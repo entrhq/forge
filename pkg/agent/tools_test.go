@@ -15,10 +15,10 @@ type mockConditionalTool struct {
 
 func (m *mockConditionalTool) Name() string        { return m.name }
 func (m *mockConditionalTool) Description() string { return "mock tool" }
-func (m *mockConditionalTool) Schema() map[string]interface{} {
-	return map[string]interface{}{"type": "object"}
+func (m *mockConditionalTool) Schema() map[string]any {
+	return map[string]any{"type": "object"}
 }
-func (m *mockConditionalTool) Execute(ctx context.Context, args []byte) (string, map[string]interface{}, error) {
+func (m *mockConditionalTool) Execute(ctx context.Context, args []byte) (string, map[string]any, error) {
 	return "", nil, nil
 }
 func (m *mockConditionalTool) IsLoopBreaking() bool { return false }
@@ -31,10 +31,10 @@ type mockRegularTool struct {
 
 func (m *mockRegularTool) Name() string        { return m.name }
 func (m *mockRegularTool) Description() string { return "mock tool" }
-func (m *mockRegularTool) Schema() map[string]interface{} {
-	return map[string]interface{}{"type": "object"}
+func (m *mockRegularTool) Schema() map[string]any {
+	return map[string]any{"type": "object"}
 }
-func (m *mockRegularTool) Execute(ctx context.Context, args []byte) (string, map[string]interface{}, error) {
+func (m *mockRegularTool) Execute(ctx context.Context, args []byte) (string, map[string]any, error) {
 	return "", nil, nil
 }
 func (m *mockRegularTool) IsLoopBreaking() bool { return false }

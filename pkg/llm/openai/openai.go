@@ -142,7 +142,7 @@ func NewProvider(apiKey string, opts ...ProviderOption) (*Provider, error) {
 	// Initialize model info (if not already set by options)
 	if p.modelInfo == nil {
 		p.modelInfo = &types.ModelInfo{
-			Metadata: make(map[string]interface{}),
+			Metadata: make(map[string]any),
 		}
 	}
 
@@ -196,7 +196,7 @@ func (p *Provider) StreamCompletion(ctx context.Context, messages []*types.Messa
 func (p *Provider) sendStreamRequest(ctx context.Context, messages []*types.Message) (*http.Response, error) {
 	openaiMessages := convertToOpenAIMessages(messages)
 
-	reqBody := map[string]interface{}{
+	reqBody := map[string]any{
 		"model":    p.model,
 		"messages": openaiMessages,
 		"stream":   true,
@@ -453,20 +453,20 @@ func (p *Provider) AnalyzeDocument(ctx context.Context, fileData []byte, mediaTy
 	// Build content part - use data URL format for all file types
 	// This works with OpenAI-compatible providers that may not support the "file" content type
 	dataURL := fmt.Sprintf("data:%s;base64,%s", mediaType, encodedData)
-	contentPart := map[string]interface{}{
+	contentPart := map[string]any{
 		"type": "image_url",
-		"image_url": map[string]interface{}{
+		"image_url": map[string]any{
 			"url": dataURL,
 		},
 	}
 
 	// Build the request body manually (matching existing pattern)
-	reqBody := map[string]interface{}{
+	reqBody := map[string]any{
 		"model": p.model,
-		"messages": []map[string]interface{}{
+		"messages": []map[string]any{
 			{
 				"role": "user",
-				"content": []map[string]interface{}{
+				"content": []map[string]any{
 					{
 						"type": "text",
 						"text": prompt,

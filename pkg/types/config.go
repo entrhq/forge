@@ -5,7 +5,7 @@ import "time"
 // ModelInfo contains information about an LLM model.
 type ModelInfo struct {
 	// Metadata holds optional additional information about the model.
-	Metadata map[string]interface{}
+	Metadata map[string]any
 
 	// Name is the model identifier (e.g., "gpt-4", "claude-3-opus").
 	Name string
@@ -23,7 +23,7 @@ type ModelInfo struct {
 // AgentConfig holds configuration for an agent instance.
 type AgentConfig struct {
 	// Metadata holds optional additional configuration.
-	Metadata map[string]interface{}
+	Metadata map[string]any
 
 	// SystemPrompt is the initial system message that sets the agent's behavior.
 	SystemPrompt string
@@ -49,7 +49,7 @@ func NewAgentConfig() *AgentConfig {
 		Timeout:         0, // no timeout
 		EnableStreaming: true,
 		BufferSize:      10,
-		Metadata:        make(map[string]interface{}),
+		Metadata:        make(map[string]any),
 	}
 }
 
@@ -84,9 +84,9 @@ func (c *AgentConfig) WithBufferSize(size int) *AgentConfig {
 }
 
 // WithMetadata adds metadata to the config and returns the config for chaining.
-func (c *AgentConfig) WithMetadata(key string, value interface{}) *AgentConfig {
+func (c *AgentConfig) WithMetadata(key string, value any) *AgentConfig {
 	if c.Metadata == nil {
-		c.Metadata = make(map[string]interface{})
+		c.Metadata = make(map[string]any)
 	}
 	c.Metadata[key] = value
 	return c

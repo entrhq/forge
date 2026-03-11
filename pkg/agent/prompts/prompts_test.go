@@ -252,10 +252,10 @@ func TestFormatToolForLLM(t *testing.T) {
 }
 
 func TestSchemaToJSON(t *testing.T) {
-	schema := map[string]interface{}{
+	schema := map[string]any{
 		"type": "object",
-		"properties": map[string]interface{}{
-			"name": map[string]interface{}{
+		"properties": map[string]any{
+			"name": map[string]any{
 				"type": "string",
 			},
 		},

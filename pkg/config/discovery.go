@@ -7,14 +7,14 @@ import (
 
 // DiscoverToolsFromAgent initializes the auto-approval section with tools from the agent
 // This should be called after the agent is created and tools are registered
-func DiscoverToolsFromAgent(agent interface{}) error {
+func DiscoverToolsFromAgent(agent any) error {
 	if !IsInitialized() {
 		return fmt.Errorf("config not initialized")
 	}
 
 	// Get tools from agent using the GetTools interface
 	type toolGetter interface {
-		GetTools() []interface{}
+		GetTools() []any
 	}
 
 	getter, ok := agent.(toolGetter)
