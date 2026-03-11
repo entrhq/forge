@@ -33,15 +33,15 @@ func (t *ListTagsTool) Description() string {
 }
 
 // Schema returns the JSON schema for the tool's input parameters.
-func (t *ListTagsTool) Schema() map[string]interface{} {
+func (t *ListTagsTool) Schema() map[string]any {
 	return tools.BaseToolSchema(
-		map[string]interface{}{},
+		map[string]any{},
 		[]string{},
 	)
 }
 
 // Execute lists all tags.
-func (t *ListTagsTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
+func (t *ListTagsTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]any, error) {
 	var input struct {
 		XMLName xml.Name `xml:"arguments"`
 	}
@@ -64,7 +64,7 @@ func (t *ListTagsTool) Execute(ctx context.Context, argsXML []byte) (string, map
 	}
 
 	// Build metadata
-	metadata := map[string]interface{}{
+	metadata := map[string]any{
 		"tags":         tags,
 		"tag_count":    len(tags),
 		"active_notes": t.manager.CountActive(),

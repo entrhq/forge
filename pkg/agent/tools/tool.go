@@ -28,13 +28,13 @@ type Tool interface {
 	// Schema returns the JSON schema for this tool's input parameters
 	// The schema should be a valid JSON Schema object defining the structure
 	// of the arguments that this tool accepts
-	Schema() map[string]interface{}
+	Schema() map[string]any
 
 	// Execute runs the tool with the given XML arguments and returns a result string
 	// The arguments should be unmarshaled from XML into the tool's argument struct
 	// Returns: (result string, metadata map, error)
 	// Metadata is optional and can be nil - it will be included in tool result events
-	Execute(ctx context.Context, argumentsXML []byte) (string, map[string]interface{}, error)
+	Execute(ctx context.Context, argumentsXML []byte) (string, map[string]any, error)
 
 	// IsLoopBreaking indicates whether this tool should terminate the agent loop
 	// Loop-breaking tools (like task_completion, ask_question, converse) will
@@ -104,7 +104,7 @@ type ToolPreview struct {
 	Content string
 
 	// Metadata holds additional preview information (file path, language, etc.)
-	Metadata map[string]interface{}
+	Metadata map[string]any
 }
 
 // PreviewType indicates the kind of preview being shown
@@ -123,8 +123,8 @@ const (
 
 // BaseToolSchema creates a common JSON schema structure for a tool
 // with the given properties and required fields
-func BaseToolSchema(properties map[string]interface{}, required []string) map[string]interface{} {
-	schema := map[string]interface{}{
+func BaseToolSchema(properties map[string]any, required []string) map[string]any {
+	schema := map[string]any{
 		"type":       "object",
 		"properties": properties,
 	}

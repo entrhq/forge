@@ -321,7 +321,7 @@ func TestGlobalConfig_ThreadSafety(t *testing.T) {
 		done := make(chan bool)
 
 		// Concurrent readers
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			go func() {
 				IsInitialized()
 				GetAutoApproval()
@@ -332,7 +332,7 @@ func TestGlobalConfig_ThreadSafety(t *testing.T) {
 			}()
 		}
 
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			<-done
 		}
 	})

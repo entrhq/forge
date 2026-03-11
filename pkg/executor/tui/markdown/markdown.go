@@ -33,7 +33,7 @@ const (
 	// on every line of a code block: a half-block bar in muted slate blue.
 	codeBorderANSI = "\x1b[38;2;98;114;164m▌\x1b[0m"
 
-	// codeBackgroundANSI sets the background colour (#33353d) for code block
+	// codeBackgroundANSI sets the background color (#33353d) for code block
 	// lines.  It is re-injected after every \x1b[0m reset inside the line so
 	// that chroma's per-token resets do not kill the background fill.
 	codeBackgroundANSI = "\x1b[48;2;51;53;61m"
@@ -119,20 +119,20 @@ func (r *Renderer) Render(text string, width int) string {
 // injected via BlockPrefix/BlockSuffix.  These are picked up by
 // applyCodeBlockBorder to prepend a visible left border to every code line.
 //
-// Background colour overrides are intentionally absent: glamour's
+// Background color overrides are intentionally absent: glamour's
 // CodeBlockElement uses its own indent.WriterPipe that bypasses the
 // MarginWriter padding path, so BackgroundColor on the outer StyleBlock
 // has no visible effect.
 func darkStyleConfig() ansi.StyleConfig {
 	s := glamourstyles.DarkStyleConfig
-	s.CodeBlock.StyleBlock.StylePrimitive.BlockPrefix = codeBlockStartMarker + "\n"
-	s.CodeBlock.StyleBlock.StylePrimitive.BlockSuffix = "\n" + codeBlockEndMarker
+	s.CodeBlock.BlockPrefix = codeBlockStartMarker + "\n"
+	s.CodeBlock.BlockSuffix = "\n" + codeBlockEndMarker
 	// Zero out the built-in margin/indent so glamour doesn't prepend extra
 	// leading spaces before each code line.  Our applyCodeBlockBorder step
 	// adds the only visible indentation (the border glyph + one space).
 	zero := uint(0)
-	s.CodeBlock.StyleBlock.Margin = &zero
-	s.CodeBlock.StyleBlock.Indent = &zero
+	s.CodeBlock.Margin = &zero
+	s.CodeBlock.Indent = &zero
 	return s
 }
 
@@ -147,7 +147,7 @@ func darkStyleConfig() ansi.StyleConfig {
 //  2. Re-injecting codeBackgroundANSI after every \x1b[0m reset inside each
 //     line — chroma emits resets between tokens, which would otherwise kill
 //     the background mid-line.
-//  3. Padding each line to max_width with background-coloured spaces so the
+//  3. Padding each line to max_width with background-colored spaces so the
 //     right edge of the block is a solid filled rectangle.
 //
 // This is a post-processing step because glamour's CodeBlockElement

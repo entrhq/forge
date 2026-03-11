@@ -16,28 +16,28 @@ type mockSection struct {
 	id          string
 	title       string
 	description string
-	data        map[string]interface{}
+	data        map[string]any
 	validateErr error
 }
 
-func (m *mockSection) ID() string                                { return m.id }
-func (m *mockSection) Title() string                             { return m.title }
-func (m *mockSection) Description() string                       { return m.description }
-func (m *mockSection) Data() map[string]interface{}              { return m.data }
-func (m *mockSection) SetData(data map[string]interface{}) error { m.data = data; return nil }
-func (m *mockSection) Validate() error                           { return m.validateErr }
-func (m *mockSection) Reset()                                    { m.data = make(map[string]interface{}) }
+func (m *mockSection) ID() string                        { return m.id }
+func (m *mockSection) Title() string                     { return m.title }
+func (m *mockSection) Description() string               { return m.description }
+func (m *mockSection) Data() map[string]any              { return m.data }
+func (m *mockSection) SetData(data map[string]any) error { m.data = data; return nil }
+func (m *mockSection) Validate() error                   { return m.validateErr }
+func (m *mockSection) Reset()                            { m.data = make(map[string]any) }
 
 // mockStore is a test implementation of the Store interface
 type mockStore struct {
-	sections map[string]map[string]interface{}
+	sections map[string]map[string]any
 	loadErr  error
 	saveErr  error
 }
 
 func newMockStore() *mockStore {
 	return &mockStore{
-		sections: make(map[string]map[string]interface{}),
+		sections: make(map[string]map[string]any),
 	}
 }
 
@@ -49,23 +49,23 @@ func (m *mockStore) Save() error {
 	return m.saveErr
 }
 
-func (m *mockStore) GetSection(sectionID string) (map[string]interface{}, error) {
+func (m *mockStore) GetSection(sectionID string) (map[string]any, error) {
 	if data, exists := m.sections[sectionID]; exists {
 		return data, nil
 	}
-	return make(map[string]interface{}), nil
+	return make(map[string]any), nil
 }
 
-func (m *mockStore) SetSection(sectionID string, data map[string]interface{}) error {
+func (m *mockStore) SetSection(sectionID string, data map[string]any) error {
 	m.sections[sectionID] = data
 	return nil
 }
 
-func (m *mockStore) GetAll() (map[string]map[string]interface{}, error) {
+func (m *mockStore) GetAll() (map[string]map[string]any, error) {
 	return m.sections, nil
 }
 
-func (m *mockStore) SetAll(data map[string]map[string]interface{}) error {
+func (m *mockStore) SetAll(data map[string]map[string]any) error {
 	m.sections = data
 	return nil
 }
@@ -167,14 +167,14 @@ func TestManager_GetSections(t *testing.T) {
 func TestManager_LoadAll(t *testing.T) {
 	t.Run("loads all sections from store", func(t *testing.T) {
 		store := newMockStore()
-		store.sections["test"] = map[string]interface{}{
+		store.sections["test"] = map[string]any{
 			"key": "value",
 		}
 
 		manager := NewManager(store)
 		section := &mockSection{
 			id:   "test",
-			data: make(map[string]interface{}),
+			data: make(map[string]any),
 		}
 		manager.RegisterSection(section)
 
@@ -195,12 +195,12 @@ func TestManager_LoadAll(t *testing.T) {
 
 	t.Run("loads multiple sections", func(t *testing.T) {
 		store := newMockStore()
-		store.sections["section1"] = map[string]interface{}{"key1": "value1"}
-		store.sections["section2"] = map[string]interface{}{"key2": "value2"}
+		store.sections["section1"] = map[string]any{"key1": "value1"}
+		store.sections["section2"] = map[string]any{"key2": "value2"}
 
 		manager := NewManager(store)
-		section1 := &mockSection{id: "section1", data: make(map[string]interface{})}
-		section2 := &mockSection{id: "section2", data: make(map[string]interface{})}
+		section1 := &mockSection{id: "section1", data: make(map[string]any)}
+		section2 := &mockSection{id: "section2", data: make(map[string]any)}
 
 		manager.RegisterSection(section1)
 		manager.RegisterSection(section2)
@@ -220,7 +220,7 @@ func TestManager_SaveAll(t *testing.T) {
 
 		section := &mockSection{
 			id: "test",
-			data: map[string]interface{}{
+			data: map[string]any{
 				"key": "value",
 			},
 		}
@@ -239,7 +239,7 @@ func TestManager_SaveAll(t *testing.T) {
 
 		section := &mockSection{
 			id:          "test",
-			data:        map[string]interface{}{"key": "value"},
+			data:        map[string]any{"key": "value"},
 			validateErr: fmt.Errorf("validation error"),
 		}
 		manager.RegisterSection(section)
@@ -252,7 +252,7 @@ func TestManager_SaveAll(t *testing.T) {
 		store := newMockStore()
 		store.saveErr = fmt.Errorf("save error")
 		manager := NewManager(store)
-		section := &mockSection{id: "test", data: make(map[string]interface{})}
+		section := &mockSection{id: "test", data: make(map[string]any)}
 		manager.RegisterSection(section)
 
 		err := manager.SaveAll()
@@ -262,8 +262,8 @@ func TestManager_SaveAll(t *testing.T) {
 	t.Run("saves multiple sections", func(t *testing.T) {
 		store := newMockStore()
 		manager := NewManager(store)
-		section1 := &mockSection{id: "section1", data: map[string]interface{}{"key1": "value1"}}
-		section2 := &mockSection{id: "section2", data: map[string]interface{}{"key2": "value2"}}
+		section1 := &mockSection{id: "section1", data: map[string]any{"key1": "value1"}}
+		section2 := &mockSection{id: "section2", data: map[string]any{"key2": "value2"}}
 		manager.RegisterSection(section1)
 		manager.RegisterSection(section2)
 
@@ -278,8 +278,8 @@ func TestManager_SaveAll(t *testing.T) {
 func TestManager_ResetAll(t *testing.T) {
 	t.Run("resets all sections", func(t *testing.T) {
 		manager := NewManager(newMockStore())
-		section1 := &mockSection{id: "section1", data: map[string]interface{}{"key1": "value1"}}
-		section2 := &mockSection{id: "section2", data: map[string]interface{}{"key2": "value2"}}
+		section1 := &mockSection{id: "section1", data: map[string]any{"key1": "value1"}}
+		section2 := &mockSection{id: "section2", data: map[string]any{"key2": "value2"}}
 		manager.RegisterSection(section1)
 		manager.RegisterSection(section2)
 
@@ -371,7 +371,7 @@ func TestManager_Concurrency(t *testing.T) {
 		manager.RegisterSection(section)
 
 		done := make(chan bool)
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			go func() {
 				manager.GetSection("test")
 				manager.GetSections()
@@ -379,7 +379,7 @@ func TestManager_Concurrency(t *testing.T) {
 			}()
 		}
 
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			<-done
 		}
 	})
@@ -388,7 +388,7 @@ func TestManager_Concurrency(t *testing.T) {
 		manager := NewManager(newMockStore())
 
 		done := make(chan bool)
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			i := i
 			go func() {
 				section := &mockSection{
@@ -400,7 +400,7 @@ func TestManager_Concurrency(t *testing.T) {
 			}()
 		}
 
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			<-done
 		}
 

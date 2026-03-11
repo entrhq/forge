@@ -54,7 +54,7 @@ func TestApprovalSystem_ConcurrentCleanupRace(t *testing.T) {
 	// Run many iterations to increase chance of hitting the race
 	// This test should pass with the sync.Once fix and fail without it
 	var wg sync.WaitGroup
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()

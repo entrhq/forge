@@ -32,22 +32,22 @@ func (t *StartSessionTool) Description() string {
 }
 
 // Schema returns the tool's JSON schema.
-func (t *StartSessionTool) Schema() map[string]interface{} {
+func (t *StartSessionTool) Schema() map[string]any {
 	return tools.BaseToolSchema(
-		map[string]interface{}{
-			"name": map[string]interface{}{
+		map[string]any{
+			"name": map[string]any{
 				"type":        "string",
 				"description": "Unique name for the browser session (e.g., 'research', 'app_test')",
 			},
-			"headless": map[string]interface{}{
+			"headless": map[string]any{
 				"type":        "boolean",
 				"description": "Run browser in headless mode (no visible window). Default: false (headed mode for transparency)",
 			},
-			"width": map[string]interface{}{
+			"width": map[string]any{
 				"type":        "integer",
 				"description": "Browser viewport width in pixels. Default: 1280",
 			},
-			"height": map[string]interface{}{
+			"height": map[string]any{
 				"type":        "integer",
 				"description": "Browser viewport height in pixels. Default: 720",
 			},
@@ -67,7 +67,7 @@ type StartSessionInput struct {
 }
 
 // Execute starts a new browser session.
-func (t *StartSessionTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
+func (t *StartSessionTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]any, error) {
 	// Parse and validate input
 	input, err := t.parseInput(argsXML)
 	if err != nil {

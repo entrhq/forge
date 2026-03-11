@@ -34,9 +34,9 @@ func (t *ListSessionsTool) Description() string {
 }
 
 // Schema returns the tool's JSON schema.
-func (t *ListSessionsTool) Schema() map[string]interface{} {
+func (t *ListSessionsTool) Schema() map[string]any {
 	return tools.BaseToolSchema(
-		map[string]interface{}{},
+		map[string]any{},
 		[]string{},
 	)
 }
@@ -47,7 +47,7 @@ type ListSessionsInput struct {
 }
 
 // Execute lists all sessions.
-func (t *ListSessionsTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
+func (t *ListSessionsTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]any, error) {
 	// Get all sessions
 	sessions := t.manager.ListSessions()
 
@@ -57,7 +57,7 @@ func (t *ListSessionsTool) Execute(ctx context.Context, argsXML []byte) (string,
 
 	// Format sessions
 	var result strings.Builder
-	result.WriteString(fmt.Sprintf("Active Browser Sessions: %d\n\n", len(sessions)))
+	fmt.Fprintf(&result, "Active Browser Sessions: %d\n\n", len(sessions))
 
 	for i, session := range sessions {
 		mode := "headed"
@@ -68,20 +68,14 @@ func (t *ListSessionsTool) Execute(ctx context.Context, argsXML []byte) (string,
 		idleTime := time.Since(session.LastUsedAt)
 		age := time.Since(session.CreatedAt)
 
-		result.WriteString(fmt.Sprintf(`%d. %s
-   URL: %s
-   Mode: %s
-   Age: %s
-   Last Used: %s ago
-
-`,
+		fmt.Fprintf(&result, "%d. %s\n   URL: %s\n   Mode: %s\n   Age: %s\n   Last Used: %s ago\n\n",
 			i+1,
 			session.Name,
 			session.CurrentURL,
 			mode,
 			formatDuration(age),
 			formatDuration(idleTime),
-		))
+		)
 	}
 
 	result.WriteString("Use close_browser_session to close a session when finished.")

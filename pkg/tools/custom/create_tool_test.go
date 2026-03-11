@@ -161,7 +161,7 @@ func TestCreateCustomToolTool_Schema(t *testing.T) {
 		t.Fatal("schema is nil")
 	}
 
-	properties, ok := schema["properties"].(map[string]interface{})
+	properties, ok := schema["properties"].(map[string]any)
 	if !ok {
 		t.Fatal("schema properties is not a map")
 	}

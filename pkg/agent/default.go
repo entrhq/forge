@@ -45,7 +45,7 @@ type DefaultAgent struct {
 	repositoryContext  string
 	maxTurns           int
 	bufferSize         int
-	metadata           map[string]interface{}
+	metadata           map[string]any
 
 	// Agent loop components
 	tools         map[string]tools.Tool
@@ -149,7 +149,7 @@ func WithBufferSize(size int) AgentOption {
 }
 
 // WithMetadata sets metadata for the agent
-func WithMetadata(metadata map[string]interface{}) AgentOption {
+func WithMetadata(metadata map[string]any) AgentOption {
 	return func(a *DefaultAgent) {
 		a.metadata = metadata
 	}
@@ -493,7 +493,7 @@ func (a *DefaultAgent) RegisterTool(tool tools.Tool) error {
 
 // GetTool retrieves a specific tool by name from the agent's tool registry.
 // Returns nil if the tool is not found.
-func (a *DefaultAgent) GetTool(name string) interface{} {
+func (a *DefaultAgent) GetTool(name string) any {
 	a.toolsMu.RLock()
 	defer a.toolsMu.RUnlock()
 
@@ -502,11 +502,11 @@ func (a *DefaultAgent) GetTool(name string) interface{} {
 
 // GetTools returns a list of all available tools (built-in + custom)
 // This is used internally for prompt building and memory
-func (a *DefaultAgent) GetTools() []interface{} {
+func (a *DefaultAgent) GetTools() []any {
 	a.toolsMu.RLock()
 	defer a.toolsMu.RUnlock()
 
-	toolsList := make([]interface{}, 0, len(a.tools))
+	toolsList := make([]any, 0, len(a.tools))
 	for _, tool := range a.tools {
 		toolsList = append(toolsList, tool)
 	}
@@ -649,10 +649,7 @@ func (a *DefaultAgent) GetContextInfo() *ContextInfo {
 	freeTokens := 0
 	usagePercent := 0.0
 	if maxTokens > 0 {
-		freeTokens = maxTokens - currentTokens
-		if freeTokens < 0 {
-			freeTokens = 0
-		}
+		freeTokens = max(maxTokens-currentTokens, 0)
 		usagePercent = float64(currentTokens) / float64(maxTokens) * 100.0
 	}
 

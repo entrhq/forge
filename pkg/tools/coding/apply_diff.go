@@ -34,24 +34,24 @@ func (t *ApplyDiffTool) Description() string {
 }
 
 // Schema returns the JSON schema for the tool's input parameters.
-func (t *ApplyDiffTool) Schema() map[string]interface{} {
+func (t *ApplyDiffTool) Schema() map[string]any {
 	return tools.BaseToolSchema(
-		map[string]interface{}{
-			"path": map[string]interface{}{
+		map[string]any{
+			"path": map[string]any{
 				"type":        "string",
 				"description": "Path to the file to edit (relative to workspace)",
 			},
-			"edits": map[string]interface{}{
+			"edits": map[string]any{
 				"type":        "array",
 				"description": "List of search/replace operations to apply",
-				"items": map[string]interface{}{
+				"items": map[string]any{
 					"type": "object",
-					"properties": map[string]interface{}{
-						"search": map[string]interface{}{
+					"properties": map[string]any{
+						"search": map[string]any{
 							"type":        "string",
 							"description": "Exact text to search for (must match exactly including whitespace)",
 						},
-						"replace": map[string]interface{}{
+						"replace": map[string]any{
 							"type":        "string",
 							"description": "Text to replace the search text with",
 						},
@@ -67,7 +67,7 @@ func (t *ApplyDiffTool) Schema() map[string]interface{} {
 // Execute performs the search/replace operations and returns metadata about the changes.
 //
 //nolint:gocyclo // TODO: refactor to reduce complexity
-func (t *ApplyDiffTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
+func (t *ApplyDiffTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]any, error) {
 	var input struct {
 		XMLName xml.Name `xml:"arguments"`
 		Path    string   `xml:"path"`
@@ -152,7 +152,7 @@ func (t *ApplyDiffTool) Execute(ctx context.Context, argsXML []byte) (string, ma
 
 	// Write the modified content atomically
 	tmpPath := absPath + ".tmp"
-	if writeErr := os.WriteFile(tmpPath, []byte(fileContent), 0600); writeErr != nil {
+	if writeErr := os.WriteFile(tmpPath, []byte(fileContent), 0600); writeErr != nil { //nolint:gosec
 		return "", nil, fmt.Errorf("failed to write temporary file: %w", writeErr)
 	}
 
@@ -168,7 +168,7 @@ func (t *ApplyDiffTool) Execute(ctx context.Context, argsXML []byte) (string, ma
 	}
 
 	// Build metadata about the changes
-	metadata := map[string]interface{}{
+	metadata := map[string]any{
 		"edits_applied": appliedEdits,
 		"lines_added":   totalLinesAdded,
 		"lines_removed": totalLinesRemoved,
@@ -284,7 +284,7 @@ func (t *ApplyDiffTool) GeneratePreview(ctx context.Context, argsXML []byte) (*t
 		Title:       fmt.Sprintf("Apply %d edit(s) to %s", len(input.Edits), relPath),
 		Description: fmt.Sprintf("This will modify %s with %d search/replace operation(s)", relPath, len(input.Edits)),
 		Content:     diffContent,
-		Metadata: map[string]interface{}{
+		Metadata: map[string]any{
 			"file_path":  relPath,
 			"language":   language,
 			"edit_count": len(input.Edits),

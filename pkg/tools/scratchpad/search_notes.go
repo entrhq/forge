@@ -33,16 +33,16 @@ func (t *SearchNotesTool) Description() string {
 }
 
 // Schema returns the JSON schema for the tool's input parameters.
-func (t *SearchNotesTool) Schema() map[string]interface{} {
+func (t *SearchNotesTool) Schema() map[string]any {
 	return tools.BaseToolSchema(
-		map[string]interface{}{
-			"query": map[string]interface{}{
+		map[string]any{
+			"query": map[string]any{
 				"type":        "string",
 				"description": "Search query to match against note content (case-insensitive substring match)",
 			},
-			"tags": map[string]interface{}{
+			"tags": map[string]any{
 				"type": "array",
-				"items": map[string]interface{}{
+				"items": map[string]any{
 					"type": "string",
 				},
 				"description": "Filter by tags (AND logic - all tags must match)",
@@ -53,7 +53,7 @@ func (t *SearchNotesTool) Schema() map[string]interface{} {
 }
 
 // Execute searches for notes.
-func (t *SearchNotesTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
+func (t *SearchNotesTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]any, error) {
 	var input struct {
 		XMLName xml.Name `xml:"arguments"`
 		Query   string   `xml:"query"`
@@ -76,11 +76,11 @@ func (t *SearchNotesTool) Execute(ctx context.Context, argsXML []byte) (string, 
 	if len(results) == 0 {
 		message.WriteString("No notes found matching the search criteria.")
 	} else {
-		message.WriteString(fmt.Sprintf("Found %d note(s):\n\n", len(results)))
+		fmt.Fprintf(&message, "Found %d note(s):\n\n", len(results))
 		for i, note := range results {
-			message.WriteString(fmt.Sprintf("%d. [%s] (tags: %s)\n",
-				i+1, note.ID, strings.Join(note.Tags, ", ")))
-			message.WriteString(fmt.Sprintf("   %s\n", note.Content))
+			fmt.Fprintf(&message, "%d. [%s] (tags: %s)\n",
+				i+1, note.ID, strings.Join(note.Tags, ", "))
+			fmt.Fprintf(&message, "   %s\n", note.Content)
 			if note.Scratched {
 				message.WriteString("   [SCRATCHED]\n")
 			}
@@ -89,7 +89,7 @@ func (t *SearchNotesTool) Execute(ctx context.Context, argsXML []byte) (string, 
 	}
 
 	// Build metadata
-	metadata := map[string]interface{}{
+	metadata := map[string]any{
 		"result_count": len(results),
 		"query":        input.Query,
 		"tags":         input.Tags,

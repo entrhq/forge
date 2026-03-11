@@ -45,9 +45,9 @@ func TestNewFileStore(t *testing.T) {
 		configPath := filepath.Join(tempDir, "config.json")
 
 		// Create a config file
-		config := map[string]interface{}{
+		config := map[string]any{
 			"version": "1.0",
-			"sections": map[string]map[string]interface{}{
+			"sections": map[string]map[string]any{
 				"test_section": {
 					"key": "value",
 				},
@@ -82,9 +82,9 @@ func TestFileStore_Load(t *testing.T) {
 		configPath := filepath.Join(tempDir, "config.json")
 
 		// Create a config file
-		config := map[string]interface{}{
+		config := map[string]any{
 			"version": "1.0",
-			"sections": map[string]map[string]interface{}{
+			"sections": map[string]map[string]any{
 				"section1": {"key1": "value1"},
 				"section2": {"key2": "value2"},
 			},
@@ -152,7 +152,7 @@ func TestFileStore_Save(t *testing.T) {
 		store, _ := NewFileStore(configPath)
 
 		// Set some data
-		testData := map[string]interface{}{
+		testData := map[string]any{
 			"key1": "value1",
 			"key2": 42,
 		}
@@ -171,7 +171,7 @@ func TestFileStore_Save(t *testing.T) {
 			t.Fatalf("Failed to read saved config: %v", err)
 		}
 
-		var config map[string]interface{}
+		var config map[string]any
 		if err := json.Unmarshal(data, &config); err != nil {
 			t.Fatalf("Saved config is not valid JSON: %v", err)
 		}
@@ -181,12 +181,12 @@ func TestFileStore_Save(t *testing.T) {
 			t.Error("Version not saved correctly")
 		}
 
-		sections, ok := config["sections"].(map[string]interface{})
+		sections, ok := config["sections"].(map[string]any)
 		if !ok {
 			t.Fatal("Sections not saved correctly")
 		}
 
-		testSection, ok := sections["test_section"].(map[string]interface{})
+		testSection, ok := sections["test_section"].(map[string]any)
 		if !ok {
 			t.Fatal("Test section not found")
 		}
@@ -201,7 +201,7 @@ func TestFileStore_Save(t *testing.T) {
 		configPath := filepath.Join(tempDir, "nested", "dir", "config.json")
 
 		store, _ := NewFileStore(configPath)
-		store.SetSection("test", map[string]interface{}{"key": "value"})
+		store.SetSection("test", map[string]any{"key": "value"})
 
 		if err := store.Save(); err != nil {
 			t.Fatalf("Save should create nested directories: %v", err)
@@ -218,7 +218,7 @@ func TestFileStore_Save(t *testing.T) {
 		configPath := filepath.Join(tempDir, "config.json")
 
 		store, _ := NewFileStore(configPath)
-		store.SetSection("test", map[string]interface{}{"key": "value"})
+		store.SetSection("test", map[string]any{"key": "value"})
 
 		if !store.IsModified() {
 			t.Error("Store should be modified after SetSection")
@@ -237,7 +237,7 @@ func TestFileStore_Save(t *testing.T) {
 func TestFileStore_GetSection(t *testing.T) {
 	t.Run("returns existing section", func(t *testing.T) {
 		store := &FileStore{
-			data: map[string]map[string]interface{}{
+			data: map[string]map[string]any{
 				"test": {
 					"key1": "value1",
 					"key2": 42,
@@ -257,7 +257,7 @@ func TestFileStore_GetSection(t *testing.T) {
 
 	t.Run("returns empty map for non-existent section", func(t *testing.T) {
 		store := &FileStore{
-			data: make(map[string]map[string]interface{}),
+			data: make(map[string]map[string]any),
 		}
 
 		section, err := store.GetSection("nonexistent")
@@ -272,7 +272,7 @@ func TestFileStore_GetSection(t *testing.T) {
 
 	t.Run("returns copy to prevent external modification", func(t *testing.T) {
 		store := &FileStore{
-			data: map[string]map[string]interface{}{
+			data: map[string]map[string]any{
 				"test": {"key": "value"},
 			},
 		}
@@ -290,10 +290,10 @@ func TestFileStore_GetSection(t *testing.T) {
 func TestFileStore_SetSection(t *testing.T) {
 	t.Run("sets section data", func(t *testing.T) {
 		store := &FileStore{
-			data: make(map[string]map[string]interface{}),
+			data: make(map[string]map[string]any),
 		}
 
-		testData := map[string]interface{}{
+		testData := map[string]any{
 			"key1": "value1",
 			"key2": 42,
 		}
@@ -310,11 +310,11 @@ func TestFileStore_SetSection(t *testing.T) {
 
 	t.Run("sets modified flag", func(t *testing.T) {
 		store := &FileStore{
-			data:     make(map[string]map[string]interface{}),
+			data:     make(map[string]map[string]any),
 			modified: false,
 		}
 
-		store.SetSection("test", map[string]interface{}{"key": "value"})
+		store.SetSection("test", map[string]any{"key": "value"})
 
 		if !store.IsModified() {
 			t.Error("Modified flag should be set")
@@ -323,10 +323,10 @@ func TestFileStore_SetSection(t *testing.T) {
 
 	t.Run("stores copy to prevent external modification", func(t *testing.T) {
 		store := &FileStore{
-			data: make(map[string]map[string]interface{}),
+			data: make(map[string]map[string]any),
 		}
 
-		testData := map[string]interface{}{"key": "value"}
+		testData := map[string]any{"key": "value"}
 		store.SetSection("test", testData)
 
 		// Modify original
@@ -343,7 +343,7 @@ func TestFileStore_SetSection(t *testing.T) {
 func TestFileStore_GetAll(t *testing.T) {
 	t.Run("returns all sections", func(t *testing.T) {
 		store := &FileStore{
-			data: map[string]map[string]interface{}{
+			data: map[string]map[string]any{
 				"section1": {"key1": "value1"},
 				"section2": {"key2": "value2"},
 			},
@@ -368,7 +368,7 @@ func TestFileStore_GetAll(t *testing.T) {
 
 	t.Run("returns deep copy", func(t *testing.T) {
 		store := &FileStore{
-			data: map[string]map[string]interface{}{
+			data: map[string]map[string]any{
 				"test": {"key": "value"},
 			},
 		}
@@ -387,10 +387,10 @@ func TestFileStore_GetAll(t *testing.T) {
 func TestFileStore_SetAll(t *testing.T) {
 	t.Run("sets all sections", func(t *testing.T) {
 		store := &FileStore{
-			data: make(map[string]map[string]interface{}),
+			data: make(map[string]map[string]any),
 		}
 
-		allData := map[string]map[string]interface{}{
+		allData := map[string]map[string]any{
 			"section1": {"key1": "value1"},
 			"section2": {"key2": "value2"},
 		}
@@ -407,10 +407,10 @@ func TestFileStore_SetAll(t *testing.T) {
 
 	t.Run("stores deep copy", func(t *testing.T) {
 		store := &FileStore{
-			data: make(map[string]map[string]interface{}),
+			data: make(map[string]map[string]any),
 		}
 
-		allData := map[string]map[string]interface{}{
+		allData := map[string]map[string]any{
 			"test": {"key": "value"},
 		}
 

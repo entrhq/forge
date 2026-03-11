@@ -2,6 +2,7 @@ package headless
 
 import (
 	"fmt"
+	"slices"
 	"time"
 )
 
@@ -178,13 +179,7 @@ func (c *ConstraintConfig) ShouldRegisterTool(toolName string) bool {
 	}
 
 	// Check if tool is in allowed list
-	for _, allowed := range c.AllowedTools {
-		if allowed == toolName {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(c.AllowedTools, toolName)
 }
 
 // DefaultConfig returns a default configuration suitable for most use cases

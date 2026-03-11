@@ -51,7 +51,7 @@ func TestFormatInjection_HasWrapperTags(t *testing.T) {
 func TestFormatInjection_TokenBudgetTruncates(t *testing.T) {
 	// Build enough memories to exceed a small budget.
 	memories := make([]*longtermmemory.MemoryFile, 0, 20)
-	for i := 0; i < 20; i++ {
+	for range 20 {
 		memories = append(memories, makeMemoryFile("id", strings.Repeat("word ", 50), ""))
 	}
 

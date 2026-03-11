@@ -17,7 +17,7 @@ const (
 type Message struct {
 	// Metadata holds optional additional information about the message.
 	// This can be used to store execution context, debugging info, etc.
-	Metadata map[string]interface{}
+	Metadata map[string]any
 
 	// Content is the text content of the message.
 	Content string
@@ -35,7 +35,7 @@ func NewMessage(role MessageRole, content string) *Message {
 		Role:      role,
 		Content:   content,
 		Timestamp: time.Now(),
-		Metadata:  make(map[string]interface{}),
+		Metadata:  make(map[string]any),
 	}
 }
 
@@ -60,9 +60,9 @@ func NewToolMessage(content string) *Message {
 }
 
 // WithMetadata adds metadata to the message and returns the message for chaining.
-func (m *Message) WithMetadata(key string, value interface{}) *Message {
+func (m *Message) WithMetadata(key string, value any) *Message {
 	if m.Metadata == nil {
-		m.Metadata = make(map[string]interface{})
+		m.Metadata = make(map[string]any)
 	}
 	m.Metadata[key] = value
 	return m

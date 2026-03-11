@@ -43,18 +43,18 @@ func (t *RunCustomToolTool) Description() string {
 	return "Execute a custom tool from ~/.forge/tools/. Discovers available tools, converts arguments to CLI flags, and executes the tool binary."
 }
 
-func (t *RunCustomToolTool) Schema() map[string]interface{} {
+func (t *RunCustomToolTool) Schema() map[string]any {
 	return tools.BaseToolSchema(
-		map[string]interface{}{
-			"tool_name": map[string]interface{}{
+		map[string]any{
+			"tool_name": map[string]any{
 				"type":        "string",
 				"description": "Name of the custom tool to execute (must exist in ~/.forge/tools/)",
 			},
-			"arguments": map[string]interface{}{
+			"arguments": map[string]any{
 				"type":        "object",
 				"description": "Tool-specific arguments as direct XML elements (not nested). Each becomes a CLI flag (e.g., <count>20</count> → --count=20)",
 			},
-			"timeout": map[string]interface{}{
+			"timeout": map[string]any{
 				"type":        "number",
 				"description": "Execution timeout in seconds (default: 30)",
 			},
@@ -63,7 +63,7 @@ func (t *RunCustomToolTool) Schema() map[string]interface{} {
 	)
 }
 
-func (t *RunCustomToolTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
+func (t *RunCustomToolTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]any, error) {
 	var input runCustomToolInput
 	if err := tools.UnmarshalXMLWithFallback(argsXML, &input); err != nil {
 		return "", nil, fmt.Errorf("invalid arguments: %w", err)
@@ -168,26 +168,26 @@ func (t *RunCustomToolTool) GeneratePreview(ctx context.Context, argsXML []byte)
 
 	// Build preview content
 	var content strings.Builder
-	content.WriteString(fmt.Sprintf("Binary: %s\n", binaryPath))
+	fmt.Fprintf(&content, "Binary: %s\n", binaryPath)
 	if len(args) > 0 {
 		content.WriteString("Arguments:\n")
 		for key, value := range args {
-			content.WriteString(fmt.Sprintf("  --%s=%v\n", key, value))
+			fmt.Fprintf(&content, "  --%s=%v\n", key, value)
 		}
 	}
 	timeout := 30.0
 	if input.Timeout > 0 {
 		timeout = input.Timeout
 	}
-	content.WriteString(fmt.Sprintf("Timeout: %.0f seconds\n", timeout))
-	content.WriteString(fmt.Sprintf("Working directory: %s", t.guard.WorkspaceDir()))
+	fmt.Fprintf(&content, "Timeout: %.0f seconds\n", timeout)
+	fmt.Fprintf(&content, "Working directory: %s", t.guard.WorkspaceDir())
 
 	return &tools.ToolPreview{
 		Type:        tools.PreviewTypeCommand,
 		Title:       fmt.Sprintf("Execute custom tool: %s", input.ToolName),
 		Description: fmt.Sprintf("Run custom tool binary from ~/.forge/tools/%s/", input.ToolName),
 		Content:     content.String(),
-		Metadata: map[string]interface{}{
+		Metadata: map[string]any{
 			"tool_name":   input.ToolName,
 			"binary_path": binaryPath,
 			"timeout":     timeout,
@@ -225,9 +225,9 @@ type runCustomToolInput struct {
 
 // parseCustomToolArguments extracts custom tool parameters from the inner XML
 // It looks for elements that are not tool_name or timeout and converts them to a map
-func parseCustomToolArguments(innerXML []byte) (map[string]interface{}, error) {
+func parseCustomToolArguments(innerXML []byte) (map[string]any, error) {
 	if len(innerXML) == 0 {
-		return make(map[string]interface{}), nil
+		return make(map[string]any), nil
 	}
 
 	// Parse the inner XML as a generic structure
@@ -240,7 +240,7 @@ func parseCustomToolArguments(innerXML []byte) (map[string]interface{}, error) {
 	wrapped := fmt.Sprintf("<container>%s</container>", string(innerXML))
 
 	decoder := xml.NewDecoder(strings.NewReader(wrapped))
-	args := make(map[string]interface{})
+	args := make(map[string]any)
 
 	var current xmlElement
 	for {

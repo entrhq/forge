@@ -2,6 +2,7 @@ package notes
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -170,12 +171,7 @@ func (n *Note) Unscratched() {
 // HasTag checks if the note has a specific tag (case-insensitive)
 func (n *Note) HasTag(tag string) bool {
 	normalized := strings.ToLower(strings.TrimSpace(tag))
-	for _, t := range n.Tags {
-		if t == normalized {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(n.Tags, normalized)
 }
 
 // MatchesAllTags checks if the note has all specified tags (case-insensitive, AND logic)

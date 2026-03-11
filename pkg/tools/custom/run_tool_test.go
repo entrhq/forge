@@ -12,14 +12,14 @@ func TestParseCustomToolArguments(t *testing.T) {
 		name     string
 		innerXML string
 		toolName string
-		want     map[string]interface{}
+		want     map[string]any
 		wantErr  bool
 	}{
 		{
 			name:     "empty xml",
 			innerXML: "",
 			toolName: "test-tool",
-			want:     map[string]interface{}{},
+			want:     map[string]any{},
 			wantErr:  false,
 		},
 		{
@@ -27,7 +27,7 @@ func TestParseCustomToolArguments(t *testing.T) {
 			innerXML: `<tool_name>recent-commits</tool_name>
 			<format>oneline</format>`,
 			toolName: "recent-commits",
-			want: map[string]interface{}{
+			want: map[string]any{
 				"format": "oneline",
 			},
 			wantErr: false,
@@ -37,7 +37,7 @@ func TestParseCustomToolArguments(t *testing.T) {
 			innerXML: `<tool_name>recent-commits</tool_name>
 			<count>20</count>`,
 			toolName: "recent-commits",
-			want: map[string]interface{}{
+			want: map[string]any{
 				"count": int64(20),
 			},
 			wantErr: false,
@@ -49,7 +49,7 @@ func TestParseCustomToolArguments(t *testing.T) {
 			<format>full</format>
 			<timeout>60</timeout>`,
 			toolName: "recent-commits",
-			want: map[string]interface{}{
+			want: map[string]any{
 				"count":  int64(15),
 				"format": "full",
 			},
@@ -60,7 +60,7 @@ func TestParseCustomToolArguments(t *testing.T) {
 			innerXML: `<tool_name>test-tool</tool_name>
 			<verbose>true</verbose>`,
 			toolName: "test-tool",
-			want: map[string]interface{}{
+			want: map[string]any{
 				"verbose": true,
 			},
 			wantErr: false,
@@ -70,7 +70,7 @@ func TestParseCustomToolArguments(t *testing.T) {
 			innerXML: `<tool_name>test-tool</tool_name>
 			<threshold>3.14</threshold>`,
 			toolName: "test-tool",
-			want: map[string]interface{}{
+			want: map[string]any{
 				"threshold": 3.14,
 			},
 			wantErr: false,

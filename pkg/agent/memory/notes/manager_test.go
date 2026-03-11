@@ -447,7 +447,7 @@ func TestManagerConcurrency(t *testing.T) {
 
 	// Test concurrent adds
 	done := make(chan bool)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		go func(n int) {
 			// Add a small sleep to ensure unique nanosecond timestamps
 			time.Sleep(time.Microsecond * time.Duration(n*10))
@@ -459,7 +459,7 @@ func TestManagerConcurrency(t *testing.T) {
 		}(i)
 	}
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		<-done
 	}
 

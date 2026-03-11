@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/xml"
 	"fmt"
+	"strings"
 )
 
 const askQuestionToolName = "ask_question"
@@ -31,17 +32,17 @@ func (t *AskQuestionTool) Description() string {
 }
 
 // Schema returns the JSON schema for the tool's arguments
-func (t *AskQuestionTool) Schema() map[string]interface{} {
+func (t *AskQuestionTool) Schema() map[string]any {
 	return BaseToolSchema(
-		map[string]interface{}{
-			"question": map[string]interface{}{
+		map[string]any{
+			"question": map[string]any{
 				"type":        "string",
 				"description": "A clear, specific question asking for the information needed to proceed with the task.",
 			},
-			"suggestions": map[string]interface{}{
+			"suggestions": map[string]any{
 				"type":        "array",
 				"description": "Optional list of 2-4 suggested answers to help the user respond quickly.",
-				"items": map[string]interface{}{
+				"items": map[string]any{
 					"type": "string",
 				},
 				"minItems": 0,
@@ -53,7 +54,7 @@ func (t *AskQuestionTool) Schema() map[string]interface{} {
 }
 
 // Execute runs the tool and returns the question for the user
-func (t *AskQuestionTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
+func (t *AskQuestionTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]any, error) {
 	var args struct {
 		XMLName     xml.Name `xml:"arguments"`
 		Question    string   `xml:"question"`
@@ -69,15 +70,16 @@ func (t *AskQuestionTool) Execute(ctx context.Context, argsXML []byte) (string, 
 	}
 
 	// Format the question with suggestions if provided
-	result := args.Question
+	var result strings.Builder
+	result.WriteString(args.Question)
 	if len(args.Suggestions) > 0 {
-		result += "\n\nSuggested answers:"
+		result.WriteString("\n\nSuggested answers:")
 		for i, suggestion := range args.Suggestions {
-			result += fmt.Sprintf("\n%d. %s", i+1, suggestion)
+			fmt.Fprintf(&result, "\n%d. %s", i+1, suggestion)
 		}
 	}
 
-	return result, nil, nil
+	return result.String(), nil, nil
 }
 
 // IsLoopBreaking returns true because this tool terminates the agent loop

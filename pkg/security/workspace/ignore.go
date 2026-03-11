@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -237,10 +238,8 @@ func (m *IgnoreMatcher) matchSimple(path, pattern string) bool {
 	parts := strings.Split(path, "/")
 
 	// Check if the pattern matches any full path component. This handles "node_modules" in "a/node_modules/b"
-	for _, part := range parts {
-		if part == pattern {
-			return true
-		}
+	if slices.Contains(parts, pattern) {
+		return true
 	}
 
 	// Check if pattern matches a subpath from the root. e.g. pattern "a/b" in "a/b/c"

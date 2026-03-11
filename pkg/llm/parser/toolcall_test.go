@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -32,18 +33,18 @@ func TestToolCallParser_StreamedToolCall(t *testing.T) {
 		"</tool>", // Closing tag
 	}
 
-	var toolCallContent string
+	var toolCallContent strings.Builder
 
 	for _, chunk := range chunks {
 		toolCall, _ := parser.Parse(chunk)
 
 		if toolCall != nil {
-			toolCallContent += toolCall.Content
+			toolCallContent.WriteString(toolCall.Content)
 		}
 	}
 
-	if toolCallContent != "data" {
-		t.Errorf("Expected 'data', got '%s'", toolCallContent)
+	if toolCallContent.String() != "data" {
+		t.Errorf("Expected 'data', got '%s'", toolCallContent.String())
 	}
 }
 
@@ -289,7 +290,7 @@ func TestToolCallParser_StreamedContentAccumulation(t *testing.T) {
 		"and more",
 	}
 
-	var regularContent string
+	var regularContent strings.Builder
 
 	for _, chunk := range chunks {
 		toolCall, regular := parser.Parse(chunk)
@@ -299,18 +300,18 @@ func TestToolCallParser_StreamedContentAccumulation(t *testing.T) {
 		}
 
 		if regular != nil {
-			regularContent += regular.Content
+			regularContent.WriteString(regular.Content)
 		}
 	}
 
 	// Flush remaining
 	_, regular := parser.Flush()
 	if regular != nil {
-		regularContent += regular.Content
+		regularContent.WriteString(regular.Content)
 	}
 
 	expected := "Regular text continues here and more"
-	if regularContent != expected {
-		t.Errorf("Expected '%s', got '%s'", expected, regularContent)
+	if regularContent.String() != expected {
+		t.Errorf("Expected '%s', got '%s'", expected, regularContent.String())
 	}
 }

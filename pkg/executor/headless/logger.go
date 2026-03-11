@@ -92,7 +92,7 @@ func (l *Logger) Step(message string) {
 }
 
 // Successf prints a success message with checkmark
-func (l *Logger) Successf(format string, args ...interface{}) {
+func (l *Logger) Successf(format string, args ...any) {
 	if l.level >= LogLevelNormal {
 		msg := fmt.Sprintf(format, args...)
 		fmt.Fprintf(l.writer, "%s✓ %s%s\n", l.colorBoldGreen, msg, l.colorReset)
@@ -100,7 +100,7 @@ func (l *Logger) Successf(format string, args ...interface{}) {
 }
 
 // Infof prints an informational message
-func (l *Logger) Infof(format string, args ...interface{}) {
+func (l *Logger) Infof(format string, args ...any) {
 	if l.level >= LogLevelNormal {
 		msg := fmt.Sprintf(format, args...)
 		fmt.Fprintf(l.writer, "%s%s%s\n", l.colorSalmon, msg, l.colorReset)
@@ -108,7 +108,7 @@ func (l *Logger) Infof(format string, args ...interface{}) {
 }
 
 // Warningf prints a warning message
-func (l *Logger) Warningf(format string, args ...interface{}) {
+func (l *Logger) Warningf(format string, args ...any) {
 	if l.level >= LogLevelQuiet {
 		msg := fmt.Sprintf(format, args...)
 		fmt.Fprintf(l.writer, "%s⚠ Warning: %s%s\n", l.colorYellow, msg, l.colorReset)
@@ -116,7 +116,7 @@ func (l *Logger) Warningf(format string, args ...interface{}) {
 }
 
 // Errorf prints an error message
-func (l *Logger) Errorf(format string, args ...interface{}) {
+func (l *Logger) Errorf(format string, args ...any) {
 	if l.level >= LogLevelQuiet {
 		msg := fmt.Sprintf(format, args...)
 		fmt.Fprintf(l.writer, "%s✗ Error: %s%s\n", l.colorBoldRed, msg, l.colorReset)
@@ -124,7 +124,7 @@ func (l *Logger) Errorf(format string, args ...interface{}) {
 }
 
 // Verbosef prints detailed information (only in verbose mode)
-func (l *Logger) Verbosef(format string, args ...interface{}) {
+func (l *Logger) Verbosef(format string, args ...any) {
 	if l.level >= LogLevelVerbose {
 		msg := fmt.Sprintf(format, args...)
 		fmt.Fprintf(l.writer, "%s→ %s%s\n", l.colorGray, msg, l.colorReset)
@@ -132,7 +132,7 @@ func (l *Logger) Verbosef(format string, args ...interface{}) {
 }
 
 // Debugf prints debug information (only in debug mode)
-func (l *Logger) Debugf(format string, args ...interface{}) {
+func (l *Logger) Debugf(format string, args ...any) {
 	if l.level >= LogLevelDebug {
 		msg := fmt.Sprintf(format, args...)
 		fmt.Fprintf(l.writer, "%s[DEBUG] %s%s\n", l.colorGray, msg, l.colorReset)

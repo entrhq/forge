@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/entrhq/forge/pkg/agent"
@@ -283,7 +284,7 @@ func (e *Executor) Run(ctx context.Context) error {
 								e.retryPhaseActive = true
 								// Cancel the original timeout and create a new one for retries
 								cancel()
-								execCtx, retryCancel = context.WithTimeout(ctx, e.config.QualityGateRetryTimeout)
+								execCtx, retryCancel = context.WithTimeout(ctx, e.config.QualityGateRetryTimeout) //nolint:gosec
 								e.logger.Infof("→ Extended timeout for quality gate retries: %v", e.config.QualityGateRetryTimeout)
 							}
 
@@ -614,19 +615,19 @@ func (e *Executor) formatToolCall(event *types.AgentEvent) string {
 	}
 
 	// Build a compact parameter summary
-	params := ""
+	var params strings.Builder
 	count := 0
 	for key := range event.ToolInput {
 		if count > 0 {
-			params += ", "
+			params.WriteString(", ")
 		}
-		params += key
+		params.WriteString(key)
 		count++
 		if count >= 3 {
-			params += ", ..."
+			params.WriteString(", ...")
 			break
 		}
 	}
 
-	return fmt.Sprintf("%s(%s)", event.ToolName, params)
+	return fmt.Sprintf("%s(%s)", event.ToolName, params.String())
 }

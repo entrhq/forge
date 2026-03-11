@@ -40,22 +40,22 @@ func (t *AnalyzeDocumentTool) Description() string {
 }
 
 // Schema returns the JSON schema for this tool's parameters.
-func (t *AnalyzeDocumentTool) Schema() map[string]interface{} {
+func (t *AnalyzeDocumentTool) Schema() map[string]any {
 	return tools.BaseToolSchema(
-		map[string]interface{}{
-			"path": map[string]interface{}{
+		map[string]any{
+			"path": map[string]any{
 				"type":        "string",
 				"description": "Path to the document file (relative to workspace). Supported formats: .png, .jpg, .jpeg, .pdf",
 			},
-			"page_start": map[string]interface{}{
+			"page_start": map[string]any{
 				"type":        "integer",
 				"description": "Optional: Starting page number for PDF analysis (1-based). Use 0 or omit for all pages (up to pdf_page_limit).",
 			},
-			"page_end": map[string]interface{}{
+			"page_end": map[string]any{
 				"type":        "integer",
 				"description": "Optional: Ending page number for PDF analysis (1-based, inclusive). Use 0 or omit to analyze from page_start to end (up to pdf_page_limit).",
 			},
-			"prompt": map[string]interface{}{
+			"prompt": map[string]any{
 				"type":        "string",
 				"description": "Optional: Specific analysis instructions or questions about the document",
 			},
@@ -74,7 +74,7 @@ type analyzeDocumentInput struct {
 }
 
 // Execute analyzes the document using LLM vision.
-func (t *AnalyzeDocumentTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
+func (t *AnalyzeDocumentTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]any, error) {
 	// Check if LLM provider is available
 	if t.provider == nil {
 		return "", nil, fmt.Errorf("LLM provider not available")
@@ -124,7 +124,7 @@ func (t *AnalyzeDocumentTool) Execute(ctx context.Context, argsXML []byte) (stri
 }
 
 // analyzeImage analyzes a PNG or JPG image.
-func (t *AnalyzeDocumentTool) analyzeImage(ctx context.Context, absPath, relPath, userPrompt string) (string, map[string]interface{}, error) {
+func (t *AnalyzeDocumentTool) analyzeImage(ctx context.Context, absPath, relPath, userPrompt string) (string, map[string]any, error) {
 	// Read image file
 	imageData, err := os.ReadFile(absPath)
 	if err != nil {
@@ -161,7 +161,7 @@ Path: %s
 
 %s`, ext, relPath, analysisResult)
 
-	metadata := map[string]interface{}{
+	metadata := map[string]any{
 		"path":          relPath,
 		"document_type": "image",
 		"format":        ext,
@@ -171,7 +171,7 @@ Path: %s
 }
 
 // analyzePDF analyzes a PDF document with optional page range.
-func (t *AnalyzeDocumentTool) analyzePDF(ctx context.Context, absPath, relPath string, pageStart, pageEnd int, userPrompt string) (string, map[string]interface{}, error) {
+func (t *AnalyzeDocumentTool) analyzePDF(ctx context.Context, absPath, relPath string, pageStart, pageEnd int, userPrompt string) (string, map[string]any, error) {
 	// Get PDF page count
 	pageCount, err := api.PageCountFile(absPath)
 	if err != nil {
@@ -244,7 +244,7 @@ Analyzed: Pages %d-%d (%d pages remaining)
 
 %s`, relPath, pageCount, actualStart, actualEnd, pagesRemaining, analysisResult)
 
-	metadata := map[string]interface{}{
+	metadata := map[string]any{
 		"path":            relPath,
 		"document_type":   "pdf",
 		"total_pages":     pageCount,
@@ -390,16 +390,16 @@ func buildPDFAnalysisPrompt(path string, totalPages, startPage, endPage, analyze
 	prompt.WriteString("You are analyzing a PDF document for an AI coding agent. Your analysis will be used by the agent to understand the document's content, structure, and purpose. Provide dense, structured information optimized for machine processing.\n\n")
 
 	prompt.WriteString("DOCUMENT CONTEXT:\n")
-	prompt.WriteString(fmt.Sprintf("- Path: %s\n", path))
-	prompt.WriteString(fmt.Sprintf("- Total Pages: %d\n", totalPages))
-	prompt.WriteString(fmt.Sprintf("- Current Analysis Scope: Pages %d-%d (%d pages)\n", startPage, endPage, analyzed))
+	fmt.Fprintf(&prompt, "- Path: %s\n", path)
+	fmt.Fprintf(&prompt, "- Total Pages: %d\n", totalPages)
+	fmt.Fprintf(&prompt, "- Current Analysis Scope: Pages %d-%d (%d pages)\n", startPage, endPage, analyzed)
 	if remaining > 0 {
-		prompt.WriteString(fmt.Sprintf("- Remaining Unanalyzed: %d pages\n", remaining))
+		fmt.Fprintf(&prompt, "- Remaining Unanalyzed: %d pages\n", remaining)
 	}
 	prompt.WriteString("\n")
 
 	if userPrompt != "" {
-		prompt.WriteString(fmt.Sprintf("AGENT QUERY: %s\n\n", userPrompt))
+		fmt.Fprintf(&prompt, "AGENT QUERY: %s\n\n", userPrompt)
 		prompt.WriteString("Address the agent's query within the structured analysis below.\n\n")
 	}
 
@@ -454,7 +454,7 @@ func buildPDFAnalysisPrompt(path string, totalPages, startPage, endPage, analyze
 
 	if remaining > 0 {
 		fmt.Fprintf(&prompt, "9. CONTINUATION CONTEXT\n")
-		prompt.WriteString(fmt.Sprintf("   - %d pages remain unanalyzed (pages %d-%d)\n", remaining, endPage+1, totalPages))
+		fmt.Fprintf(&prompt, "   - %d pages remain unanalyzed (pages %d-%d)\n", remaining, endPage+1, totalPages)
 		prompt.WriteString("   - Note any topics that appear to continue beyond the analyzed range\n")
 		prompt.WriteString("   - Suggest whether additional pages would provide valuable context\n\n")
 	}

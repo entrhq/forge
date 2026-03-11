@@ -342,7 +342,7 @@ func GenerateASCIIArt(text string) string {
 			continue
 		}
 
-		for i := 0; i < 6; i++ {
+		for i := range 6 {
 			lines[i].WriteString(charLines[i])
 		}
 	}
@@ -350,7 +350,7 @@ func GenerateASCIIArt(text string) string {
 	// Join all lines with newlines and add indentation
 	var result strings.Builder
 	result.WriteString("\n")
-	for i := 0; i < 6; i++ {
+	for i := range 6 {
 		result.WriteString("\t")
 		result.WriteString(lines[i].String())
 		if i < 5 {

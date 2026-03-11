@@ -17,7 +17,7 @@ const (
 // AgentError represents a structured error from the agent framework.
 type AgentError struct {
 	// Metadata holds optional additional context about the error.
-	Metadata map[string]interface{}
+	Metadata map[string]any
 
 	// Message provides a human-readable description of the error.
 	Message string
@@ -43,9 +43,9 @@ func (e *AgentError) Unwrap() error {
 }
 
 // WithMetadata adds metadata to the error and returns the error for chaining.
-func (e *AgentError) WithMetadata(key string, value interface{}) *AgentError {
+func (e *AgentError) WithMetadata(key string, value any) *AgentError {
 	if e.Metadata == nil {
-		e.Metadata = make(map[string]interface{})
+		e.Metadata = make(map[string]any)
 	}
 	e.Metadata[key] = value
 	return e
@@ -56,7 +56,7 @@ func NewAgentError(code ErrorCode, message string) *AgentError {
 	return &AgentError{
 		Code:     code,
 		Message:  message,
-		Metadata: make(map[string]interface{}),
+		Metadata: make(map[string]any),
 	}
 }
 
@@ -66,7 +66,7 @@ func NewAgentErrorWithCause(code ErrorCode, message string, cause error) *AgentE
 		Code:     code,
 		Message:  message,
 		Cause:    cause,
-		Metadata: make(map[string]interface{}),
+		Metadata: make(map[string]any),
 	}
 }
 

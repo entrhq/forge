@@ -37,15 +37,15 @@ func (t *AnalyzePageTool) Description() string {
 }
 
 // Schema returns the JSON schema for this tool's parameters.
-func (t *AnalyzePageTool) Schema() map[string]interface{} {
-	return map[string]interface{}{
+func (t *AnalyzePageTool) Schema() map[string]any {
+	return map[string]any{
 		"type": "object",
-		"properties": map[string]interface{}{
-			"session": map[string]interface{}{
+		"properties": map[string]any{
+			"session": map[string]any{
 				"type":        "string",
 				"description": "Name of the browser session to analyze",
 			},
-			"focus": map[string]interface{}{
+			"focus": map[string]any{
 				"type":        "string",
 				"description": "Optional: What to focus on in the analysis (e.g., 'forms', 'navigation', 'data extraction')",
 			},
@@ -62,7 +62,7 @@ type analyzePageInput struct {
 }
 
 // Execute analyzes the current page using LLM.
-func (t *AnalyzePageTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
+func (t *AnalyzePageTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]any, error) {
 	// Check if LLM provider is available first
 	if t.provider == nil {
 		return "", nil, fmt.Errorf("LLM provider not available")
@@ -131,11 +131,11 @@ func buildAnalysisPrompt(url, title, htmlContent, focus string) string {
 	var prompt strings.Builder
 
 	prompt.WriteString("Analyze the following web page and provide a structured summary. The content is cleaned HTML that preserves semantic structure and key targeting attributes.\n\n")
-	prompt.WriteString(fmt.Sprintf("URL: %s\n", url))
-	prompt.WriteString(fmt.Sprintf("Title: %s\n\n", title))
+	fmt.Fprintf(&prompt, "URL: %s\n", url)
+	fmt.Fprintf(&prompt, "Title: %s\n\n", title)
 
 	if focus != "" {
-		prompt.WriteString(fmt.Sprintf("Analysis Focus: %s\n\n", focus))
+		fmt.Fprintf(&prompt, "Analysis Focus: %s\n\n", focus)
 	}
 
 	prompt.WriteString("Page HTML (cleaned, with semantic structure and targeting attributes):\n")
@@ -151,7 +151,7 @@ func buildAnalysisPrompt(url, title, htmlContent, focus string) string {
 	prompt.WriteString("5. INTERACTION OPPORTUNITIES: Identify key actions the user can take (navigation, form submission, clicking elements) with specific selectors\n\n")
 
 	if focus != "" {
-		prompt.WriteString(fmt.Sprintf("Focus your analysis on: %s\n\n", focus))
+		fmt.Fprintf(&prompt, "Focus your analysis on: %s\n\n", focus)
 	}
 
 	prompt.WriteString("Keep the analysis concise and actionable. Include specific selectors for targeting elements. Format as plain text with clear section headers.")
@@ -186,7 +186,7 @@ func (t *AnalyzePageTool) GeneratePreview(ctx context.Context, argsXML []byte) (
 		Title:       "Analyze Page with AI",
 		Description: description,
 		Content:     content,
-		Metadata: map[string]interface{}{
+		Metadata: map[string]any{
 			"session": input.Session,
 			"focus":   input.Focus,
 		},

@@ -302,10 +302,7 @@ func (m *model) handleWindowResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 	m.width = msg.Width
 	m.height = msg.Height
 
-	maxInputLines := m.height / 3
-	if maxInputLines < 1 {
-		maxInputLines = 1
-	}
+	maxInputLines := max(m.height/3, 1)
 	m.textarea.MaxHeight = maxInputLines
 
 	m.textarea.SetWidth(m.width - textareaHorizontalPadding - promptWidth)

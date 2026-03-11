@@ -153,7 +153,7 @@ func TestGoalBatchCompactionStrategy_ShouldRun_BelowMinTurns(t *testing.T) {
 	conv.Add(newSummarizedMsg("[SUMMARIZED] did goal 2"))
 
 	// Push into eligible window
-	for i := 0; i < 6; i++ {
+	for range 6 {
 		conv.Add(types.NewAssistantMessage("recent"))
 	}
 
@@ -164,11 +164,11 @@ func TestGoalBatchCompactionStrategy_ShouldRun_MeetsThreshold(t *testing.T) {
 	s := NewGoalBatchCompactionStrategy(5, 3, 6)
 	conv := memory.NewConversationMemory()
 
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		conv.Add(types.NewUserMessage("goal"))
 		conv.Add(newSummarizedMsg("[SUMMARIZED] done"))
 	}
-	for i := 0; i < 6; i++ {
+	for range 6 {
 		conv.Add(types.NewAssistantMessage("recent"))
 	}
 
@@ -189,7 +189,7 @@ func TestGoalBatchCompactionStrategy_Summarize_ReplacesWithGoalBatch(t *testing.
 	conv.Add(newSummarizedMsg("[SUMMARIZED] I added ValidateConfig, tests pass"))
 
 	// Recent messages to push old content into eligible window
-	for i := 0; i < 6; i++ {
+	for range 6 {
 		conv.Add(types.NewAssistantMessage("recent"))
 	}
 
@@ -231,7 +231,7 @@ func TestGoalBatchCompactionStrategy_Summarize_PreservesRecentMessages(t *testin
 	conv.Add(newSummarizedMsg("[SUMMARIZED] done 2"))
 
 	recentContent := "this is recent work"
-	for i := 0; i < 6; i++ {
+	for range 6 {
 		conv.Add(types.NewAssistantMessage(recentContent))
 	}
 
@@ -259,11 +259,11 @@ func TestGoalBatchCompactionStrategy_Summarize_RespectsMaxTurnsPerBatch(t *testi
 	s := NewGoalBatchCompactionStrategy(5, 2, 2)
 	conv := memory.NewConversationMemory()
 
-	for i := 0; i < 4; i++ {
+	for range 4 {
 		conv.Add(types.NewUserMessage("goal"))
 		conv.Add(newSummarizedMsg("[SUMMARIZED] done"))
 	}
-	for i := 0; i < 6; i++ {
+	for range 6 {
 		conv.Add(types.NewAssistantMessage("recent"))
 	}
 
@@ -289,7 +289,7 @@ func TestGoalBatchCompactionStrategy_Summarize_PreservesGoalBatchBlocks(t *testi
 	conv.Add(types.NewUserMessage("new goal 2"))
 	conv.Add(newSummarizedMsg("[SUMMARIZED] done 2"))
 
-	for i := 0; i < 6; i++ {
+	for range 6 {
 		conv.Add(types.NewAssistantMessage("recent"))
 	}
 

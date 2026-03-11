@@ -65,24 +65,24 @@ func (s *CommandWhitelistSection) Description() string {
 }
 
 // Data returns the current configuration data.
-func (s *CommandWhitelistSection) Data() map[string]interface{} {
+func (s *CommandWhitelistSection) Data() map[string]any {
 	// Convert patterns to interface{} slice
-	patternsData := make([]interface{}, len(s.patterns))
+	patternsData := make([]any, len(s.patterns))
 	for i, p := range s.patterns {
-		patternsData[i] = map[string]interface{}{
+		patternsData[i] = map[string]any{
 			"pattern":     p.Pattern,
 			"description": p.Description,
 			"type":        p.Type,
 		}
 	}
 
-	return map[string]interface{}{
+	return map[string]any{
 		"patterns": patternsData,
 	}
 }
 
 // SetData updates the configuration from the provided data.
-func (s *CommandWhitelistSection) SetData(data map[string]interface{}) error {
+func (s *CommandWhitelistSection) SetData(data map[string]any) error {
 	if data == nil {
 		return nil
 	}
@@ -92,14 +92,14 @@ func (s *CommandWhitelistSection) SetData(data map[string]interface{}) error {
 		return nil // No patterns key, keep defaults
 	}
 
-	patternsSlice, ok := patternsData.([]interface{})
+	patternsSlice, ok := patternsData.([]any)
 	if !ok {
 		return fmt.Errorf("invalid patterns type: expected []interface{}, got %T", patternsData)
 	}
 
 	patterns := make([]WhitelistPattern, 0, len(patternsSlice))
 	for i, item := range patternsSlice {
-		patternMap, ok := item.(map[string]interface{})
+		patternMap, ok := item.(map[string]any)
 		if !ok {
 			return fmt.Errorf("invalid pattern at index %d: expected map, got %T", i, item)
 		}

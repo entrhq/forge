@@ -33,7 +33,7 @@ func TestEvaluateTool_Schema(t *testing.T) {
 	assert.NotNil(t, schema)
 	assert.Contains(t, schema, "properties")
 
-	props := schema["properties"].(map[string]interface{})
+	props := schema["properties"].(map[string]any)
 	assert.Contains(t, props, "session")
 	assert.Contains(t, props, "code")
 	assert.Contains(t, props, "timeout")

@@ -114,7 +114,7 @@ func TestVectorMap_ConcurrentAccess(t *testing.T) {
 	var wg sync.WaitGroup
 	query := Normalise([]float32{1, 0})
 
-	for i := 0; i < 20; i++ {
+	for range 20 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -123,7 +123,7 @@ func TestVectorMap_ConcurrentAccess(t *testing.T) {
 			vm.Len()
 		}()
 	}
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()

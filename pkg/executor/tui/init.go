@@ -86,7 +86,6 @@ func loadShowThinkingSetting() bool {
 func (m *model) Init() tea.Cmd {
 	cmds := []tea.Cmd{textarea.Blink, m.spinner.Tick}
 	for _, w := range m.startupWarnings {
-		w := w // capture loop variable
 		cmds = append(cmds, func() tea.Msg { return w })
 	}
 	return tea.Batch(cmds...)

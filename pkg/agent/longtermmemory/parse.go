@@ -16,13 +16,13 @@ func Parse(raw []byte) (*MemoryFile, error) {
 		return nil, fmt.Errorf("longtermmemory: missing front-matter delimiter")
 	}
 	rest := s[len(frontMatterDelimiter):]
-	idx := strings.Index(rest, "\n"+frontMatterDelimiter)
-	if idx == -1 {
+	before, after, ok := strings.Cut(rest, "\n"+frontMatterDelimiter)
+	if !ok {
 		return nil, fmt.Errorf("longtermmemory: unclosed front-matter block")
 	}
-	yamlBlock := rest[:idx]
+	yamlBlock := before
 	// Remove the closing delimiter and up to two newlines (if separated by a blank line)
-	bodyRaw := rest[idx+len("\n"+frontMatterDelimiter):]
+	bodyRaw := after
 	body := strings.TrimPrefix(bodyRaw, "\n")
 
 	var meta MemoryMeta

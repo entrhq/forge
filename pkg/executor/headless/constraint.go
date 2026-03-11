@@ -3,6 +3,7 @@ package headless
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
 	"sync"
 	"time"
 
@@ -36,7 +37,7 @@ type FileModification struct {
 type ConstraintViolation struct {
 	Type    ViolationType
 	Message string
-	Details map[string]interface{}
+	Details map[string]any
 }
 
 func (e *ConstraintViolation) Error() string {
@@ -74,7 +75,7 @@ func NewConstraintManager(config ConstraintConfig, mode ExecutionMode) (*Constra
 }
 
 // ValidateToolCall validates a tool call against constraints
-func (cm *ConstraintManager) ValidateToolCall(toolName string, args interface{}) error {
+func (cm *ConstraintManager) ValidateToolCall(toolName string, args any) error {
 	cm.mu.RLock()
 	defer cm.mu.RUnlock()
 
@@ -88,7 +89,7 @@ func (cm *ConstraintManager) ValidateToolCall(toolName string, args interface{})
 		return &ConstraintViolation{
 			Type:    ViolationReadOnlyMode,
 			Message: fmt.Sprintf("tool '%s' is not allowed in read-only mode", toolName),
-			Details: map[string]interface{}{
+			Details: map[string]any{
 				"tool": toolName,
 				"mode": string(cm.mode),
 			},
@@ -97,18 +98,12 @@ func (cm *ConstraintManager) ValidateToolCall(toolName string, args interface{})
 
 	// Check if tool is allowed
 	if len(cm.config.AllowedTools) > 0 {
-		allowed := false
-		for _, allowedTool := range cm.config.AllowedTools {
-			if allowedTool == toolName {
-				allowed = true
-				break
-			}
-		}
+		allowed := slices.Contains(cm.config.AllowedTools, toolName)
 		if !allowed {
 			return &ConstraintViolation{
 				Type:    ViolationToolRestriction,
 				Message: fmt.Sprintf("tool '%s' is not in allowed tools list", toolName),
-				Details: map[string]interface{}{
+				Details: map[string]any{
 					"tool":          toolName,
 					"allowed_tools": cm.config.AllowedTools,
 				},
@@ -124,7 +119,7 @@ func (cm *ConstraintManager) ValidateToolCall(toolName string, args interface{})
 				return &ConstraintViolation{
 					Type:    ViolationFilePattern,
 					Message: fmt.Sprintf("file '%s' does not match allowed patterns", filePath),
-					Details: map[string]interface{}{
+					Details: map[string]any{
 						"file":             filePath,
 						"allowed_patterns": cm.config.AllowedPatterns,
 						"denied_patterns":  cm.config.DeniedPatterns,
@@ -152,7 +147,7 @@ func (cm *ConstraintManager) RecordFileModification(path string, linesAdded, lin
 			return &ConstraintViolation{
 				Type:    ViolationFileCount,
 				Message: fmt.Sprintf("maximum file count exceeded (%d)", cm.config.MaxFiles),
-				Details: map[string]interface{}{
+				Details: map[string]any{
 					"max_files":      cm.config.MaxFiles,
 					"current_count":  len(cm.filesModified),
 					"attempted_file": path,
@@ -180,7 +175,7 @@ func (cm *ConstraintManager) RecordFileModification(path string, linesAdded, lin
 			return &ConstraintViolation{
 				Type:    ViolationLineCount,
 				Message: fmt.Sprintf("maximum lines changed exceeded (%d)", cm.config.MaxLinesChanged),
-				Details: map[string]interface{}{
+				Details: map[string]any{
 					"max_lines_changed": cm.config.MaxLinesChanged,
 					"current_total":     totalLinesChanged,
 					"file":              path,
@@ -203,7 +198,7 @@ func (cm *ConstraintManager) RecordTokenUsage(tokens int) error {
 		return &ConstraintViolation{
 			Type:    ViolationTokenLimit,
 			Message: fmt.Sprintf("maximum token usage exceeded (%d)", cm.config.MaxTokens),
-			Details: map[string]interface{}{
+			Details: map[string]any{
 				"max_tokens":  cm.config.MaxTokens,
 				"tokens_used": cm.tokensUsed,
 			},
@@ -227,7 +222,7 @@ func (cm *ConstraintManager) CheckTimeout() error {
 		return &ConstraintViolation{
 			Type:    ViolationTimeout,
 			Message: fmt.Sprintf("execution timeout exceeded (%v)", cm.config.Timeout),
-			Details: map[string]interface{}{
+			Details: map[string]any{
 				"timeout": cm.config.Timeout,
 				"elapsed": elapsed,
 			},
@@ -312,12 +307,12 @@ func isLoopBreakingTool(toolName string) bool {
 
 // extractFilePath extracts the file path from tool arguments.
 // Returns the path and an error if extraction fails.
-func extractFilePath(args interface{}) (string, error) {
+func extractFilePath(args any) (string, error) {
 	if args == nil {
 		return "", fmt.Errorf("tool arguments are nil")
 	}
 
-	argsMap, ok := args.(map[string]interface{})
+	argsMap, ok := args.(map[string]any)
 	if !ok {
 		return "", fmt.Errorf("tool arguments are not a map[string]interface{}, got type %T", args)
 	}

@@ -30,10 +30,7 @@ func cosineTopK(entries []MemoryVector, query []float32, k int) []MemoryVector {
 }
 
 func dotProduct(a, b []float32) float64 {
-	n := len(a)
-	if len(b) < n {
-		n = len(b)
-	}
+	n := min(len(b), len(a))
 	var sum float64
 	for i := 0; i < n; i++ {
 		sum += float64(a[i]) * float64(b[i])

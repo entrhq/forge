@@ -7,9 +7,9 @@ import (
 
 func TestGenerateXMLExample(t *testing.T) {
 	t.Run("SimpleStringParameter", func(t *testing.T) {
-		schema := map[string]interface{}{
-			"properties": map[string]interface{}{
-				"message": map[string]interface{}{
+		schema := map[string]any{
+			"properties": map[string]any{
+				"message": map[string]any{
 					"type":        "string",
 					"description": "A simple message",
 				},
@@ -28,9 +28,9 @@ func TestGenerateXMLExample(t *testing.T) {
 	})
 
 	t.Run("EntityEscapingForContentFields", func(t *testing.T) {
-		schema := map[string]interface{}{
-			"properties": map[string]interface{}{
-				"content": map[string]interface{}{
+		schema := map[string]any{
+			"properties": map[string]any{
+				"content": map[string]any{
 					"type":        "string",
 					"description": "File content",
 				},
@@ -47,19 +47,19 @@ func TestGenerateXMLExample(t *testing.T) {
 	})
 
 	t.Run("NestedArrayOfObjects", func(t *testing.T) {
-		schema := map[string]interface{}{
-			"properties": map[string]interface{}{
-				"edits": map[string]interface{}{
+		schema := map[string]any{
+			"properties": map[string]any{
+				"edits": map[string]any{
 					"type":        "array",
 					"description": "List of edits",
-					"items": map[string]interface{}{
+					"items": map[string]any{
 						"type": "object",
-						"properties": map[string]interface{}{
-							"search": map[string]interface{}{
+						"properties": map[string]any{
+							"search": map[string]any{
 								"type":        "string",
 								"description": "Search text",
 							},
-							"replace": map[string]interface{}{
+							"replace": map[string]any{
 								"type":        "string",
 								"description": "Replace text",
 							},
@@ -93,9 +93,9 @@ func TestGenerateXMLExample(t *testing.T) {
 	})
 
 	t.Run("BooleanParameter", func(t *testing.T) {
-		schema := map[string]interface{}{
-			"properties": map[string]interface{}{
-				"recursive": map[string]interface{}{
+		schema := map[string]any{
+			"properties": map[string]any{
+				"recursive": map[string]any{
 					"type":        "boolean",
 					"description": "Whether to recurse",
 				},
@@ -111,13 +111,13 @@ func TestGenerateXMLExample(t *testing.T) {
 	})
 
 	t.Run("NumericParameters", func(t *testing.T) {
-		schema := map[string]interface{}{
-			"properties": map[string]interface{}{
-				"count": map[string]interface{}{
+		schema := map[string]any{
+			"properties": map[string]any{
+				"count": map[string]any{
 					"type":        "integer",
 					"description": "Count value",
 				},
-				"ratio": map[string]interface{}{
+				"ratio": map[string]any{
 					"type":        "number",
 					"description": "Ratio value",
 				},

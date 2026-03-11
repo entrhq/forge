@@ -32,10 +32,10 @@ func (t *DeleteNoteTool) Description() string {
 }
 
 // Schema returns the JSON schema for the tool's input parameters.
-func (t *DeleteNoteTool) Schema() map[string]interface{} {
+func (t *DeleteNoteTool) Schema() map[string]any {
 	return tools.BaseToolSchema(
-		map[string]interface{}{
-			"id": map[string]interface{}{
+		map[string]any{
+			"id": map[string]any{
 				"type":        "string",
 				"description": "ID of the note to delete",
 			},
@@ -45,7 +45,7 @@ func (t *DeleteNoteTool) Schema() map[string]interface{} {
 }
 
 // Execute deletes a note.
-func (t *DeleteNoteTool) Execute(_ context.Context, argsXML []byte) (string, map[string]interface{}, error) {
+func (t *DeleteNoteTool) Execute(_ context.Context, argsXML []byte) (string, map[string]any, error) {
 	var input struct {
 		XMLName xml.Name `xml:"arguments"`
 		ID      string   `xml:"id"`
@@ -68,7 +68,7 @@ func (t *DeleteNoteTool) Execute(_ context.Context, argsXML []byte) (string, map
 	message := fmt.Sprintf("Note %s deleted successfully", input.ID)
 
 	// Build metadata
-	metadata := map[string]interface{}{
+	metadata := map[string]any{
 		"note_id":     input.ID,
 		"total_notes": t.manager.Count(),
 	}

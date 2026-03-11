@@ -31,22 +31,22 @@ func (t *WaitTool) Description() string {
 }
 
 // Schema returns the tool's JSON schema.
-func (t *WaitTool) Schema() map[string]interface{} {
+func (t *WaitTool) Schema() map[string]any {
 	return tools.BaseToolSchema(
-		map[string]interface{}{
-			"session": map[string]interface{}{
+		map[string]any{
+			"session": map[string]any{
 				"type":        "string",
 				"description": "Name of the browser session to use",
 			},
-			"selector": map[string]interface{}{
+			"selector": map[string]any{
 				"type":        "string",
 				"description": "CSS selector for the element to wait for (e.g., '.loading-spinner', '#content')",
 			},
-			"state": map[string]interface{}{
+			"state": map[string]any{
 				"type":        "string",
 				"description": "State to wait for: 'attached' (in DOM), 'detached' (removed from DOM), 'visible' (default), or 'hidden'",
 			},
-			"timeout": map[string]interface{}{
+			"timeout": map[string]any{
 				"type":        "number",
 				"description": "Maximum wait time in milliseconds. Default: 30000 (30 seconds)",
 			},
@@ -65,7 +65,7 @@ type WaitInput struct {
 }
 
 // Execute waits for an element.
-func (t *WaitTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
+func (t *WaitTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]any, error) {
 	// Parse parameters
 	var input WaitInput
 	if err := tools.UnmarshalXMLWithFallback(argsXML, &input); err != nil {

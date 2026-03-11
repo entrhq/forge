@@ -214,9 +214,9 @@ func (r *QualityGateResults) FormatErrorMessage() string {
 	var msg strings.Builder
 	msg.WriteString("Quality gate failures:\n\n")
 	for _, result := range failed {
-		msg.WriteString(fmt.Sprintf("❌ %s\n", result.Name))
+		fmt.Fprintf(&msg, "❌ %s\n", result.Name)
 		if result.Error != "" {
-			msg.WriteString(fmt.Sprintf("   Error: %s\n\n", result.Error))
+			fmt.Fprintf(&msg, "   Error: %s\n\n", result.Error)
 		}
 	}
 
@@ -231,14 +231,14 @@ func (r *QualityGateResults) FormatFeedbackMessage(retryCount, maxRetries int) s
 	}
 
 	var msg strings.Builder
-	msg.WriteString(fmt.Sprintf("Your previous task completion failed quality gates (attempt %d/%d).\n\n", retryCount, maxRetries))
+	fmt.Fprintf(&msg, "Your previous task completion failed quality gates (attempt %d/%d).\n\n", retryCount, maxRetries)
 	msg.WriteString("Please review and fix the following issues:\n\n")
 
 	for _, result := range failed {
-		msg.WriteString(fmt.Sprintf("❌ %s\n", result.Name))
+		fmt.Fprintf(&msg, "❌ %s\n", result.Name)
 		if result.Error != "" {
 			// Extract useful error information from QualityGateError
-			msg.WriteString(fmt.Sprintf("   %s\n\n", result.Error))
+			fmt.Fprintf(&msg, "   %s\n\n", result.Error)
 		}
 	}
 

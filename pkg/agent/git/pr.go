@@ -59,15 +59,15 @@ func (g *PRGenerator) buildPRPrompt(
 	sb.WriteString("Generate a pull request title and description based on the following information.\n\n")
 
 	if customTitle != "" {
-		sb.WriteString(fmt.Sprintf("User-provided title: %s\n", customTitle))
+		fmt.Fprintf(&sb, "User-provided title: %s\n", customTitle)
 		sb.WriteString("(You may use this or generate a better one based on the changes)\n\n")
 	}
 
-	sb.WriteString(fmt.Sprintf("Base: %s -> Head: %s\n\n", base, head))
+	fmt.Fprintf(&sb, "Base: %s -> Head: %s\n\n", base, head)
 
 	sb.WriteString("Commits:\n")
 	for _, commit := range commits {
-		sb.WriteString(fmt.Sprintf("- %s: %s\n", commit.Hash, commit.Message))
+		fmt.Fprintf(&sb, "- %s: %s\n", commit.Hash, commit.Message)
 	}
 
 	sb.WriteString("\nMaterial Changes (from git diff):\n")
@@ -89,13 +89,13 @@ func parsePRContent(response string) *PRContent {
 	jsonStr := response
 
 	// Remove markdown code fences if present
-	if idx := strings.Index(response, "```json"); idx != -1 {
-		jsonStr = response[idx+7:] // Skip "```json"
+	if _, after, ok := strings.Cut(response, "```json"); ok {
+		jsonStr = after // Skip "```json"
 		if endIdx := strings.Index(jsonStr, "```"); endIdx != -1 {
 			jsonStr = jsonStr[:endIdx]
 		}
-	} else if idx := strings.Index(response, "```"); idx != -1 {
-		jsonStr = response[idx+3:]
+	} else if _, after, ok := strings.Cut(response, "```"); ok {
+		jsonStr = after
 		if endIdx := strings.Index(jsonStr, "```"); endIdx != -1 {
 			jsonStr = jsonStr[:endIdx]
 		}

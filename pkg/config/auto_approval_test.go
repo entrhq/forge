@@ -64,7 +64,7 @@ func TestAutoApprovalSection_Data(t *testing.T) {
 func TestAutoApprovalSection_SetData(t *testing.T) {
 	t.Run("sets tool data correctly", func(t *testing.T) {
 		section := NewAutoApprovalSection()
-		data := map[string]interface{}{
+		data := map[string]any{
 			"tool1": true,
 			"tool2": false,
 			"tool3": true,
@@ -99,7 +99,7 @@ func TestAutoApprovalSection_SetData(t *testing.T) {
 
 	t.Run("rejects invalid value types", func(t *testing.T) {
 		section := NewAutoApprovalSection()
-		data := map[string]interface{}{
+		data := map[string]any{
 			"tool1": "not a bool",
 		}
 
@@ -111,7 +111,7 @@ func TestAutoApprovalSection_SetData(t *testing.T) {
 
 	t.Run("rejects non-bool values", func(t *testing.T) {
 		section := NewAutoApprovalSection()
-		data := map[string]interface{}{
+		data := map[string]any{
 			"tool1": 42,
 		}
 

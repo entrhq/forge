@@ -36,18 +36,18 @@ func (t *ReadFileTool) Description() string {
 }
 
 // Schema returns the JSON schema for the tool's input parameters.
-func (t *ReadFileTool) Schema() map[string]interface{} {
+func (t *ReadFileTool) Schema() map[string]any {
 	return tools.BaseToolSchema(
-		map[string]interface{}{
-			"path": map[string]interface{}{
+		map[string]any{
+			"path": map[string]any{
 				"type":        "string",
 				"description": "Path to the file to read (relative to workspace)",
 			},
-			"start_line": map[string]interface{}{
+			"start_line": map[string]any{
 				"type":        "integer",
 				"description": "Optional starting line number (1-based, inclusive)",
 			},
-			"end_line": map[string]interface{}{
+			"end_line": map[string]any{
 				"type":        "integer",
 				"description": "Optional ending line number (1-based, inclusive)",
 			},
@@ -57,7 +57,7 @@ func (t *ReadFileTool) Schema() map[string]interface{} {
 }
 
 // Execute reads the file and returns its contents.
-func (t *ReadFileTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
+func (t *ReadFileTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]any, error) {
 	var input struct {
 		XMLName   xml.Name `xml:"arguments"`
 		Path      string   `xml:"path"`
@@ -96,7 +96,7 @@ func (t *ReadFileTool) Execute(ctx context.Context, argsXML []byte) (string, map
 	}
 
 	// Build metadata
-	metadata := map[string]interface{}{
+	metadata := map[string]any{
 		"path": input.Path,
 	}
 	if input.StartLine > 0 {
@@ -179,7 +179,7 @@ func (t *ReadFileTool) scanAndFormatLines(file *os.File, startLine, endLine int)
 		if builder.Len() > 0 {
 			builder.WriteString("\n")
 		}
-		builder.WriteString(fmt.Sprintf("%d | %s", lineNum, scanner.Text()))
+		fmt.Fprintf(&builder, "%d | %s", lineNum, scanner.Text())
 	}
 
 	if err := scanner.Err(); err != nil {

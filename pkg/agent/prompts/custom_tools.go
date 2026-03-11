@@ -24,7 +24,7 @@ func FormatCustomToolsList(tools []ToolMetadata) string {
 	builder.WriteString("The following custom tools are currently available:\n\n")
 
 	for _, tool := range tools {
-		builder.WriteString(fmt.Sprintf("- **%s**: %s\n", tool.GetName(), tool.GetDescription()))
+		fmt.Fprintf(&builder, "- **%s**: %s\n", tool.GetName(), tool.GetDescription())
 	}
 
 	builder.WriteString("\nTo see full parameter details for any custom tool, read its tool.yaml file at ~/.forge/tools/<tool-name>/tool.yaml using the read_file tool.\n")

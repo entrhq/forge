@@ -5,9 +5,9 @@ import "github.com/entrhq/forge/pkg/types"
 // captureLogger is the minimal logging interface used by Observer and other
 // capture-package types to avoid coupling to a concrete logger implementation.
 type captureLogger interface {
-	Debugf(string, ...interface{})
-	Infof(string, ...interface{})
-	Warnf(string, ...interface{})
+	Debugf(string, ...any)
+	Infof(string, ...any)
+	Warnf(string, ...any)
 }
 
 // Observer hooks into the agent loop and enqueues a capture trigger after

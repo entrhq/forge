@@ -12,16 +12,16 @@ type XMLExampleProvider interface {
 }
 
 // GenerateXMLExample creates a concrete XML example from a JSON Schema
-func GenerateXMLExample(schema map[string]interface{}, toolName string) string {
+func GenerateXMLExample(schema map[string]any, toolName string) string {
 	var builder strings.Builder
 
 	builder.WriteString("<tool>\n")
 	builder.WriteString("<server_name>local</server_name>\n")
-	builder.WriteString(fmt.Sprintf("<tool_name>%s</tool_name>\n", toolName))
+	fmt.Fprintf(&builder, "<tool_name>%s</tool_name>\n", toolName)
 	builder.WriteString("<arguments>\n")
 
 	// Extract properties
-	properties, ok := schema["properties"].(map[string]interface{})
+	properties, ok := schema["properties"].(map[string]any)
 	if ok && len(properties) > 0 {
 		// Get required fields
 		requiredFields := make(map[string]bool)
@@ -33,7 +33,7 @@ func GenerateXMLExample(schema map[string]interface{}, toolName string) string {
 
 		// Generate example for each property
 		for propName, propValue := range properties {
-			propMap, ok := propValue.(map[string]interface{})
+			propMap, ok := propValue.(map[string]any)
 			if !ok {
 				continue
 			}
@@ -55,7 +55,7 @@ func GenerateXMLExample(schema map[string]interface{}, toolName string) string {
 }
 
 // generatePropertyExample creates an XML example for a single property
-func generatePropertyExample(name string, propSchema map[string]interface{}, indent string) string {
+func generatePropertyExample(name string, propSchema map[string]any, indent string) string {
 	propType, _ := propSchema["type"].(string)           //nolint:errcheck
 	description, _ := propSchema["description"].(string) //nolint:errcheck
 
@@ -76,7 +76,7 @@ func generatePropertyExample(name string, propSchema map[string]interface{}, ind
 }
 
 // generateStringExample creates example for string properties
-func generateStringExample(name string, propSchema map[string]interface{}, description string, indent string) string {
+func generateStringExample(name string, propSchema map[string]any, description string, indent string) string {
 	// Check if this is a code/content field that might have special characters
 	isCodeField := strings.Contains(description, "code") ||
 		strings.Contains(description, "content") ||
@@ -95,7 +95,7 @@ func generateStringExample(name string, propSchema map[string]interface{}, descr
 
 	// Simple string
 	exampleValue := "value"
-	if enum, ok := propSchema["enum"].([]interface{}); ok && len(enum) > 0 {
+	if enum, ok := propSchema["enum"].([]any); ok && len(enum) > 0 {
 		if str, ok := enum[0].(string); ok {
 			exampleValue = str
 		}
@@ -114,8 +114,8 @@ func generateNumberExample(name string, propType string, indent string) string {
 }
 
 // generateArrayExample creates example for array properties
-func generateArrayExample(name string, propSchema map[string]interface{}, indent string) string {
-	items, ok := propSchema["items"].(map[string]interface{})
+func generateArrayExample(name string, propSchema map[string]any, indent string) string {
+	items, ok := propSchema["items"].(map[string]any)
 	if !ok {
 		// Simple array - show multiple elements
 		return fmt.Sprintf("%s<%s>item1</%s>\n%s<%s>item2</%s>\n",
@@ -127,7 +127,7 @@ func generateArrayExample(name string, propSchema map[string]interface{}, indent
 	// If items are objects, use nested structure
 	if itemType == "object" {
 		var builder strings.Builder
-		builder.WriteString(fmt.Sprintf("%s<%s>\n", indent, name))
+		fmt.Fprintf(&builder, "%s<%s>\n", indent, name)
 
 		// Generate example item (singular form if possible)
 		singularName := name
@@ -135,19 +135,19 @@ func generateArrayExample(name string, propSchema map[string]interface{}, indent
 			singularName = name[:len(name)-1]
 		}
 
-		builder.WriteString(fmt.Sprintf("%s  <%s>\n", indent, singularName))
+		fmt.Fprintf(&builder, "%s  <%s>\n", indent, singularName)
 
-		if itemProps, ok := items["properties"].(map[string]interface{}); ok {
+		if itemProps, ok := items["properties"].(map[string]any); ok {
 			for propName, propValue := range itemProps {
-				if propMap, ok := propValue.(map[string]interface{}); ok {
+				if propMap, ok := propValue.(map[string]any); ok {
 					example := generatePropertyExample(propName, propMap, indent+"    ")
 					builder.WriteString(example)
 				}
 			}
 		}
 
-		builder.WriteString(fmt.Sprintf("%s  </%s>\n", indent, singularName))
-		builder.WriteString(fmt.Sprintf("%s</%s>\n", indent, name))
+		fmt.Fprintf(&builder, "%s  </%s>\n", indent, singularName)
+		fmt.Fprintf(&builder, "%s</%s>\n", indent, name)
 
 		return builder.String()
 	}
@@ -156,7 +156,7 @@ func generateArrayExample(name string, propSchema map[string]interface{}, indent
 	// This matches the XML unmarshaling pattern: Tags []string `xml:"tags>tag"`
 	// which expects: <tags><tag>value1</tag><tag>value2</tag></tags>
 	var builder strings.Builder
-	builder.WriteString(fmt.Sprintf("%s<%s>\n", indent, name))
+	fmt.Fprintf(&builder, "%s<%s>\n", indent, name)
 
 	// Generate 2 example items with singular form
 	singularName := name
@@ -164,29 +164,29 @@ func generateArrayExample(name string, propSchema map[string]interface{}, indent
 		singularName = name[:len(name)-1]
 	}
 
-	builder.WriteString(fmt.Sprintf("%s  <%s>item1</%s>\n", indent, singularName, singularName))
-	builder.WriteString(fmt.Sprintf("%s  <%s>item2</%s>\n", indent, singularName, singularName))
-	builder.WriteString(fmt.Sprintf("%s</%s>\n", indent, name))
+	fmt.Fprintf(&builder, "%s  <%s>item1</%s>\n", indent, singularName, singularName)
+	fmt.Fprintf(&builder, "%s  <%s>item2</%s>\n", indent, singularName, singularName)
+	fmt.Fprintf(&builder, "%s</%s>\n", indent, name)
 
 	return builder.String()
 }
 
 // generateObjectExample creates example for object properties
-func generateObjectExample(name string, propSchema map[string]interface{}, indent string) string {
+func generateObjectExample(name string, propSchema map[string]any, indent string) string {
 	var builder strings.Builder
 
-	builder.WriteString(fmt.Sprintf("%s<%s>\n", indent, name))
+	fmt.Fprintf(&builder, "%s<%s>\n", indent, name)
 
-	if props, ok := propSchema["properties"].(map[string]interface{}); ok {
+	if props, ok := propSchema["properties"].(map[string]any); ok {
 		for propName, propValue := range props {
-			if propMap, ok := propValue.(map[string]interface{}); ok {
+			if propMap, ok := propValue.(map[string]any); ok {
 				example := generatePropertyExample(propName, propMap, indent+"  ")
 				builder.WriteString(example)
 			}
 		}
 	}
 
-	builder.WriteString(fmt.Sprintf("%s</%s>\n", indent, name))
+	fmt.Fprintf(&builder, "%s</%s>\n", indent, name)
 
 	return builder.String()
 }

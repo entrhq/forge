@@ -168,7 +168,7 @@ func TestSummarize_AllToolCallsSummarized(t *testing.T) {
 	conv.Add(types.NewToolMessage("Command executed"))
 
 	// Add recent messages to push the above into "old" territory.
-	for i := 0; i < 6; i++ {
+	for range 6 {
 		conv.Add(types.NewUserMessage("Recent message"))
 	}
 
@@ -215,7 +215,7 @@ func TestSummarize_PreservesUserMessages(t *testing.T) {
 	conv.Add(types.NewToolMessage("test output"))
 
 	// Add recent messages to push the above into "old" territory.
-	for i := 0; i < 6; i++ {
+	for range 6 {
 		conv.Add(types.NewAssistantMessage("Working on it..."))
 	}
 
@@ -274,7 +274,7 @@ func TestSummarize_SummariesAccumulateAcrossMultipleRuns(t *testing.T) {
 	conv.Add(types.NewToolMessage("written ok"))
 
 	// Push these into "old" territory with padding.
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		conv.Add(types.NewAssistantMessage("thinking..."))
 	}
 
@@ -304,7 +304,7 @@ func TestSummarize_SummariesAccumulateAcrossMultipleRuns(t *testing.T) {
 	conv.Add(types.NewToolMessage("a.go b.go"))
 
 	// Push second batch into old territory.
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		conv.Add(types.NewAssistantMessage("thinking..."))
 	}
 

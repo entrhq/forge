@@ -167,8 +167,8 @@ func (s *ToolResultSummarizer) extractExitCode(result string) (int, bool) {
 	if strings.Contains(result, "Exit code: ") {
 		var code int
 		// Let's grab the last line usually
-		lines := strings.Split(result, "\n")
-		for _, line := range lines {
+		lines := strings.SplitSeq(result, "\n")
+		for line := range lines {
 			if _, err := fmt.Sscanf(line, "Exit code: %d", &code); err == nil {
 				return code, true
 			}
@@ -308,9 +308,9 @@ func (s *ToolResultSummarizer) parseSearchResults(result string) (matchCount, fi
 
 // parseListResults extracts file and directory counts from list results
 func (s *ToolResultSummarizer) parseListResults(result string) (fileCount, dirCount int) {
-	lines := strings.Split(result, "\n")
+	lines := strings.SplitSeq(result, "\n")
 
-	for _, line := range lines {
+	for line := range lines {
 		line = strings.TrimSpace(line)
 		if strings.HasPrefix(line, "▸") && strings.HasSuffix(line, "/") {
 			dirCount++
@@ -338,11 +338,4 @@ func (s *ToolResultSummarizer) parseApplyDiffResults(result string) int {
 		}
 	}
 	return count
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }

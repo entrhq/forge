@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -21,7 +22,7 @@ func TestThinkingParserWithLessThanGreaterThan(t *testing.T) {
 		"\n\n<tool>test</tool>",
 	}
 
-	var thinkingContent string
+	var thinkingContent strings.Builder
 	var messageContent string
 	var stillInThinking bool
 
@@ -29,7 +30,7 @@ func TestThinkingParserWithLessThanGreaterThan(t *testing.T) {
 		thinking, message := parser.Parse(chunk)
 
 		if thinking != nil {
-			thinkingContent += thinking.Content
+			thinkingContent.WriteString(thinking.Content)
 		}
 		if message != nil {
 			messageContent += message.Content
@@ -56,14 +57,14 @@ func TestThinkingParserWithLessThanGreaterThan(t *testing.T) {
 	// Flush any remaining content
 	thinking, message := parser.Flush()
 	if thinking != nil {
-		thinkingContent += thinking.Content
+		thinkingContent.WriteString(thinking.Content)
 	}
 	if message != nil {
 		messageContent += message.Content
 	}
 
 	t.Logf("Final: inThinking=%v", parser.IsInThinking())
-	t.Logf("Thinking content: %q", thinkingContent)
+	t.Logf("Thinking content: %q", thinkingContent.String())
 	t.Logf("Message content: %q", messageContent)
 
 	// BUG: The parser should NOT still be in thinking mode after </thinking>
@@ -77,8 +78,8 @@ func TestThinkingParserWithLessThanGreaterThan(t *testing.T) {
 	}
 
 	// Thinking content should contain the code examples with < and >
-	if !contains(thinkingContent, "i<10") || !contains(thinkingContent, "x>3") {
-		t.Errorf("Thinking content should preserve < and > characters. Got: %q", thinkingContent)
+	if !contains(thinkingContent.String(), "i<10") || !contains(thinkingContent.String(), "x>3") {
+		t.Errorf("Thinking content should preserve < and > characters. Got: %q", thinkingContent.String())
 	}
 }
 
@@ -93,26 +94,26 @@ func TestThinkingParserSimpleCase(t *testing.T) {
 		"This is a message",
 	}
 
-	var messageContent string
+	var messageContent strings.Builder
 
 	for _, chunk := range chunks {
 		_, message := parser.Parse(chunk)
 		if message != nil {
-			messageContent += message.Content
+			messageContent.WriteString(message.Content)
 		}
 	}
 
 	_, message := parser.Flush()
 	if message != nil {
-		messageContent += message.Content
+		messageContent.WriteString(message.Content)
 	}
 
 	if parser.IsInThinking() {
 		t.Error("Parser should not be in thinking mode after </thinking>")
 	}
 
-	if !contains(messageContent, "This is a message") {
-		t.Errorf("Message content should contain the message. Got: %q", messageContent)
+	if !contains(messageContent.String(), "This is a message") {
+		t.Errorf("Message content should contain the message. Got: %q", messageContent.String())
 	}
 }
 

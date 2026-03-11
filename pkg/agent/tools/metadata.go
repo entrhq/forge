@@ -4,8 +4,8 @@ import "context"
 
 // ToolResult represents the result of a tool execution with optional metadata.
 type ToolResult struct {
-	Output   string                 // The main output/result message
-	Metadata map[string]interface{} // Optional metadata about the execution
+	Output   string         // The main output/result message
+	Metadata map[string]any // Optional metadata about the execution
 }
 
 // MetadataProvider is an optional interface that tools can implement to return

@@ -31,22 +31,22 @@ func (t *ExtractContentTool) Description() string {
 }
 
 // Schema returns the tool's JSON schema.
-func (t *ExtractContentTool) Schema() map[string]interface{} {
+func (t *ExtractContentTool) Schema() map[string]any {
 	return tools.BaseToolSchema(
-		map[string]interface{}{
-			"session": map[string]interface{}{
+		map[string]any{
+			"session": map[string]any{
 				"type":        "string",
 				"description": "Name of the browser session to extract from",
 			},
-			"format": map[string]interface{}{
+			"format": map[string]any{
 				"type":        "string",
 				"description": "Output format: 'markdown' (default), 'text', or 'structured' (JSON)",
 			},
-			"selector": map[string]interface{}{
+			"selector": map[string]any{
 				"type":        "string",
 				"description": "Optional CSS selector to extract content from specific element (e.g., 'article', '.main-content')",
 			},
-			"max_length": map[string]interface{}{
+			"max_length": map[string]any{
 				"type":        "integer",
 				"description": "Maximum content length in characters. Default: 10000",
 			},
@@ -65,7 +65,7 @@ type ExtractContentInput struct {
 }
 
 // Execute extracts content from the page.
-func (t *ExtractContentTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
+func (t *ExtractContentTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]any, error) {
 	// Parse parameters
 	var input ExtractContentInput
 	if err := tools.UnmarshalXMLWithFallback(argsXML, &input); err != nil {

@@ -32,20 +32,20 @@ func (t *UpdateNoteTool) Description() string {
 }
 
 // Schema returns the JSON schema for the tool's input parameters.
-func (t *UpdateNoteTool) Schema() map[string]interface{} {
+func (t *UpdateNoteTool) Schema() map[string]any {
 	return tools.BaseToolSchema(
-		map[string]interface{}{
-			"id": map[string]interface{}{
+		map[string]any{
+			"id": map[string]any{
 				"type":        "string",
 				"description": "ID of the note to update",
 			},
-			"content": map[string]interface{}{
+			"content": map[string]any{
 				"type":        "string",
 				"description": "New content for the note (replaces existing if provided)",
 			},
-			"tags": map[string]interface{}{
+			"tags": map[string]any{
 				"type": "array",
-				"items": map[string]interface{}{
+				"items": map[string]any{
 					"type": "string",
 				},
 				"description": "New tags for the note (replaces existing if provided, must be 1-5 tags)",
@@ -58,7 +58,7 @@ func (t *UpdateNoteTool) Schema() map[string]interface{} {
 }
 
 // Execute updates a note.
-func (t *UpdateNoteTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
+func (t *UpdateNoteTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]any, error) {
 	var input struct {
 		XMLName xml.Name `xml:"arguments"`
 		ID      string   `xml:"id"`
@@ -101,7 +101,7 @@ func (t *UpdateNoteTool) Execute(ctx context.Context, argsXML []byte) (string, m
 	}
 
 	// Build metadata
-	metadata := map[string]interface{}{
+	metadata := map[string]any{
 		"note_id":     note.ID,
 		"total_notes": t.manager.Count(),
 	}

@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -145,7 +146,7 @@ func TestBufferingWithLessThanGreaterThan(t *testing.T) {
 	}
 
 	var toolCallFound bool
-	var regularContent string
+	var regularContent strings.Builder
 
 	for _, chunk := range chunks {
 		tc, rc := parser.Parse(chunk)
@@ -153,7 +154,7 @@ func TestBufferingWithLessThanGreaterThan(t *testing.T) {
 			toolCallFound = true
 		}
 		if rc != nil {
-			regularContent += rc.Content
+			regularContent.WriteString(rc.Content)
 		}
 	}
 
@@ -162,7 +163,7 @@ func TestBufferingWithLessThanGreaterThan(t *testing.T) {
 		toolCallFound = true
 	}
 	if rc != nil {
-		regularContent += rc.Content
+		regularContent.WriteString(rc.Content)
 	}
 
 	if !toolCallFound {
@@ -170,7 +171,7 @@ func TestBufferingWithLessThanGreaterThan(t *testing.T) {
 	}
 
 	// Regular content should contain the comparison operators
-	if !contains(regularContent, "x < 5") || !contains(regularContent, "y > 10") {
-		t.Errorf("Regular content should preserve < and > characters.\nGot: %s", regularContent)
+	if !contains(regularContent.String(), "x < 5") || !contains(regularContent.String(), "y > 10") {
+		t.Errorf("Regular content should preserve < and > characters.\nGot: %s", regularContent.String())
 	}
 }

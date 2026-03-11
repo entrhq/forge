@@ -11,8 +11,8 @@ func GenerateUnifiedDiff(original, modified, filename string) string {
 	modifiedLines := strings.Split(modified, "\n")
 
 	var diff strings.Builder
-	diff.WriteString(fmt.Sprintf("--- %s\n", filename))
-	diff.WriteString(fmt.Sprintf("+++ %s\n", filename))
+	fmt.Fprintf(&diff, "--- %s\n", filename)
+	fmt.Fprintf(&diff, "+++ %s\n", filename)
 
 	changes := findChanges(originalLines, modifiedLines)
 	if len(changes) == 0 {
@@ -20,9 +20,9 @@ func GenerateUnifiedDiff(original, modified, filename string) string {
 	}
 
 	for _, change := range changes {
-		diff.WriteString(fmt.Sprintf("@@ -%d,%d +%d,%d @@\n",
+		fmt.Fprintf(&diff, "@@ -%d,%d +%d,%d @@\n",
 			change.originalStart+1, change.originalCount,
-			change.modifiedStart+1, change.modifiedCount))
+			change.modifiedStart+1, change.modifiedCount)
 
 		for _, line := range change.lines {
 			diff.WriteString(line)

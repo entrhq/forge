@@ -29,21 +29,21 @@ func TestProvider_AnalyzeDocument_Success(t *testing.T) {
 		body, err := io.ReadAll(r.Body)
 		require.NoError(t, err)
 
-		var reqBody map[string]interface{}
+		var reqBody map[string]any
 		require.NoError(t, json.Unmarshal(body, &reqBody))
 
 		// Verify model
 		assert.Equal(t, "test-model", reqBody["model"])
 
 		// Verify messages structure
-		messages, ok := reqBody["messages"].([]interface{})
+		messages, ok := reqBody["messages"].([]any)
 		require.True(t, ok)
 		require.GreaterOrEqual(t, len(messages), 1, "should have at least 1 message")
 
 		// Find user message (could be first or second depending on system prompt)
-		var userMsg map[string]interface{}
+		var userMsg map[string]any
 		for _, msg := range messages {
-			m := msg.(map[string]interface{})
+			m := msg.(map[string]any)
 			if m["role"] == "user" {
 				userMsg = m
 				break
@@ -52,22 +52,22 @@ func TestProvider_AnalyzeDocument_Success(t *testing.T) {
 		require.NotNil(t, userMsg, "should have user message")
 
 		// Verify content is array with text and image parts
-		content, ok := userMsg["content"].([]interface{})
+		content, ok := userMsg["content"].([]any)
 		require.True(t, ok)
 		require.Len(t, content, 2)
 
 		// Verify text part
-		textPart, ok := content[0].(map[string]interface{})
+		textPart, ok := content[0].(map[string]any)
 		require.True(t, ok)
 		assert.Equal(t, "text", textPart["type"])
 		assert.Contains(t, textPart["text"], "test prompt")
 
 		// Verify image part
-		imagePart, ok := content[1].(map[string]interface{})
+		imagePart, ok := content[1].(map[string]any)
 		require.True(t, ok)
 		assert.Equal(t, "image_url", imagePart["type"])
 
-		imageURL, ok := imagePart["image_url"].(map[string]interface{})
+		imageURL, ok := imagePart["image_url"].(map[string]any)
 		require.True(t, ok)
 		dataURL, ok := imageURL["url"].(string)
 		require.True(t, ok)
@@ -76,15 +76,15 @@ func TestProvider_AnalyzeDocument_Success(t *testing.T) {
 		// Return success response
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		json.NewEncoder(w).Encode(map[string]any{
 			"id":      "test-id",
 			"object":  "chat.completion",
 			"created": 1234567890,
 			"model":   "test-model",
-			"choices": []map[string]interface{}{
+			"choices": []map[string]any{
 				{
 					"index": 0,
-					"message": map[string]interface{}{
+					"message": map[string]any{
 						"role":    "assistant",
 						"content": "This is the analysis result",
 					},
@@ -125,17 +125,17 @@ func TestProvider_AnalyzeDocument_PDFContentType(t *testing.T) {
 		body, err := io.ReadAll(r.Body)
 		require.NoError(t, err)
 
-		var reqBody map[string]interface{}
+		var reqBody map[string]any
 		require.NoError(t, json.Unmarshal(body, &reqBody))
 
 		// Verify messages structure
-		messages, ok := reqBody["messages"].([]interface{})
+		messages, ok := reqBody["messages"].([]any)
 		require.True(t, ok)
 
 		// Find user message
-		var userMsg map[string]interface{}
+		var userMsg map[string]any
 		for _, msg := range messages {
-			m := msg.(map[string]interface{})
+			m := msg.(map[string]any)
 			if m["role"] == "user" {
 				userMsg = m
 				break
@@ -143,14 +143,14 @@ func TestProvider_AnalyzeDocument_PDFContentType(t *testing.T) {
 		}
 		require.NotNil(t, userMsg, "should have user message")
 
-		content := userMsg["content"].([]interface{})
+		content := userMsg["content"].([]any)
 
 		// Verify PDF is sent as image_url data URI (OpenAI-compatible format)
-		filePart, ok := content[1].(map[string]interface{})
+		filePart, ok := content[1].(map[string]any)
 		require.True(t, ok)
 		assert.Equal(t, "image_url", filePart["type"])
 
-		imageURL, ok := filePart["image_url"].(map[string]interface{})
+		imageURL, ok := filePart["image_url"].(map[string]any)
 		require.True(t, ok)
 		url, ok := imageURL["url"].(string)
 		require.True(t, ok)
@@ -159,10 +159,10 @@ func TestProvider_AnalyzeDocument_PDFContentType(t *testing.T) {
 		// Return success response
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"choices": []map[string]interface{}{
+		json.NewEncoder(w).Encode(map[string]any{
+			"choices": []map[string]any{
 				{
-					"message": map[string]interface{}{
+					"message": map[string]any{
 						"content": "PDF analysis result",
 					},
 				},
@@ -198,8 +198,8 @@ func TestProvider_AnalyzeDocument_ErrorResponse(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"error": map[string]interface{}{
+		json.NewEncoder(w).Encode(map[string]any{
+			"error": map[string]any{
 				"message": "Invalid request",
 				"type":    "invalid_request_error",
 			},
@@ -233,8 +233,8 @@ func TestProvider_AnalyzeDocument_EmptyChoices(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"choices": []interface{}{},
+		json.NewEncoder(w).Encode(map[string]any{
+			"choices": []any{},
 		})
 	}))
 	defer server.Close()

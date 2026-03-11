@@ -45,7 +45,7 @@ func TestBuildWindow_SkipsToolMessages(t *testing.T) {
 func TestBuildWindow_TailsToWindowMessages(t *testing.T) {
 	// Create more than windowMessages (6) messages.
 	history := make([]*types.Message, 0, 10)
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		history = append(history, types.NewUserMessage("msg"))
 	}
 	// Add a distinguishable first message that should be excluded.

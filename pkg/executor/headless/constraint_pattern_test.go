@@ -10,7 +10,7 @@ func TestConstraintManager_FilePatternMatching(t *testing.T) {
 		allowedPatterns []string
 		deniedPatterns  []string
 		toolName        string
-		args            map[string]interface{}
+		args            map[string]any
 		wantErr         bool
 		errType         ViolationType
 	}{
@@ -19,7 +19,7 @@ func TestConstraintManager_FilePatternMatching(t *testing.T) {
 			allowedPatterns: []string{"src/*.go"},
 			deniedPatterns:  []string{},
 			toolName:        "write_file",
-			args:            map[string]interface{}{"path": "src/main.go"},
+			args:            map[string]any{"path": "src/main.go"},
 			wantErr:         false,
 		},
 		{
@@ -27,7 +27,7 @@ func TestConstraintManager_FilePatternMatching(t *testing.T) {
 			allowedPatterns: []string{"src/**"},
 			deniedPatterns:  []string{"src/internal/**"},
 			toolName:        "write_file",
-			args:            map[string]interface{}{"path": "src/internal/secret.go"},
+			args:            map[string]any{"path": "src/internal/secret.go"},
 			wantErr:         true,
 			errType:         ViolationFilePattern,
 		},
@@ -36,7 +36,7 @@ func TestConstraintManager_FilePatternMatching(t *testing.T) {
 			allowedPatterns: []string{"src/*.go"},
 			deniedPatterns:  []string{},
 			toolName:        "write_file",
-			args:            map[string]interface{}{"path": "tests/test.go"},
+			args:            map[string]any{"path": "tests/test.go"},
 			wantErr:         true,
 			errType:         ViolationFilePattern,
 		},
@@ -45,7 +45,7 @@ func TestConstraintManager_FilePatternMatching(t *testing.T) {
 			allowedPatterns: []string{"**/*.go"},
 			deniedPatterns:  []string{"**/vendor/**"},
 			toolName:        "apply_diff",
-			args:            map[string]interface{}{"path": "src/pkg/utils.go"},
+			args:            map[string]any{"path": "src/pkg/utils.go"},
 			wantErr:         false,
 		},
 		{
@@ -53,7 +53,7 @@ func TestConstraintManager_FilePatternMatching(t *testing.T) {
 			allowedPatterns: []string{"**/*.go"},
 			deniedPatterns:  []string{"vendor/**"},
 			toolName:        "apply_diff",
-			args:            map[string]interface{}{"path": "vendor/pkg/lib.go"},
+			args:            map[string]any{"path": "vendor/pkg/lib.go"},
 			wantErr:         true,
 			errType:         ViolationFilePattern,
 		},
@@ -62,7 +62,7 @@ func TestConstraintManager_FilePatternMatching(t *testing.T) {
 			allowedPatterns: []string{"src/*.go"},
 			deniedPatterns:  []string{},
 			toolName:        "read_file",
-			args:            map[string]interface{}{"path": "tests/test.go"},
+			args:            map[string]any{"path": "tests/test.go"},
 			wantErr:         false,
 		},
 		{
@@ -70,7 +70,7 @@ func TestConstraintManager_FilePatternMatching(t *testing.T) {
 			allowedPatterns: []string{},
 			deniedPatterns:  []string{},
 			toolName:        "write_file",
-			args:            map[string]interface{}{"path": "anywhere/file.go"},
+			args:            map[string]any{"path": "anywhere/file.go"},
 			wantErr:         false,
 		},
 		{
@@ -78,7 +78,7 @@ func TestConstraintManager_FilePatternMatching(t *testing.T) {
 			allowedPatterns: []string{"src/**"},
 			deniedPatterns:  []string{"src/**/*_test.go"},
 			toolName:        "write_file",
-			args:            map[string]interface{}{"path": "src/pkg/main_test.go"},
+			args:            map[string]any{"path": "src/pkg/main_test.go"},
 			wantErr:         true,
 			errType:         ViolationFilePattern,
 		},
@@ -87,7 +87,7 @@ func TestConstraintManager_FilePatternMatching(t *testing.T) {
 			allowedPatterns: []string{"src/**"},
 			deniedPatterns:  []string{"src/**/*_test.go"},
 			toolName:        "write_file",
-			args:            map[string]interface{}{"path": "src/pkg/main.go"},
+			args:            map[string]any{"path": "src/pkg/main.go"},
 			wantErr:         false,
 		},
 	}
@@ -138,7 +138,7 @@ func TestConstraintManager_FilePatternMatchingWithReadOnlyMode(t *testing.T) {
 	}
 
 	// In read-only mode, write operations should be blocked regardless of patterns
-	err = cm.ValidateToolCall("write_file", map[string]interface{}{"path": "src/main.go"})
+	err = cm.ValidateToolCall("write_file", map[string]any{"path": "src/main.go"})
 	if err == nil {
 		t.Error("ValidateToolCall() expected error for write_file in read-only mode")
 	}
@@ -166,14 +166,14 @@ func TestConstraintManager_FilePatternMatchingWithAllowedTools(t *testing.T) {
 
 	// write_file is allowed by tool restrictions
 	// Pattern should allow src/main.go
-	err = cm.ValidateToolCall("write_file", map[string]interface{}{"path": "src/main.go"})
+	err = cm.ValidateToolCall("write_file", map[string]any{"path": "src/main.go"})
 	if err != nil {
 		t.Errorf("ValidateToolCall() unexpected error = %v", err)
 	}
 
 	// write_file is allowed by tool restrictions
 	// Pattern should block tests/test.go
-	err = cm.ValidateToolCall("write_file", map[string]interface{}{"path": "tests/test.go"})
+	err = cm.ValidateToolCall("write_file", map[string]any{"path": "tests/test.go"})
 	if err == nil {
 		t.Error("ValidateToolCall() expected error for disallowed pattern")
 	}

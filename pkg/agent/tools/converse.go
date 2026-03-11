@@ -30,10 +30,10 @@ func (t *ConverseTool) Description() string {
 }
 
 // Schema returns the JSON schema for the tool's arguments
-func (t *ConverseTool) Schema() map[string]interface{} {
+func (t *ConverseTool) Schema() map[string]any {
 	return BaseToolSchema(
-		map[string]interface{}{
-			"message": map[string]interface{}{
+		map[string]any{
+			"message": map[string]any{
 				"type":        "string",
 				"description": "A conversational message to share with the user. Can include information, explanations, or casual responses.",
 			},
@@ -43,7 +43,7 @@ func (t *ConverseTool) Schema() map[string]interface{} {
 }
 
 // Execute runs the tool and returns the conversational message
-func (t *ConverseTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]interface{}, error) {
+func (t *ConverseTool) Execute(ctx context.Context, argsXML []byte) (string, map[string]any, error) {
 	var args struct {
 		XMLName xml.Name `xml:"arguments"`
 		Message string   `xml:"message"`

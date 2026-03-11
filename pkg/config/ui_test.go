@@ -233,7 +233,7 @@ func TestUISection_ThreadSafety(t *testing.T) {
 
 	// Writer goroutine
 	go func() {
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			ui.SetAutoCloseCommandOverlay(i%2 == 0)
 			ui.SetKeepOpenOnError(i%3 == 0)
 			ui.SetAutoCloseDelay(time.Duration(i+1) * time.Second)
@@ -243,7 +243,7 @@ func TestUISection_ThreadSafety(t *testing.T) {
 
 	// Reader goroutine
 	go func() {
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			ui.GetAutoCloseSettings()
 			ui.ShouldAutoClose(i % 3)
 		}

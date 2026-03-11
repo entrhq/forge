@@ -41,7 +41,7 @@ func TestAddNoteTool_Schema(t *testing.T) {
 	}
 
 	// Check required fields
-	props, ok := schema["properties"].(map[string]interface{})
+	props, ok := schema["properties"].(map[string]any)
 	if !ok {
 		t.Fatal("Schema missing properties")
 	}
