@@ -284,7 +284,7 @@ func (e *Executor) Run(ctx context.Context) error {
 								e.retryPhaseActive = true
 								// Cancel the original timeout and create a new one for retries
 								cancel()
-								execCtx, retryCancel = context.WithTimeout(ctx, e.config.QualityGateRetryTimeout) //nolint:gosec
+								execCtx, retryCancel = context.WithTimeout(ctx, e.config.QualityGateRetryTimeout) //nolint:gosec // retryCancel is deferred at top of function
 								e.logger.Infof("→ Extended timeout for quality gate retries: %v", e.config.QualityGateRetryTimeout)
 							}
 
