@@ -11,6 +11,7 @@ import (
 	"github.com/entrhq/forge/pkg/agent/git"
 	"github.com/entrhq/forge/pkg/agent/slash"
 	"github.com/entrhq/forge/pkg/executor/tui/approval"
+	"github.com/entrhq/forge/pkg/executor/tui/markdown"
 	"github.com/entrhq/forge/pkg/executor/tui/overlay"
 	"github.com/entrhq/forge/pkg/llm"
 	"github.com/entrhq/forge/pkg/types"
@@ -37,6 +38,9 @@ type model struct {
 
 	// Customization
 	header string // Custom ASCII art header (empty means use default)
+
+	// Markdown renderer — applies glamour styling to completed agent messages.
+	mdRenderer *markdown.Renderer
 
 	// Content buffers
 	// messages is the TUI-owned display history. Each entry stores raw text

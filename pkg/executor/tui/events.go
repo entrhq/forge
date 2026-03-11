@@ -228,7 +228,14 @@ func (m *model) handleToolResult(event *pkgtypes.AgentEvent) {
 
 	switch tier {
 	case TierFullInline:
-		m.appendMsg(newEntryMsg("    ✓ ", resultStr, toolResultStyle, "\n\n"))
+		// Loop-breaking tools (task_completion, converse, ask_question) carry
+		// markdown-rich prose written by the agent; render them with glamour.
+		// Regular small tool results remain plain-text styled.
+		if m.resultClassifier.IsLoopBreakingTool(m.lastToolName) {
+			m.appendMsg(newMarkdownMsg(m.mdRenderer.RenderFn(resultStr), "\n\n"))
+		} else {
+			m.appendMsg(newEntryMsg("    ✓ ", resultStr, toolResultStyle, "\n\n"))
+		}
 
 	case TierSummaryWithPreview:
 		summary := m.resultSummarizer.GenerateSummary(m.lastToolName, resultStr)
@@ -273,8 +280,12 @@ func (m *model) handleMessageContent(content string) bool {
 func (m *model) handleMessageEnd() {
 	if m.messageBuffer.Len() > 0 && m.hasMessageContentStarted {
 		// Capture raw text for reflow-capable DisplayMessage.
+		// glamour requires the complete document — apply it here at the commit
+		// point, never during streaming.  The RenderFn closure captures msgText
+		// and re-renders at the correct width on each viewport rebuild, so
+		// terminal resizes automatically reflow the markdown output.
 		msgText := m.messageBuffer.String()
-		m.appendMsg(newEntryMsg("", msgText, lipgloss.NewStyle(), "\n\n"))
+		m.appendMsg(newMarkdownMsg(m.mdRenderer.RenderFn(msgText), "\n\n"))
 		m.hasMessageContentStarted = false
 	}
 	m.messageBuffer.Reset()

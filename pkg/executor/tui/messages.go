@@ -66,3 +66,13 @@ func newRawMsg(text, trailing string) DisplayMessage {
 		Trailing: trailing,
 	}
 }
+
+// newMarkdownMsg returns a DisplayMessage that uses a caller-supplied
+// width-aware render closure.  Use this for glamour-rendered agent messages
+// so that resize triggers a fresh render at the new width.
+func newMarkdownMsg(renderFn func(int) string, trailing string) DisplayMessage {
+	return DisplayMessage{
+		RenderFn: renderFn,
+		Trailing: trailing,
+	}
+}

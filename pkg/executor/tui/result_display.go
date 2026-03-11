@@ -45,6 +45,12 @@ func NewToolResultClassifier() *ToolResultClassifier {
 	}
 }
 
+// IsLoopBreakingTool returns true if the tool always renders its result inline
+// and is eligible for markdown rendering.
+func (c *ToolResultClassifier) IsLoopBreakingTool(toolName string) bool {
+	return c.loopBreakingTools[toolName]
+}
+
 // ClassifyToolResult determines the display tier for a tool result
 func (c *ToolResultClassifier) ClassifyToolResult(toolName string, result string) DisplayTier {
 	// Check if this is a loop-breaking tool (always full inline)

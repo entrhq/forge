@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/entrhq/forge/pkg/config"
+	"github.com/entrhq/forge/pkg/executor/tui/markdown"
 	"github.com/entrhq/forge/pkg/executor/tui/overlay"
 )
 
@@ -52,6 +53,7 @@ func initialModel() model {
 		messages:         nil,
 		thinkingBuffer:   &strings.Builder{},
 		messageBuffer:    &strings.Builder{},
+		mdRenderer:       markdown.New(""),
 		overlay:          newOverlayState(),
 		commandPalette:   overlay.NewCommandPalette(cmdItems),
 		summarization:    &summarizationStatus{},
