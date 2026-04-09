@@ -460,18 +460,21 @@ func TestConfirmDialog_YesNo(t *testing.T) {
 	yesCalled := false
 	noCalled := false
 
-	dialog := &confirmDialog{
-		title:   "Confirm Action",
-		message: "Are you sure?",
-		onYes: func() {
+	dialog := newConfirmDialog(
+		"Confirm Action",
+		"Are you sure?",
+		"Yes",
+		"No",
+		"Cancel",
+		func() {
 			yesCalled = true
 			overlay.confirmDialog = nil
 		},
-		onNo: func() {
+		func() {
 			noCalled = true
 			overlay.confirmDialog = nil
 		},
-	}
+	)
 
 	overlay.confirmDialog = dialog
 
@@ -506,13 +509,17 @@ func TestConfirmDialog_YesNo(t *testing.T) {
 func TestConfirmDialog_Escape(t *testing.T) {
 	overlay := NewSettingsOverlay(100, 50)
 
-	dialog := &confirmDialog{
-		title:   "Confirm Action",
-		message: "Are you sure?",
-		onNo: func() {
+	dialog := newConfirmDialog(
+		"Confirm Action",
+		"Are you sure?",
+		"Yes",
+		"No",
+		"Cancel",
+		nil,
+		func() {
 			t.Error("Escape should NOT call onNo - it just cancels")
 		},
-	}
+	)
 
 	overlay.confirmDialog = dialog
 
