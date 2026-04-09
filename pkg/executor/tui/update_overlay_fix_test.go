@@ -26,6 +26,9 @@ func (m *mockOverlay) Update(msg tea.Msg, state types.StateProvider, actions typ
 	if _, ok := msg.(mockMsg); ok && m.shouldClose {
 		return nil, m.cmdToReturn
 	}
+	if _, ok := msg.(tea.KeyMsg); ok && m.shouldClose {
+		return nil, m.cmdToReturn
+	}
 	return m, nil
 }
 
@@ -84,4 +87,26 @@ func TestUpdate_OverlayClosingWithCommand(t *testing.T) {
 	}
 
 	t.Log("Test finished - verified that overlay closed and a command was returned.")
+}
+
+func TestUpdate_OverlayClosingKeyDoesNotLeakToTextarea(t *testing.T) {
+	m := &model{
+		overlay:        newOverlayState(),
+		spinner:        spinner.New(),
+		textarea:       textarea.New(),
+		viewport:       viewport.New(80, 24),
+		commandPalette: overlay.NewCommandPalette(nil),
+	}
+	m.textarea.Focus()
+
+	m.overlay.activate(types.OverlayModeSettings, &mockOverlay{shouldClose: true})
+
+	_, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+
+	if m.overlay.isActive() {
+		t.Fatal("overlay should be closed after key update")
+	}
+	if got := m.textarea.Value(); got != "" {
+		t.Fatalf("textarea should stay empty after overlay close key, got %q", got)
+	}
 }

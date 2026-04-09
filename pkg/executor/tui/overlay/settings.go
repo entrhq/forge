@@ -125,11 +125,14 @@ const (
 
 // confirmDialog represents a confirmation dialog
 type confirmDialog struct {
-	title   string
-	message string
-	details []string
-	onYes   func()
-	onNo    func()
+	title       string
+	message     string
+	details     []string
+	yesLabel    string
+	noLabel     string
+	cancelLabel string
+	onYes       func()
+	onNo        func()
 }
 
 // NewSettingsOverlay creates a new interactive settings overlay
@@ -1178,8 +1181,11 @@ func (s *SettingsOverlay) showEditPatternDialog() tea.Cmd {
 
 func (s *SettingsOverlay) showDeleteConfirmation() {
 	s.confirmDialog = &confirmDialog{
-		title:   "Delete Pattern",
-		message: "Are you sure you want to delete this pattern?",
+		title:       "Delete Pattern",
+		message:     "Delete this command whitelist pattern?",
+		yesLabel:    "Delete pattern",
+		noLabel:     "Keep pattern",
+		cancelLabel: "Cancel",
 		onYes: func() {
 			s.deletePattern(s.selectedItem)
 			s.confirmDialog = nil
@@ -1192,8 +1198,11 @@ func (s *SettingsOverlay) showDeleteConfirmation() {
 
 func (s *SettingsOverlay) showUnsavedChangesDialog() {
 	s.confirmDialog = &confirmDialog{
-		title:   "Unsaved Changes",
-		message: "You have unsaved changes. Save before closing?",
+		title:       "Unsaved Changes",
+		message:     "Save changes before closing settings?",
+		yesLabel:    "Save and close",
+		noLabel:     "Discard changes",
+		cancelLabel: "Keep editing",
 		onYes: func() {
 			// Save settings and clear state - handleConfirmInput will close overlay
 			_ = s.saveSettings() //nolint:errcheck
@@ -1743,7 +1752,20 @@ func (s *SettingsOverlay) renderConfirmDialog() string {
 	content.WriteString("\n")
 
 	// Buttons
-	buttonRow := "[y] Yes, delete    [n] No, cancel"
+	yesLabel := s.confirmDialog.yesLabel
+	if yesLabel == "" {
+		yesLabel = "Yes"
+	}
+	noLabel := s.confirmDialog.noLabel
+	if noLabel == "" {
+		noLabel = "No"
+	}
+	cancelLabel := s.confirmDialog.cancelLabel
+	if cancelLabel == "" {
+		cancelLabel = "Cancel"
+	}
+
+	buttonRow := fmt.Sprintf("[y] %s    [n] %s    [Esc] %s", yesLabel, noLabel, cancelLabel)
 	buttonStyle := lipgloss.NewStyle().Foreground(types.MutedGray)
 	content.WriteString(buttonStyle.Render(buttonRow))
 

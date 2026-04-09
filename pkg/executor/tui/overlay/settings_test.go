@@ -525,6 +525,28 @@ func TestConfirmDialog_Escape(t *testing.T) {
 	}
 }
 
+func TestShowUnsavedChangesDialog_UsesActionLabels(t *testing.T) {
+	overlay := NewSettingsOverlay(100, 50)
+
+	overlay.showUnsavedChangesDialog()
+
+	if overlay.confirmDialog == nil {
+		t.Fatal("expected unsaved changes dialog to be shown")
+	}
+	if got := overlay.confirmDialog.message; got != "Save changes before closing settings?" {
+		t.Fatalf("message = %q, want %q", got, "Save changes before closing settings?")
+	}
+	if got := overlay.confirmDialog.yesLabel; got != "Save and close" {
+		t.Fatalf("yesLabel = %q, want %q", got, "Save and close")
+	}
+	if got := overlay.confirmDialog.noLabel; got != "Discard changes" {
+		t.Fatalf("noLabel = %q, want %q", got, "Discard changes")
+	}
+	if got := overlay.confirmDialog.cancelLabel; got != "Keep editing" {
+		t.Fatalf("cancelLabel = %q, want %q", got, "Keep editing")
+	}
+}
+
 func TestInputDialog_CharInput(t *testing.T) {
 	newOverlayWithTextField := func(maxLength int) *SettingsOverlay {
 		overlay := NewSettingsOverlay(100, 50)
