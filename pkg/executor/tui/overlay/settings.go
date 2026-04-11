@@ -125,11 +125,38 @@ const (
 
 // confirmDialog represents a confirmation dialog
 type confirmDialog struct {
-	title   string
-	message string
-	details []string
-	onYes   func()
-	onNo    func()
+	title       string
+	message     string
+	details     []string
+	yesLabel    string
+	noLabel     string
+	cancelLabel string
+	onYes       func()
+	onNo        func()
+}
+
+func newConfirmDialog(
+	title string,
+	message string,
+	yesLabel string,
+	noLabel string,
+	cancelLabel string,
+	onYes func(),
+	onNo func(),
+) *confirmDialog {
+	if yesLabel == "" || noLabel == "" || cancelLabel == "" {
+		panic("confirm dialog labels are required")
+	}
+
+	return &confirmDialog{
+		title:       title,
+		message:     message,
+		yesLabel:    yesLabel,
+		noLabel:     noLabel,
+		cancelLabel: cancelLabel,
+		onYes:       onYes,
+		onNo:        onNo,
+	}
 }
 
 // NewSettingsOverlay creates a new interactive settings overlay
@@ -1177,35 +1204,41 @@ func (s *SettingsOverlay) showEditPatternDialog() tea.Cmd {
 }
 
 func (s *SettingsOverlay) showDeleteConfirmation() {
-	s.confirmDialog = &confirmDialog{
-		title:   "Delete Pattern",
-		message: "Are you sure you want to delete this pattern?",
-		onYes: func() {
+	s.confirmDialog = newConfirmDialog(
+		"Delete Pattern",
+		"Delete this command whitelist pattern?",
+		"Delete pattern",
+		"Keep pattern",
+		"Cancel",
+		func() {
 			s.deletePattern(s.selectedItem)
 			s.confirmDialog = nil
 		},
-		onNo: func() {
+		func() {
 			s.confirmDialog = nil
 		},
-	}
+	)
 }
 
 func (s *SettingsOverlay) showUnsavedChangesDialog() {
-	s.confirmDialog = &confirmDialog{
-		title:   "Unsaved Changes",
-		message: "You have unsaved changes. Save before closing?",
-		onYes: func() {
+	s.confirmDialog = newConfirmDialog(
+		"Unsaved Changes",
+		"Save changes before closing settings?",
+		"Save and close",
+		"Discard changes",
+		"Keep editing",
+		func() {
 			// Save settings and clear state - handleConfirmInput will close overlay
 			_ = s.saveSettings() //nolint:errcheck
 			s.hasChanges = false
 			s.confirmDialog = nil
 		},
-		onNo: func() {
+		func() {
 			// Discard changes and clear state - handleConfirmInput will close overlay
 			s.hasChanges = false
 			s.confirmDialog = nil
 		},
-	}
+	)
 }
 
 func (s *SettingsOverlay) showTextFieldEditDialog() tea.Cmd {
@@ -1742,10 +1775,19 @@ func (s *SettingsOverlay) renderConfirmDialog() string {
 
 	content.WriteString("\n")
 
-	// Buttons
-	buttonRow := "[y] Yes, delete    [n] No, cancel"
+	// Primary actions
+	actionsLabelStyle := lipgloss.NewStyle().Foreground(types.MutedGray)
+	content.WriteString(actionsLabelStyle.Render("Choose an action:"))
+	content.WriteString("\n")
+
+	buttonRow := strings.Join([]string{
+		fmt.Sprintf("[y] %s", s.confirmDialog.yesLabel),
+		fmt.Sprintf("[n] %s", s.confirmDialog.noLabel),
+	}, "\n")
 	buttonStyle := lipgloss.NewStyle().Foreground(types.MutedGray)
 	content.WriteString(buttonStyle.Render(buttonRow))
+	content.WriteString("\n\n")
+	content.WriteString(actionsLabelStyle.Render(fmt.Sprintf("[Esc] %s", s.confirmDialog.cancelLabel)))
 
 	// Create dialog box with flat border matching redesign
 	dialogStyle := lipgloss.NewStyle().

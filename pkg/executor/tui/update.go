@@ -48,7 +48,13 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if overlayCmd != nil {
 				spinnerCmd = tea.Batch(spinnerCmd, overlayCmd)
 			}
-			// Continue processing the message in the main model.
+			// Consume the input event that closed the overlay so it does not leak
+			// into the main textarea or viewport in the same update cycle.
+			switch msg.(type) {
+			case tea.KeyMsg, tea.MouseMsg:
+				return m, spinnerCmd
+			}
+			// Continue processing non-input messages in the main model.
 		} else {
 			m.overlay.overlay = updatedOverlay
 

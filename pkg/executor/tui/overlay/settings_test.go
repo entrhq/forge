@@ -2,6 +2,7 @@ package overlay
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -460,18 +461,21 @@ func TestConfirmDialog_YesNo(t *testing.T) {
 	yesCalled := false
 	noCalled := false
 
-	dialog := &confirmDialog{
-		title:   "Confirm Action",
-		message: "Are you sure?",
-		onYes: func() {
+	dialog := newConfirmDialog(
+		"Confirm Action",
+		"Are you sure?",
+		"Yes",
+		"No",
+		"Cancel",
+		func() {
 			yesCalled = true
 			overlay.confirmDialog = nil
 		},
-		onNo: func() {
+		func() {
 			noCalled = true
 			overlay.confirmDialog = nil
 		},
-	}
+	)
 
 	overlay.confirmDialog = dialog
 
@@ -506,13 +510,17 @@ func TestConfirmDialog_YesNo(t *testing.T) {
 func TestConfirmDialog_Escape(t *testing.T) {
 	overlay := NewSettingsOverlay(100, 50)
 
-	dialog := &confirmDialog{
-		title:   "Confirm Action",
-		message: "Are you sure?",
-		onNo: func() {
+	dialog := newConfirmDialog(
+		"Confirm Action",
+		"Are you sure?",
+		"Yes",
+		"No",
+		"Cancel",
+		nil,
+		func() {
 			t.Error("Escape should NOT call onNo - it just cancels")
 		},
-	}
+	)
 
 	overlay.confirmDialog = dialog
 
@@ -522,6 +530,48 @@ func TestConfirmDialog_Escape(t *testing.T) {
 
 	if overlay.confirmDialog != nil {
 		t.Error("Dialog should be closed after Escape")
+	}
+}
+
+func TestShowUnsavedChangesDialog_UsesActionLabels(t *testing.T) {
+	overlay := NewSettingsOverlay(100, 50)
+
+	overlay.showUnsavedChangesDialog()
+
+	if overlay.confirmDialog == nil {
+		t.Fatal("expected unsaved changes dialog to be shown")
+	}
+	if got := overlay.confirmDialog.message; got != "Save changes before closing settings?" {
+		t.Fatalf("message = %q, want %q", got, "Save changes before closing settings?")
+	}
+	if got := overlay.confirmDialog.yesLabel; got != "Save and close" {
+		t.Fatalf("yesLabel = %q, want %q", got, "Save and close")
+	}
+	if got := overlay.confirmDialog.noLabel; got != "Discard changes" {
+		t.Fatalf("noLabel = %q, want %q", got, "Discard changes")
+	}
+	if got := overlay.confirmDialog.cancelLabel; got != "Keep editing" {
+		t.Fatalf("cancelLabel = %q, want %q", got, "Keep editing")
+	}
+}
+
+func TestRenderConfirmDialog_StacksActions(t *testing.T) {
+	overlay := NewSettingsOverlay(100, 50)
+	overlay.showUnsavedChangesDialog()
+
+	rendered := overlay.renderConfirmDialog()
+
+	expectedRows := []string{
+		"Choose an action:",
+		"[y] Save and close",
+		"[n] Discard changes",
+		"[Esc] Keep editing",
+	}
+
+	for _, row := range expectedRows {
+		if !strings.Contains(rendered, row) {
+			t.Fatalf("expected rendered confirm dialog to contain %q", row)
+		}
 	}
 }
 
