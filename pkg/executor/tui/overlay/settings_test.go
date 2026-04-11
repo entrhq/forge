@@ -2,6 +2,7 @@ package overlay
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -551,6 +552,26 @@ func TestShowUnsavedChangesDialog_UsesActionLabels(t *testing.T) {
 	}
 	if got := overlay.confirmDialog.cancelLabel; got != "Keep editing" {
 		t.Fatalf("cancelLabel = %q, want %q", got, "Keep editing")
+	}
+}
+
+func TestRenderConfirmDialog_StacksActions(t *testing.T) {
+	overlay := NewSettingsOverlay(100, 50)
+	overlay.showUnsavedChangesDialog()
+
+	rendered := overlay.renderConfirmDialog()
+
+	expectedRows := []string{
+		"Choose an action:",
+		"[y] Save and close",
+		"[n] Discard changes",
+		"[Esc] Keep editing",
+	}
+
+	for _, row := range expectedRows {
+		if !strings.Contains(rendered, row) {
+			t.Fatalf("expected rendered confirm dialog to contain %q", row)
+		}
 	}
 }
 

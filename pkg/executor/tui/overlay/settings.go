@@ -1775,15 +1775,19 @@ func (s *SettingsOverlay) renderConfirmDialog() string {
 
 	content.WriteString("\n")
 
-	// Buttons
-	buttonRow := fmt.Sprintf(
-		"[y] %s    [n] %s    [Esc] %s",
-		s.confirmDialog.yesLabel,
-		s.confirmDialog.noLabel,
-		s.confirmDialog.cancelLabel,
-	)
+	// Primary actions
+	actionsLabelStyle := lipgloss.NewStyle().Foreground(types.MutedGray)
+	content.WriteString(actionsLabelStyle.Render("Choose an action:"))
+	content.WriteString("\n")
+
+	buttonRow := strings.Join([]string{
+		fmt.Sprintf("[y] %s", s.confirmDialog.yesLabel),
+		fmt.Sprintf("[n] %s", s.confirmDialog.noLabel),
+	}, "\n")
 	buttonStyle := lipgloss.NewStyle().Foreground(types.MutedGray)
 	content.WriteString(buttonStyle.Render(buttonRow))
+	content.WriteString("\n\n")
+	content.WriteString(actionsLabelStyle.Render(fmt.Sprintf("[Esc] %s", s.confirmDialog.cancelLabel)))
 
 	// Create dialog box with flat border matching redesign
 	dialogStyle := lipgloss.NewStyle().
