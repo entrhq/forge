@@ -18,11 +18,13 @@ import (
 const (
 	// Section and field names
 	llmSection                = "llm"
+	providerField             = "provider"
 	modelField                = "model"
 	summarizationModelField   = "summarization_model"
 	browserAnalysisModelField = "browser_analysis_model"
 	baseURLField              = "base_url"
 	apiKeyField               = "api_key"
+	maxTokensField            = "max_tokens"
 )
 
 // SettingsOverlay provides a full interactive settings editor
@@ -245,11 +247,13 @@ func (s *SettingsOverlay) loadSettings() {
 				key         string
 				displayName string
 			}{
+				{providerField, "Provider"},
 				{modelField, "Model"},
 				{summarizationModelField, "Summarization Model"},
 				{browserAnalysisModelField, "Browser Analysis Model"},
 				{baseURLField, "Base URL"},
 				{apiKeyField, "API Key"},
+				{maxTokensField, "Max Tokens"},
 			}
 
 			for _, field := range llmFields {
@@ -258,6 +262,10 @@ func (s *SettingsOverlay) loadSettings() {
 				// Try to get value from runtime provider first (actual running config)
 				if s.provider != nil {
 					switch field.key {
+					case providerField:
+						if info := s.provider.GetModelInfo(); info != nil {
+							value = info.Provider
+						}
 					case modelField:
 						if model := s.provider.GetModel(); model != "" {
 							value = model
@@ -274,9 +282,10 @@ func (s *SettingsOverlay) loadSettings() {
 					}
 				}
 
-				// Fall back to config file value if provider didn't have it
+				// Fall back to config file value if provider didn't have it.
+				// An unset max_tokens is stored as 0 and shown blank, meaning provider default.
 				if value == "" {
-					if v, ok := data[field.key]; ok && v != nil {
+					if v, ok := data[field.key]; ok && v != nil && v != 0 {
 						value = fmt.Sprintf("%v", v)
 					}
 				}

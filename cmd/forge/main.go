@@ -23,7 +23,7 @@ import (
 	appconfig "github.com/entrhq/forge/pkg/config"
 	"github.com/entrhq/forge/pkg/executor/tui"
 	"github.com/entrhq/forge/pkg/llm"
-	"github.com/entrhq/forge/pkg/llm/openai"
+	"github.com/entrhq/forge/pkg/llm/factory"
 	frameworkVersion "github.com/entrhq/forge/pkg/version"
 
 	"github.com/entrhq/forge/pkg/security/workspace"
@@ -109,8 +109,8 @@ func parseFlags() *Config {
 	// Use temporary variables for flags
 	var apiKey, baseURL, model string
 
-	flag.StringVar(&apiKey, "api-key", "", "OpenAI API key (or set OPENAI_API_KEY env var)")
-	flag.StringVar(&baseURL, "base-url", "", "OpenAI API base URL (or set OPENAI_BASE_URL env var)")
+	flag.StringVar(&apiKey, "api-key", "", "LLM API key (or set OPENAI_API_KEY / ANTHROPIC_API_KEY per provider, or FORGE_API_KEY for either)")
+	flag.StringVar(&baseURL, "base-url", "", "LLM API base URL (or set OPENAI_BASE_URL / ANTHROPIC_BASE_URL per provider, or FORGE_BASE_URL for either)")
 	flag.StringVar(&model, "model", "", "LLM model to use")
 	flag.StringVar(&config.WorkspaceDir, "workspace", ".", "Workspace directory (default: current directory)")
 	flag.StringVar(&config.SystemPrompt, "prompt", "", "Custom instructions for the agent (optional, overrides default)")
@@ -124,8 +124,12 @@ func parseFlags() *Config {
 		fmt.Fprintf(os.Stderr, "Options:\n")
 		flag.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\nEnvironment Variables:\n")
-		fmt.Fprintf(os.Stderr, "  OPENAI_API_KEY     OpenAI API key\n")
-		fmt.Fprintf(os.Stderr, "  OPENAI_BASE_URL    OpenAI API base URL (for compatible APIs)\n")
+		fmt.Fprintf(os.Stderr, "  OPENAI_API_KEY     API key when llm.provider is \"openai\" (default)\n")
+		fmt.Fprintf(os.Stderr, "  OPENAI_BASE_URL    Base URL for OpenAI-compatible APIs\n")
+		fmt.Fprintf(os.Stderr, "  ANTHROPIC_API_KEY  API key when llm.provider is \"anthropic\"\n")
+		fmt.Fprintf(os.Stderr, "  ANTHROPIC_BASE_URL Base URL for Anthropic-compatible APIs\n")
+		fmt.Fprintf(os.Stderr, "  FORGE_API_KEY      API key for either provider, read after the provider-specific variable\n")
+		fmt.Fprintf(os.Stderr, "  FORGE_BASE_URL     Base URL for either provider, read after the provider-specific variable\n")
 		fmt.Fprintf(os.Stderr, "\nExamples:\n")
 		fmt.Fprintf(os.Stderr, "  # TUI Mode (default)\n")
 		fmt.Fprintf(os.Stderr, "  forge                                    # Start in current directory\n")
@@ -216,7 +220,7 @@ func runTUI(ctx context.Context, config *Config) error {
 		cliAPIKey = *config.APIKey
 	}
 
-	provider, err := openai.BuildProvider(cliModel, cliBaseURL, cliAPIKey, defaultModel)
+	provider, err := factory.BuildProvider(cliModel, cliBaseURL, cliAPIKey, defaultModel)
 	if err != nil {
 		return err
 	}
