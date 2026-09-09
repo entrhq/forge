@@ -139,7 +139,8 @@ func (s *GoalBatchCompactionStrategy) Summarize(ctx context.Context, conv *memor
 	}
 
 	// Build the replacement [GOAL BATCH] message.
-	goalBatch := types.NewAssistantMessage(fmt.Sprintf("[GOAL BATCH]\n%s", response.Content))
+	goalBatch := types.NewAssistantMessage(fmt.Sprintf("[GOAL BATCH]\n%s", response.Content)).
+		WithStability(types.StabilitySession)
 	goalBatch.WithMetadata("summarized", true)
 	goalBatch.WithMetadata("summary_type", "goal_batch")
 	goalBatch.WithMetadata("turn_count", len(batch))

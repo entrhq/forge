@@ -210,6 +210,7 @@ func TestGoalBatchCompactionStrategy_Summarize_ReplacesWithGoalBatch(t *testing.
 		if isGoalBatch(msg) {
 			foundGoalBatch = true
 			assert.Contains(t, msg.Content, "[GOAL BATCH]")
+			assert.Equal(t, types.StabilitySession, msg.Stability, "goal batch is a stable cache target")
 		}
 	}
 	assert.True(t, foundGoalBatch, "conversation must contain a [GOAL BATCH] block")
