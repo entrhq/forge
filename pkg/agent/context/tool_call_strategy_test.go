@@ -188,6 +188,7 @@ func TestSummarize_AllToolCallsSummarized(t *testing.T) {
 	messages := conv.GetAll()
 	for _, msg := range messages {
 		if isSummarized(msg) {
+			assert.Equal(t, types.StabilitySession, msg.Stability, "summary is a stable cache target")
 			continue
 		}
 		assert.False(

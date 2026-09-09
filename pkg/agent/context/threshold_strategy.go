@@ -141,6 +141,7 @@ func (s *ThresholdSummarizationStrategy) generateSummary(ctx context.Context, to
 	// The [SUMMARIZED] prefix is an explicit epistemic marker so the agent
 	// knows this content is compressed recalled experience, not raw history.
 	summary := types.NewAssistantMessage(fmt.Sprintf("[SUMMARIZED] %s", response.Content)).
+		WithStability(types.StabilitySession).
 		WithMetadata("summarized", true).
 		WithMetadata("summary_count", len(toSummarize)).
 		WithMetadata("summary_method", s.Name())

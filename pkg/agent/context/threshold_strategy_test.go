@@ -152,6 +152,7 @@ func TestThresholdStrategy_Summarize_HalfAndHalf(t *testing.T) {
 	// First message is the summary.
 	assert.Equal(t, types.RoleAssistant, result[0].Role)
 	assert.True(t, result[0].Metadata["summarized"].(bool), "first message must be marked summarized")
+	assert.Equal(t, types.StabilitySession, result[0].Stability, "summary is a stable cache target")
 
 	// The recent half is verbatim, in order.
 	assert.Equal(t, msgs[3], result[1], "recent[0] should be turn 2 assistant verbatim")

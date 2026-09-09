@@ -1,6 +1,7 @@
 package prompts
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -129,7 +130,7 @@ func TestBuildMessages(t *testing.T) {
 		}
 		userMessage := "How are you?"
 
-		messages := BuildMessages(systemPrompt, history, userMessage, "")
+		messages := BuildMessages(systemMessagesFor(systemPrompt), history, userMessage)
 
 		// Should have: system + 2 history + new user = 4 messages
 		if len(messages) != 4 {
@@ -160,7 +161,7 @@ func TestBuildMessages(t *testing.T) {
 			types.NewUserMessage("Hello"),
 		}
 
-		messages := BuildMessages(systemPrompt, history, "", "")
+		messages := BuildMessages(systemMessagesFor(systemPrompt), history, "")
 
 		// Should have: new system + 1 user (old system skipped) = 2 messages
 		if len(messages) != 2 {
@@ -216,7 +217,7 @@ func TestBuildMessages_ToolRoleRemapping(t *testing.T) {
 		types.NewToolMessage("Tool 'execute_command' result:\nok"),
 	}
 
-	messages := BuildMessages(systemPrompt, history, "", "")
+	messages := BuildMessages(systemMessagesFor(systemPrompt), history, "")
 
 	// system + 3 history = 4 messages
 	if len(messages) != 4 {
@@ -271,5 +272,123 @@ func TestSchemaToJSON(t *testing.T) {
 	}
 	if !strings.Contains(jsonStr, "name") {
 		t.Error("JSON should contain properties")
+	}
+}
+
+// systemMessagesFor wraps a plain system prompt in the slice form BuildMessages takes.
+func systemMessagesFor(systemPrompt string) []*types.Message {
+	return []*types.Message{types.NewSystemMessage(systemPrompt)}
+}
+
+func TestBuildSegments(t *testing.T) {
+	builder := NewPromptBuilder().
+		WithCustomInstructions("be terse").
+		WithRepositoryContext("go module").
+		WithTools([]tools.Tool{tools.NewTaskCompletionTool()}).
+		WithCustomToolsList("## Custom").
+		WithBrowserGuidance("## Browser")
+
+	segments := builder.BuildSegments()
+	if len(segments) != 2 {
+		t.Fatalf("expected 2 segments, got %d", len(segments))
+	}
+	for _, seg := range segments {
+		if seg.Role != types.RoleSystem {
+			t.Errorf("segment role must be system, got %s", seg.Role)
+		}
+	}
+	if segments[0].Stability != types.StabilityStatic {
+		t.Error("first segment must be static")
+	}
+	if segments[1].Stability != types.StabilitySession {
+		t.Error("second segment must be session")
+	}
+
+	// The split point is the tool listing: everything before it is static.
+	if strings.Contains(segments[0].Content, "<available_tools>") {
+		t.Error("static segment must not contain the tool listing")
+	}
+	if !strings.HasPrefix(segments[1].Content, "<available_tools>") {
+		t.Error("session segment must start with the tool listing")
+	}
+	for _, want := range []string{"be terse", "go module", ToolCallingPrompt} {
+		if !strings.Contains(segments[0].Content, want) {
+			t.Errorf("static segment missing %q", want)
+		}
+	}
+	for _, want := range []string{"task_completion", ToolUseRulesPrompt, "## Custom", "## Browser"} {
+		if !strings.Contains(segments[1].Content, want) {
+			t.Errorf("session segment missing %q", want)
+		}
+	}
+
+	if joined := segments[0].Content + segments[1].Content; joined != builder.Build() {
+		t.Error("BuildSegments joined must equal Build")
+	}
+}
+
+func TestBuildMessages_SystemFirstThenEphemeralTrailing(t *testing.T) {
+	system := []*types.Message{
+		types.NewSystemMessage("static").WithStability(types.StabilityStatic),
+		types.NewSystemMessage("session").WithStability(types.StabilitySession),
+	}
+	history := []*types.Message{
+		types.NewUserMessage("hello"),
+		types.NewAssistantMessage("hi"),
+	}
+
+	messages := BuildMessages(system, history, "", "memories", "", "error context")
+
+	wantRoles := []types.MessageRole{
+		types.RoleSystem, types.RoleSystem,
+		types.RoleUser, types.RoleAssistant,
+		types.RoleUser, types.RoleUser,
+	}
+	if len(messages) != len(wantRoles) {
+		t.Fatalf("expected %d messages, got %d", len(wantRoles), len(messages))
+	}
+	for i, role := range wantRoles {
+		if messages[i].Role != role {
+			t.Errorf("message %d: expected role %s, got %s", i, role, messages[i].Role)
+		}
+	}
+	if messages[0].Stability != types.StabilityStatic || messages[1].Stability != types.StabilitySession {
+		t.Error("system message stability must be preserved")
+	}
+	if messages[4].Content != "memories" || messages[5].Content != "error context" {
+		t.Error("ephemeral context must follow history in the order given, skipping empty entries")
+	}
+}
+
+// manyParamsTool has enough required parameters that unsorted map iteration
+// would reorder the formatted output almost every call.
+type manyParamsTool struct{}
+
+func (manyParamsTool) Name() string        { return "many_params" }
+func (manyParamsTool) Description() string { return "A tool with many parameters." }
+func (manyParamsTool) IsLoopBreaking() bool { return false }
+func (manyParamsTool) Execute(context.Context, []byte) (string, map[string]any, error) {
+	return "", nil, nil
+}
+func (manyParamsTool) Schema() map[string]any {
+	props := map[string]any{}
+	var required []string
+	for _, name := range []string{"alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta", "theta"} {
+		props[name] = map[string]any{"type": "string", "description": name}
+		required = append(required, name)
+	}
+	return map[string]any{"type": "object", "properties": props, "required": required}
+}
+
+func TestFormatToolSchemas_Deterministic(t *testing.T) {
+	toolsList := []tools.Tool{manyParamsTool{}}
+	first := FormatToolSchemas(toolsList)
+	for range 50 {
+		if got := FormatToolSchemas(toolsList); got != first {
+			t.Fatal("FormatToolSchemas output changed between calls with identical input")
+		}
+	}
+	if !strings.Contains(first, "- `alpha`") || strings.Index(first, "- `alpha`") > strings.Index(first, "- `beta`") {
+		t.Error("parameters must be listed in sorted order")
 	}
 }

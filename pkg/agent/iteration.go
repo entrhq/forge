@@ -12,7 +12,6 @@ import (
 
 // promptContext holds the prepared prompt and related metadata
 type promptContext struct {
-	systemPrompt string
 	messages     []*types.Message
 	promptTokens int
 }
@@ -57,50 +56,27 @@ func (a *DefaultAgent) attemptSummarization(ctx context.Context, promptTokens in
 
 // preparePrompt builds the prompt, counts tokens, and handles context summarization
 func (a *DefaultAgent) preparePrompt(ctx context.Context, errorContext string) *promptContext {
-	// Build system prompt with tools
-	systemPrompt := a.buildSystemPrompt()
-
-	// Get conversation history from memory
+	systemMessages := a.buildSystemMessages()
 	history := a.memory.GetAll()
 
-	// Retrieve relevant long-term memories and prepend them to the system prompt.
-	// This is a no-op when the retrieval engine is nil or the index is empty.
-	if a.retrievalEngine != nil {
-		a.cancelMu.Lock()
-		turnID := a.currentTurnID
-		a.cancelMu.Unlock()
+	// Retrieved memories travel as an ephemeral trailing message rather than
+	// as part of the system prompt: they change every turn, and placing them
+	// after history keeps the system prompt and history byte-identical across
+	// requests so providers can cache that prefix.
+	memoryContext := a.retrieveMemories(ctx, history)
 
-		// Grab the last user message content for the HyDE window.
-		var lastUserContent string
-		for i := len(history) - 1; i >= 0; i-- {
-			if history[i].Role == "user" {
-				lastUserContent = history[i].Content
-				break
-			}
-		}
+	messages := prompts.BuildMessages(systemMessages, history, "", memoryContext, errorContext)
 
-		if injection := a.retrievalEngine.RetrieveForTurn(ctx, turnID, history, lastUserContent); injection != "" {
-			systemPrompt = injection + "\n\n" + systemPrompt
-		}
-	}
-
-	// Build messages for LLM with optional error context
-	messages := prompts.BuildMessages(systemPrompt, history, "", errorContext)
-
-	// Track prompt tokens before sending to LLM
 	var promptTokens int
 	if a.tokenizer != nil {
 		promptTokens = a.tokenizer.CountMessagesTokens(messages)
 		agentDebugLog.Printf("Prompt tokens before send: %d", promptTokens)
 	}
 
-	// Check if we need to summarize conversation history
 	if summarized := a.attemptSummarization(ctx, promptTokens); summarized {
-		// Rebuild messages after summarization
 		history = a.memory.GetAll()
-		messages = prompts.BuildMessages(systemPrompt, history, "", errorContext)
+		messages = prompts.BuildMessages(systemMessages, history, "", memoryContext, errorContext)
 
-		// Recalculate tokens with updated messages
 		if a.tokenizer != nil {
 			promptTokens = a.tokenizer.CountMessagesTokens(messages)
 			agentDebugLog.Printf("Tokens after summarization: %d", promptTokens)
@@ -108,10 +84,32 @@ func (a *DefaultAgent) preparePrompt(ctx context.Context, errorContext string) *
 	}
 
 	return &promptContext{
-		systemPrompt: systemPrompt,
 		messages:     messages,
 		promptTokens: promptTokens,
 	}
+}
+
+// retrieveMemories returns long-term memories relevant to the current turn,
+// or "" when retrieval is disabled or nothing matches.
+func (a *DefaultAgent) retrieveMemories(ctx context.Context, history []*types.Message) string {
+	if a.retrievalEngine == nil {
+		return ""
+	}
+
+	a.cancelMu.Lock()
+	turnID := a.currentTurnID
+	a.cancelMu.Unlock()
+
+	// The most recent user message anchors the HyDE retrieval window.
+	var lastUserContent string
+	for i := len(history) - 1; i >= 0; i-- {
+		if history[i].Role == types.RoleUser {
+			lastUserContent = history[i].Content
+			break
+		}
+	}
+
+	return a.retrievalEngine.RetrieveForTurn(ctx, turnID, history, lastUserContent)
 }
 
 // callLLM sends the request to the LLM and processes the streaming response

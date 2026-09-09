@@ -115,6 +115,9 @@ Proposed → Accepted → [Deprecated or Superseded]
 | [0051](0051-tui-visual-redesign.md) | TUI Visual Redesign | Implemented |
 | [0052](0052-tui-viewport-spacer-height-fix.md) | TUI Viewport Spacer Height Fix | Implemented |
 | [0053](0053-multimodal-document-analysis.md) | Multimodal Document Analysis | Proposed |
+| [0054](0054-tui-markdown-rendering.md) | TUI Markdown Rendering for Agent Responses | Proposed |
+| [0055](0055-anthropic-native-provider.md) | Anthropic Native Provider | Proposed |
+| [0056](0056-prompt-caching-strategy.md) | Prompt Caching Strategy | Proposed |
 
 ## Resources
 

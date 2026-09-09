@@ -55,65 +55,76 @@ func (pb *PromptBuilder) WithBrowserGuidance(guidance string) *PromptBuilder {
 	return pb
 }
 
-// Build constructs the complete system prompt by assembling all sections
+// Build constructs the complete system prompt as a single string.
+// It is the concatenation of BuildSegments and is used where one string is
+// needed: display, snapshots, and token accounting.
 func (pb *PromptBuilder) Build() string {
+	return pb.staticSection() + pb.sessionSection()
+}
+
+// BuildSegments constructs the system prompt as ordered system messages tagged
+// by stability, for providers that place cache breakpoints. Content and order
+// are identical to Build; the split is at the first section that can change
+// during a session, the tool listing.
+func (pb *PromptBuilder) BuildSegments() []*types.Message {
+	return []*types.Message{
+		types.NewSystemMessage(pb.staticSection()).WithStability(types.StabilityStatic),
+		types.NewSystemMessage(pb.sessionSection()).WithStability(types.StabilitySession),
+	}
+}
+
+// staticSection holds everything that is fixed for the life of the process:
+// user instructions, repository context, and the base behavioral prompts.
+func (pb *PromptBuilder) staticSection() string {
 	var builder strings.Builder
 
-	// Add custom instructions if provided (these are user-provided instructions)
 	if pb.customInstructions != "" {
 		builder.WriteString("<custom_instructions>\n")
 		builder.WriteString(pb.customInstructions)
 		builder.WriteString("\n</custom_instructions>\n\n")
 	}
 
-	// Add repository context if provided (from AGENTS.md)
 	if pb.repositoryContext != "" {
 		builder.WriteString("<repository_context>\n")
 		builder.WriteString(pb.repositoryContext)
 		builder.WriteString("\n</repository_context>\n\n")
 	}
 
-	// Add system capabilities
 	builder.WriteString(SystemCapabilitiesPrompt)
 	builder.WriteString("\n\n")
-
-	// Add agent loop explanation
 	builder.WriteString(AgentLoopPrompt)
 	builder.WriteString("\n\n")
-
-	// Add chain of thought instructions
 	builder.WriteString(ChainOfThoughtPrompt)
 	builder.WriteString("\n\n")
-
-	// Add tool calling instructions
 	builder.WriteString(ToolCallingPrompt)
 	builder.WriteString("\n\n")
 
-	// Add available tools section
+	return builder.String()
+}
+
+// sessionSection holds the tool listing and everything after it. The rules
+// and guidance text here is itself fixed, but it follows the tool listing in
+// the prompt, so it can only be as stable as the section before it.
+func (pb *PromptBuilder) sessionSection() string {
+	var builder strings.Builder
+
 	if len(pb.tools) > 0 {
 		builder.WriteString("<available_tools>\n")
 		builder.WriteString(FormatToolSchemas(pb.tools))
 		builder.WriteString("</available_tools>\n\n")
 	}
 
-	// Add tool use rules
 	builder.WriteString(ToolUseRulesPrompt)
 	builder.WriteString("\n\n")
-
-	// Add scratchpad guidance
 	builder.WriteString(ScratchpadGuidancePrompt)
 	builder.WriteString("\n\n")
-
-	// Add custom tools guidance
 	builder.WriteString(CustomToolsGuidancePrompt)
 
-	// Add available custom tools list if provided
 	if pb.customToolsList != "" {
 		builder.WriteString("\n\n")
 		builder.WriteString(pb.customToolsList)
 	}
 
-	// Add browser automation guidance if provided
 	if pb.browserGuidance != "" {
 		builder.WriteString("\n\n")
 		builder.WriteString(pb.browserGuidance)
@@ -138,31 +149,35 @@ func normalizeRoleForLLM(msg *types.Message) *types.Message {
 	return &normalized
 }
 
-// BuildMessages creates a complete message list including system prompt and conversation history
-// The errorContext parameter allows passing ephemeral error messages to the agent without
-// storing them in permanent memory - useful for self-healing error recovery
-func BuildMessages(systemPrompt string, history []*types.Message, userMessage string, errorContext string) []*types.Message {
-	messages := make([]*types.Message, 0, len(history)+3)
+// BuildMessages creates the complete message list sent to the provider.
+//
+// System messages always come first and are contiguous, followed only by
+// conversation messages. Providers rely on that ordering to tell the system
+// segment apart from history when placing cache breakpoints.
+//
+// ephemeralContext entries are appended as user messages for this request only
+// and are never stored in memory: retrieved long-term memories and
+// error-recovery context. They sit after history so that history itself stays
+// byte-identical from one request to the next.
+func BuildMessages(systemMessages, history []*types.Message, userMessage string, ephemeralContext ...string) []*types.Message {
+	messages := make([]*types.Message, 0, len(systemMessages)+len(history)+len(ephemeralContext)+1)
+	messages = append(messages, systemMessages...)
 
-	// Add system message
-	messages = append(messages, types.NewSystemMessage(systemPrompt))
-
-	// Add conversation history (skip any existing system messages to avoid duplicates).
-	// RoleTool messages are remapped to RoleUser so XML-mode providers receive the
-	// expected format while memory retains the semantic role.
+	// Stale system messages in history are dropped so the builder's segments are
+	// the only system content. RoleTool is remapped to RoleUser so XML-mode
+	// providers receive the expected format while memory keeps the semantic role.
 	for _, msg := range history {
 		if msg.Role != types.RoleSystem {
 			messages = append(messages, normalizeRoleForLLM(msg))
 		}
 	}
 
-	// Add error context as ephemeral user message if provided
-	// This is NOT stored in memory - only used for this iteration
-	if errorContext != "" {
-		messages = append(messages, types.NewUserMessage(errorContext))
+	for _, content := range ephemeralContext {
+		if content != "" {
+			messages = append(messages, types.NewUserMessage(content))
+		}
 	}
 
-	// Add new user message if provided
 	if userMessage != "" {
 		messages = append(messages, types.NewUserMessage(userMessage))
 	}

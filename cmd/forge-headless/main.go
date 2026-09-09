@@ -25,7 +25,7 @@ import (
 	appconfig "github.com/entrhq/forge/pkg/config"
 	"github.com/entrhq/forge/pkg/executor/headless"
 	"github.com/entrhq/forge/pkg/llm"
-	"github.com/entrhq/forge/pkg/llm/openai"
+	"github.com/entrhq/forge/pkg/llm/factory"
 	"github.com/entrhq/forge/pkg/logging"
 	"github.com/entrhq/forge/pkg/security/workspace"
 	"github.com/entrhq/forge/pkg/tools/browser"
@@ -102,8 +102,8 @@ func main() {
 func parseFlags() *CLIConfig {
 	config := &CLIConfig{}
 
-	flag.StringVar(&config.APIKey, "api-key", os.Getenv("OPENAI_API_KEY"), "OpenAI API key")
-	flag.StringVar(&config.BaseURL, "base-url", os.Getenv("OPENAI_BASE_URL"), "OpenAI API base URL")
+	flag.StringVar(&config.APIKey, "api-key", "", "LLM API key (or set OPENAI_API_KEY / ANTHROPIC_API_KEY per provider, or FORGE_API_KEY for either)")
+	flag.StringVar(&config.BaseURL, "base-url", "", "LLM API base URL (or set OPENAI_BASE_URL / ANTHROPIC_BASE_URL per provider, or FORGE_BASE_URL for either)")
 	flag.StringVar(&config.Model, "model", defaultModel, "LLM model to use")
 	flag.StringVar(&config.ConfigFile, "config", "", "Path to configuration file (YAML)")
 	flag.StringVar(&config.Task, "task", "", "Task description (required if no config file)")
@@ -151,45 +151,10 @@ func run(ctx context.Context, cliConfig *CLIConfig) error {
 		return fmt.Errorf("failed to initialize configuration: %w", initErr)
 	}
 
-	// Determine final LLM configuration (CLI args override config file)
-	finalModel := cliConfig.Model
-	finalBaseURL := cliConfig.BaseURL
-	finalAPIKey := cliConfig.APIKey
-
-	// Override with config file values if CLI args are not provided
-	if llmConfig := appconfig.GetLLM(); llmConfig != nil {
-		if cliConfig.Model == defaultModel {
-			// CLI used default, check config
-			if configModel := llmConfig.GetModel(); configModel != "" {
-				finalModel = configModel
-			}
-		}
-		if cliConfig.BaseURL == "" {
-			// CLI didn't specify base URL, check config
-			if configBaseURL := llmConfig.GetBaseURL(); configBaseURL != "" {
-				finalBaseURL = configBaseURL
-			}
-		}
-		if cliConfig.APIKey == "" {
-			// CLI didn't specify API key, check config
-			if configAPIKey := llmConfig.GetAPIKey(); configAPIKey != "" {
-				finalAPIKey = configAPIKey
-			}
-		}
-	}
-
-	// Create LLM provider with final configuration
-	providerOpts := []openai.ProviderOption{
-		openai.WithModel(finalModel),
-	}
-
-	if finalBaseURL != "" {
-		providerOpts = append(providerOpts, openai.WithBaseURL(finalBaseURL))
-	}
-
-	provider, err := openai.NewProvider(finalAPIKey, providerOpts...)
+	// Resolve LLM settings with CLI flags > environment > config file > default precedence.
+	provider, err := factory.BuildProvider(cliConfig.Model, cliConfig.BaseURL, cliConfig.APIKey, defaultModel)
 	if err != nil {
-		return fmt.Errorf("failed to create LLM provider: %w", err)
+		return err
 	}
 
 	// Create context manager for long-running autonomous tasks

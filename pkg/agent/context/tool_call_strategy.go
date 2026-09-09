@@ -302,7 +302,8 @@ func (s *ToolCallSummarizationStrategy) summarizeBatch(ctx context.Context, grou
 	}
 
 	// Return as a single summarized message covering all groups
-	summary := types.NewAssistantMessage(fmt.Sprintf("[SUMMARIZED] %s", response.Content))
+	summary := types.NewAssistantMessage(fmt.Sprintf("[SUMMARIZED] %s", response.Content)).
+		WithStability(types.StabilitySession)
 	summary.WithMetadata("summarized", true)
 	summary.WithMetadata("original_message_count", len(groups))
 	summary.WithMetadata("original_group_count", len(groups))

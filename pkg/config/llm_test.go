@@ -281,3 +281,41 @@ func TestLLMSection_IntegrationWithManager(t *testing.T) {
 		assert.Equal(t, "sk-test", newSection.GetAPIKey())
 	})
 }
+
+func TestLLMSection_Provider(t *testing.T) {
+	section := NewLLMSection()
+	assert.Equal(t, ProviderOpenAI, section.GetProvider(), "empty provider resolves to openai")
+	assert.Equal(t, "", section.Data()["provider"], "unset provider is persisted as empty")
+
+	require.NoError(t, section.SetData(map[string]any{"provider": ProviderAnthropic}))
+	assert.Equal(t, ProviderAnthropic, section.GetProvider())
+	assert.Equal(t, ProviderAnthropic, section.Data()["provider"])
+	assert.NoError(t, section.Validate())
+
+	section.SetProvider("gemini")
+	assert.Error(t, section.Validate())
+
+	section.Reset()
+	assert.Equal(t, ProviderOpenAI, section.GetProvider())
+}
+
+func TestLLMSection_MaxTokens(t *testing.T) {
+	section := NewLLMSection()
+	assert.Equal(t, 0, section.GetMaxTokens())
+	assert.Equal(t, 0, section.Data()["max_tokens"])
+
+	for _, input := range []any{4096, float64(4096), "4096", " 4096 "} {
+		section.Reset()
+		require.NoError(t, section.SetData(map[string]any{"max_tokens": input}))
+		assert.Equal(t, 4096, section.GetMaxTokens(), "input %#v", input)
+	}
+
+	require.NoError(t, section.SetData(map[string]any{"max_tokens": "not a number"}))
+	assert.Equal(t, 4096, section.GetMaxTokens(), "unparseable input leaves the value unchanged")
+
+	section.SetMaxTokens(-1)
+	assert.Error(t, section.Validate())
+
+	section.Reset()
+	assert.Equal(t, 0, section.GetMaxTokens())
+}

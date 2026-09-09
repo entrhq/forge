@@ -14,7 +14,7 @@ import (
 	appconfig "github.com/entrhq/forge/pkg/config"
 	"github.com/entrhq/forge/pkg/executor/headless"
 	"github.com/entrhq/forge/pkg/llm"
-	"github.com/entrhq/forge/pkg/llm/openai"
+	"github.com/entrhq/forge/pkg/llm/factory"
 	"github.com/entrhq/forge/pkg/security/workspace"
 	"github.com/entrhq/forge/pkg/tools/browser"
 	"github.com/entrhq/forge/pkg/tools/coding"
@@ -52,7 +52,7 @@ func runHeadless(ctx context.Context, config *Config) error {
 	}
 
 	// Build the LLM provider, respecting config file and CLI flag precedence
-	provider, err := openai.BuildProvider(cliModel, cliBaseURL, cliAPIKey, defaultModel)
+	provider, err := factory.BuildProvider(cliModel, cliBaseURL, cliAPIKey, defaultModel)
 	if err != nil {
 		return err
 	}

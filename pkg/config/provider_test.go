@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/entrhq/forge/pkg/llm/openai"
+	"github.com/entrhq/forge/pkg/llm/factory"
 )
 
 func TestBuildProvider(t *testing.T) {
@@ -23,6 +23,26 @@ func TestBuildProvider(t *testing.T) {
 			os.Unsetenv("OPENAI_BASE_URL")
 		}
 	}()
+
+	// FORGE_API_KEY/FORGE_BASE_URL are a provider-neutral fallback (see
+	// pkg/llm/factory) and must be cleared for the "no API key" case to
+	// actually exercise the error path regardless of the outer shell env.
+	originalForgeAPIKey := os.Getenv("FORGE_API_KEY")
+	originalForgeBaseURL := os.Getenv("FORGE_BASE_URL")
+	defer func() {
+		if originalForgeAPIKey != "" {
+			os.Setenv("FORGE_API_KEY", originalForgeAPIKey)
+		} else {
+			os.Unsetenv("FORGE_API_KEY")
+		}
+		if originalForgeBaseURL != "" {
+			os.Setenv("FORGE_BASE_URL", originalForgeBaseURL)
+		} else {
+			os.Unsetenv("FORGE_BASE_URL")
+		}
+	}()
+	os.Unsetenv("FORGE_API_KEY")
+	os.Unsetenv("FORGE_BASE_URL")
 
 	tests := []struct {
 		name           string
@@ -116,7 +136,7 @@ func TestBuildProvider(t *testing.T) {
 			}
 
 			// Call BuildProvider
-			provider, err := openai.BuildProvider(tt.cliModel, tt.cliBaseURL, tt.cliAPIKey, tt.defaultModel)
+			provider, err := factory.BuildProvider(tt.cliModel, tt.cliBaseURL, tt.cliAPIKey, tt.defaultModel)
 
 			// Check error expectation
 			if tt.expectError {

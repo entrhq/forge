@@ -31,9 +31,9 @@ func GenerateXMLExample(schema map[string]any, toolName string) string {
 			}
 		}
 
-		// Generate example for each property
-		for propName, propValue := range properties {
-			propMap, ok := propValue.(map[string]any)
+		// Sorted so the example text is identical across requests (prompt caching).
+		for _, propName := range sortedKeys(properties) {
+			propMap, ok := properties[propName].(map[string]any)
 			if !ok {
 				continue
 			}

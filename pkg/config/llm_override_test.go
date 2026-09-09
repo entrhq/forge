@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/entrhq/forge/pkg/config"
-	"github.com/entrhq/forge/pkg/llm/openai"
+	"github.com/entrhq/forge/pkg/llm/factory"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -77,7 +77,7 @@ func TestBuildProvider(t *testing.T) {
 			err = config.Initialize(configPath)
 			require.NoError(t, err)
 
-			provider, err := openai.BuildProvider(tc.cliConfig.Model, tc.cliConfig.BaseURL, tc.cliConfig.APIKey, defaultTestModel)
+			provider, err := factory.BuildProvider(tc.cliConfig.Model, tc.cliConfig.BaseURL, tc.cliConfig.APIKey, defaultTestModel)
 
 			if tc.expectError {
 				require.Error(t, err)

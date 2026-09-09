@@ -318,7 +318,17 @@ These settings are typically managed via the `config.yaml` file or the TUI setti
 - **Description**: The model used by the `browser/analyze_page` tool for web page analysis. If not set, it defaults to the main agent model.
 - **Example**: `"anthropic/claude-haiku-3-5"`
 
-**Example `config.yaml`:**
+#### `provider`
+- **Type**: `string`
+- **Default**: `"openai"`
+- **Description**: Which wire protocol to use. `"openai"` speaks the OpenAI Chat Completions API and works with any OpenAI-compatible endpoint, including routers such as OpenRouter. `"anthropic"` speaks the native Anthropic Messages API and works against Anthropic directly or any endpoint implementing that API. The provider selects which environment variables are read first: `OPENAI_API_KEY`/`OPENAI_BASE_URL` or `ANTHROPIC_API_KEY`/`ANTHROPIC_BASE_URL`. `FORGE_API_KEY`/`FORGE_BASE_URL` are read after those and apply to either provider, for endpoints that serve both APIs from one credential. Full precedence: CLI flag > provider variable > `FORGE_*` variable > config file > default.
+
+#### `max_tokens`
+- **Type**: `integer`
+- **Default**: provider default (Anthropic: 64000 for streamed completions, 16000 for document analysis)
+- **Description**: Response token ceiling sent with each request. Only the Anthropic provider sends `max_tokens`; the OpenAI-compatible provider leaves it to the server. Lower it for models with a smaller output cap (older Claude 3 models cap at 4096) or to bound cost. `0` or unset means the provider default.
+
+**Example `config.yaml` (OpenAI-compatible router):**
 ```yaml
 llm:
   model: "anthropic/claude-sonnet-4.5"
@@ -326,6 +336,16 @@ llm:
   browser_analysis_model: "anthropic/claude-haiku-3-5"
   base_url: "https://openrouter.ai/api/v1"
   api_key: "sk-..."
+```
+
+**Example `config.yaml` (native Anthropic Messages API):**
+```yaml
+llm:
+  provider: "anthropic"
+  model: "claude-sonnet-4-5"
+  base_url: "https://api.anthropic.com"
+  api_key: "sk-ant-..."
+  max_tokens: 64000
 ```
 
 ---
