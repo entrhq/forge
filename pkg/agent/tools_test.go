@@ -129,3 +129,25 @@ func TestGetToolsList_ConditionalVisibility(t *testing.T) {
 		})
 	}
 }
+
+func TestGetToolsList_SortedByName(t *testing.T) {
+	agent := &DefaultAgent{tools: make(map[string]tools.Tool)}
+	for _, name := range []string{"write_file", "ask_question", "read_file", "execute_command"} {
+		agent.tools[name] = &mockRegularTool{name: name}
+	}
+
+	var got []string
+	for _, tool := range agent.getToolsList() {
+		got = append(got, tool.Name())
+	}
+
+	want := []string{"ask_question", "execute_command", "read_file", "write_file"}
+	if len(got) != len(want) {
+		t.Fatalf("expected %v, got %v", want, got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("expected %v, got %v", want, got)
+		}
+	}
+}

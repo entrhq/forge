@@ -3,6 +3,7 @@ package prompts
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/entrhq/forge/pkg/agent/tools"
@@ -33,9 +34,10 @@ func FormatToolSchema(tool tools.Tool) string {
 			}
 		}
 
-		// Format each property
-		for propName, propValue := range properties {
-			propMap, ok := propValue.(map[string]any)
+		// Properties are a map; iterate in sorted order so the prompt text is
+		// identical across requests, which prompt caching depends on.
+		for _, propName := range sortedKeys(properties) {
+			propMap, ok := properties[propName].(map[string]any)
 			if !ok {
 				continue
 			}
@@ -121,4 +123,14 @@ func SchemaToJSON(schema map[string]any) (string, error) {
 		return "", fmt.Errorf("failed to marshal schema: %w", err)
 	}
 	return string(jsonBytes), nil
+}
+
+// sortedKeys returns the map's keys in ascending order.
+func sortedKeys(m map[string]any) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
