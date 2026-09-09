@@ -1,6 +1,8 @@
 package config
 
 import (
+	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -78,15 +80,18 @@ func (s *MemorySection) Data() map[string]any {
 	}
 }
 
-// intFromAny converts a map value (int or float64) to int, returning false if
-// the value is absent or not a numeric type. JSON/YAML unmarshal produces
-// float64 for numbers, so both types must be handled.
+// intFromAny converts a map value to int, returning false if the value is
+// absent or not numeric. JSON/YAML unmarshal produces float64 for numbers and
+// the settings overlay submits text fields as strings, so all three are handled.
 func intFromAny(v any) (int, bool) {
 	switch n := v.(type) {
 	case int:
 		return n, true
 	case float64:
 		return int(n), true
+	case string:
+		i, err := strconv.Atoi(strings.TrimSpace(n))
+		return i, err == nil
 	default:
 		return 0, false
 	}
